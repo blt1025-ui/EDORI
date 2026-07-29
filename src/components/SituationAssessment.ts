@@ -1,5 +1,10 @@
-import { DemandSection } from "./assessment/DemandSection";
 import { TimeSection } from "./assessment/TimeSection";
+import { DemandSection } from "./assessment/DemandSection";
+import { HospitalSection } from "./assessment/HospitalSection";
+import { ResourcesSection } from "./assessment/ResourcesSection";
+import { ComplexitySection } from "./assessment/ComplexitySection";
+import { ForecastSection } from "./assessment/ForecastSection";
+
 
 export function SituationAssessment() {
 
@@ -7,19 +12,23 @@ export function SituationAssessment() {
 
 <div class="panel">
 
-<h2>Situation Assessment</h2>
+    <h2>Situation Assessment</h2>
 
-${TimeSection()}
+    ${TimeSection()}
 
-${DemandSection()}
+    ${DemandSection()}
 
-<div id="resource-section"></div>
+    ${HospitalSection()}
 
-<div id="complexity-section"></div>
+    ${ResourcesSection()}
+
+    ${ComplexitySection()}
+
+    ${ForecastSection()}
+
+  
 
 </div>
 
 `;
-
 }
-

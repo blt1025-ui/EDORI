@@ -1,29 +1,48 @@
-import { updateDemand } from "./UpdateDemand";
+import { updateHistoricalValues }
+from "./TimeService";
 
-export function registerEventHandlers() {
 
-    const ids = [
+export function registerEventHandlers(){
 
-        "occupiedBeds",
 
-        "hallwayPatients",
+const timeInputs = [
 
-        "waitingPatients"
+    "day",
 
-    ];
+    "hour"
 
-    ids.forEach(id => {
+];
 
-        const input = document.getElementById(id);
 
-        if (!input) return;
+timeInputs.forEach(id=>{
 
-        input.addEventListener("input", () => {
 
-            updateDemand();
+const element =
+document.getElementById(id);
 
-        });
 
-    });
+if(!element)
+{
+    console.warn(
+        `${id} selector not found`
+    );
+
+    return;
+}
+
+
+element.addEventListener(
+"change",
+()=>{
+
+    updateHistoricalValues();
+
+}
+
+);
+
+
+});
+
 
 }

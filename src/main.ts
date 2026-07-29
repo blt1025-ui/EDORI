@@ -10,4 +10,6 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = App();
 
 registerEventHandlers();
 
+updateHistoricalValues();
+
 updateDemand();

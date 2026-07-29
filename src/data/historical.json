@@ -1,4 +1,52 @@
-history.find(x =>
-    x.day === "Monday" &&
-    x.hour === 14
-);
+[
+  {
+    "day": "Monday",
+    "hour": 0,
+    "expectedVolume": 55,
+    "expectedBoarders": 30,
+    "expectedRN": 12,
+    "expectedMD": 3,
+    "expectedArrivals": 4,
+    "expectedDepartures": 5
+  },
+  {
+    "day": "Monday",
+    "hour": 1,
+    "expectedVolume": 53,
+    "expectedBoarders": 31,
+    "expectedRN": 12,
+    "expectedMD": 3,
+    "expectedArrivals": 3,
+    "expectedDepartures": 5
+  },
+  {
+    "day": "Monday",
+    "hour": 2,
+    "expectedVolume": 50,
+    "expectedBoarders": 32,
+    "expectedRN": 10,
+    "expectedMD": 2,
+    "expectedArrivals": 3,
+    "expectedDepartures": 4
+  },
+  {
+    "day": "Monday",
+    "hour": 3,
+    "expectedVolume": 48,
+    "expectedBoarders": 33,
+    "expectedRN": 10,
+    "expectedMD": 2,
+    "expectedArrivals": 2,
+    "expectedDepartures": 4
+  },
+  {
+    "day": "Monday",
+    "hour": 4,
+    "expectedVolume": 46,
+    "expectedBoarders": 34,
+    "expectedRN": 10,
+    "expectedMD": 2,
+    "expectedArrivals": 2,
+    "expectedDepartures": 3
+  }
+]

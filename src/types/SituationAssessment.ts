@@ -1,31 +1,36 @@
 export interface SituationAssessment {
 
-    day: string;
+    day:string;
 
-    hour: number;
+    hour:number;
 
-    occupiedBeds: number;
 
-    hallwayPatients: number;
+    totalEDVolume:number;
 
-    waitingPatients: number;
+    boardedPatients:number;
 
-    boardedPatients: number;
 
-    occupiedMedicalBeds: number;
+    occupiedMedicalBeds:number;
 
-    currentRN: number;
 
-    currentMD: number;
+    currentRN:number;
 
-    esi1: number;
+    currentMD:number;
 
-    esi2: number;
 
-    esi3: number;
+    esi1:number;
 
-    esi4: number;
+    esi2:number;
 
-    esi5: number;
+    esi3:number;
+
+    esi4:number;
+
+    esi5:number;
+
+
+    expectedArrivals:number;
+
+    expectedDepartures:number;
 
 }

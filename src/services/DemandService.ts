@@ -1,28 +1,29 @@
 import { defaultSettings } from "../config/defaultSettings";
 
 export interface DemandResult {
-    totalVolume: number;
-    occupancyRatio: number;
+
+    occupancyRatio:number;
+
+    boardingPercent:number;
+
 }
 
 export function calculateDemand(
-    occupiedBeds: number,
-    hallwayPatients: number,
-    waitingPatients: number
-): DemandResult {
 
-    const totalVolume =
-        occupiedBeds +
-        hallwayPatients +
-        waitingPatients;
+    totalEDVolume:number,
 
-    const occupancyRatio =
-        totalVolume /
-        defaultSettings.edCapacity;
+    boardedPatients:number
 
-    return {
-        totalVolume,
-        occupancyRatio
+):DemandResult{
+
+    return{
+
+        occupancyRatio:
+            totalEDVolume/defaultSettings.edCapacity,
+
+        boardingPercent:
+            boardedPatients/Math.max(totalEDVolume,1)
+
     };
 
 }

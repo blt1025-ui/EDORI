@@ -1,109 +1,96 @@
 export function DemandSection() {
 
-    return `
+return `
 
-    <div class="assessment-card">
+<div class="assessment-card">
 
-        <h3>👥 ED Demand</h3>
+<h3>👥 ED Demand</h3>
 
-        <div class="input-group">
+<div class="input-group">
 
-            <label for="occupiedBeds">
-                Occupied Treatment Spaces
-            </label>
+<label>Total ED Volume</label>
 
-            <input
-                type="number"
-                id="occupiedBeds"
-                value="0"
-                min="0"
-            
->
+<input
+type="number"
+id="totalEDVolume"
+value="0"
+min="0">
 
-        </div>
+</div>
 
-        <div class="input-group">
+<div class="input-group">
 
-            <label for="hallwayPatients">
-                Hallway Patients
-            </label>
+<label>Boarding Patients</label>
 
-            <input
-                type="number"
-                id="hallwayPatients"
-                value="0"
-                min="0"
-                
-                >
+<input
+type="number"
+id="boardedPatients"
+value="0"
+min="0">
 
-        </div>
+</div>
 
-        <div class="input-group">
+<hr>
 
-            <label for="waitingPatients">
-                Waiting Room Patients
-            </label>
+<div class="calculated-row">
 
-            <input
-                type="number"
-                id="waitingPatients"
-                value="0"
-                min="0"
-                
-                >
+<span>ED Occupancy</span>
 
-        </div>
+<strong id="occupancyRatio">
 
-        <div class="input-group">
+--
 
-            <label for="boardedPatients">
-                Boarding Patients
-            </label>
+</strong>
 
-            <input
-                type="number"
-                id="boardedPatients"
-                value="0"
-                min="0">
+</div>
 
-        </div>
+<div class="calculated-row">
 
-        <hr>
+<span>Projected ED Volume</span>
 
-        <div class="calculated-row">
+<strong id="projectedVolume">
 
-            <span>Total ED Volume</span>
+--
 
-            <strong id="totalVolume">
+</strong>
 
-                --
+<div class="calculated-row">
 
-            </strong>
+<span>Expected ED Volume</span>
 
-        </div>
+<strong id="expectedVolume">
+--
+</strong>
 
-        <div class="calculated-row">
+</div>
 
-            <span>ED Occupancy Ratio</span>
 
-            <strong id="occupancyRatio" class="status-normal">--</strong>
+<div class="calculated-row">
 
-        </div>
+<span>Expected Boarders</span>
 
-        <div class="calculated-row">
+<strong id="expectedBoarders">
+--
+</strong>
 
-            <span>Projected ED Volume</span>
+</div>
 
-            <strong id="projectedVolume">
+</div>
 
-                --
+<div class="calculated-row">
 
-            </strong>
+<span>Boarding %</span>
 
-        </div>
+<strong id="boardingPercent">
 
-    </div>
+--
 
-    `;
+</strong>
+
+</div>
+
+</div>
+
+`;
 
 }

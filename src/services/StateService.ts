@@ -1,24 +1,27 @@
-import type { SituationAssessment } from "../types/SituationAssessment";
+import type { SituationAssessment } 
+from "../types/SituationAssessment";
 
-let state: SituationAssessment = {
+
+let currentState: SituationAssessment = {
+
 
     day: "Monday",
 
     hour: 0,
 
-    occupiedBeds: 0,
 
-    hallwayPatients: 0,
-
-    waitingPatients: 0,
+    totalEDVolume: 0,
 
     boardedPatients: 0,
 
+
     occupiedMedicalBeds: 0,
+
 
     currentRN: 0,
 
     currentMD: 0,
+
 
     esi1: 0,
 
@@ -28,25 +31,37 @@ let state: SituationAssessment = {
 
     esi4: 0,
 
-    esi5: 0
+    esi5: 0,
+
+
+    expectedArrivals: 0,
+
+    expectedDepartures: 0
 
 };
 
-export function getState() {
 
-    return state;
+
+export function getState(){
+
+    return currentState;
 
 }
 
+
+
 export function updateState(
-    partial: Partial<SituationAssessment>
-) {
 
-    state = {
+    updates:
+    Partial<SituationAssessment>
 
-        ...state,
+){
 
-        ...partial
+    currentState = {
+
+        ...currentState,
+
+        ...updates
 
     };
 

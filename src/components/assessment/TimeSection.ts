@@ -1,73 +1,263 @@
 export function TimeSection() {
 
-    const days = [
-
-        "Monday",
-
-        "Tuesday",
-
-        "Wednesday",
-
-        "Thursday",
-
-        "Friday",
-
-        "Saturday",
-
-        "Sunday"
-
-    ];
-
-    const dayOptions = days.map(day =>
-
-        `<option value="${day}">${day}</option>`
-
-    ).join("");
-
-    const hourOptions = Array
-        .from({ length: 24 }, (_, hour) => {
-
-            const label = hour
-                .toString()
-                .padStart(2, "0") + ":00";
-
-            return `<option value="${hour}">${label}</option>`;
-
-        })
-        .join("");
-
     return `
 
-<div class="assessment-card">
+    <div class="assessment-card">
 
-<h3>📅 Time</h3>
+        <h3>📅 Time Selection</h3>
 
-<div class="input-group">
 
-<label>Day</label>
+        <div class="input-row">
 
-<select id="day">
+            <label for="day">
+                Day of Week
+            </label>
 
-${dayOptions}
 
-</select>
+            <select id="day">
 
-</div>
+                <option value="Monday">
+                    Monday
+                </option>
 
-<div class="input-group">
+                <option value="Tuesday">
+                    Tuesday
+                </option>
 
-<label>Hour</label>
+                <option value="Wednesday">
+                    Wednesday
+                </option>
 
-<select id="hour">
+                <option value="Thursday">
+                    Thursday
+                </option>
 
-${hourOptions}
+                <option value="Friday">
+                    Friday
+                </option>
 
-</select>
+                <option value="Saturday">
+                    Saturday
+                </option>
 
-</div>
+                <option value="Sunday">
+                    Sunday
+                </option>
 
-</div>
+            </select>
 
-`;
+        </div>
+
+
+
+        <div class="input-row">
+
+            <label for="hour">
+                Hour of Day
+            </label>
+
+
+            <select id="hour">
+
+                <option value="0">
+                    00:00
+                </option>
+
+                <option value="1">
+                    01:00
+                </option>
+
+                <option value="2">
+                    02:00
+                </option>
+
+                <option value="3">
+                    03:00
+                </option>
+
+                <option value="4">
+                    04:00
+                </option>
+
+                <option value="5">
+                    05:00
+                </option>
+
+                <option value="6">
+                    06:00
+                </option>
+
+                <option value="7">
+                    07:00
+                </option>
+
+                <option value="8">
+                    08:00
+                </option>
+
+                <option value="9">
+                    09:00
+                </option>
+
+                <option value="10">
+                    10:00
+                </option>
+
+                <option value="11">
+                    11:00
+                </option>
+
+                <option value="12">
+                    12:00
+                </option>
+
+                <option value="13">
+                    13:00
+                </option>
+
+                <option value="14">
+                    14:00
+                </option>
+
+                <option value="15">
+                    15:00
+                </option>
+
+                <option value="16">
+                    16:00
+                </option>
+
+                <option value="17">
+                    17:00
+                </option>
+
+                <option value="18">
+                    18:00
+                </option>
+
+                <option value="19">
+                    19:00
+                </option>
+
+                <option value="20">
+                    20:00
+                </option>
+
+                <option value="21">
+                    21:00
+                </option>
+
+                <option value="22">
+                    22:00
+                </option>
+
+                <option value="23">
+                    23:00
+                </option>
+
+            </select>
+
+        </div>
+
+
+
+        <div class="calculated-section">
+
+
+            <h4>
+                Historical Expectations
+            </h4>
+
+
+
+            <div class="calculated-row">
+
+                <span>
+                    Expected ED Volume
+                </span>
+
+                <strong id="expectedVolume">
+                    --
+                </strong>
+
+            </div>
+
+
+
+            <div class="calculated-row">
+
+                <span>
+                    Expected Boarders
+                </span>
+
+                <strong id="expectedBoarders">
+                    --
+                </strong>
+
+            </div>
+
+
+
+            <div class="calculated-row">
+
+                <span>
+                    Expected RNs
+                </span>
+
+                <strong id="expectedRN">
+                    --
+                </strong>
+
+            </div>
+
+
+
+            <div class="calculated-row">
+
+                <span>
+                    Expected Physicians
+                </span>
+
+                <strong id="expectedMD">
+                    --
+                </strong>
+
+            </div>
+
+
+
+            <div class="calculated-row">
+
+                <span>
+                    Expected Arrivals
+                </span>
+
+                <strong id="expectedArrivals">
+                    --
+                </strong>
+
+            </div>
+
+
+
+            <div class="calculated-row">
+
+                <span>
+                    Expected Departures
+                </span>
+
+                <strong id="expectedDepartures">
+                    --
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+    `;
 
 }

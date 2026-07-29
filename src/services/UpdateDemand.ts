@@ -1,27 +1,24 @@
-import { calculateDemand } from "./DemandService";
 import { numberValue } from "./DomService";
+import { calculateDemand } from "./DemandService";
+import { defaultSettings } from "../config/defaultSettings";
 
 export function updateDemand() {
 
-    const occupiedBeds = numberValue("occupiedBeds");
-
-const hallwayPatients = numberValue("hallwayPatients");
-
-const waitingPatients = numberValue("waitingPatients");
+    const totalVolume = numberValue("totalEDVolume");
+    const boardedPatients = numberValue("boardedPatients");
 
     const result = calculateDemand(
-        occupiedBeds,
-        hallwayPatients,
-        waitingPatients
+        totalVolume,
+        boardedPatients
     );
 
-    document.getElementById("totalVolume")!.textContent =
-        result.totalVolume.toString();
+    document.getElementById("volumeCard")!.textContent =
+        totalVolume.toString();
 
     document.getElementById("occupancyRatio")!.textContent =
-    `${result.totalVolume}/63 (${(result.occupancyRatio * 100).toFixed(0)}%)`;
+        `${totalVolume}/${defaultSettings.edCapacity} (${(result.occupancyRatio * 100).toFixed(0)}%)`;
 
-    document.getElementById("volumeCard")!.textContent =
-        result.totalVolume.toString();
+    document.getElementById("boardingPercent")!.textContent =
+        `${(result.boardingPercent * 100).toFixed(0)}%`;
 
 }
