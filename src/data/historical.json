@@ -1,0 +1,4 @@
+history.find(x =>
+    x.day === "Monday" &&
+    x.hour === 14
+);

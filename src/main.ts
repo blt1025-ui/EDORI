@@ -1,19 +1,13 @@
-import './styles/style.css';
+import "./styles/style.css";
 
-import { Header } from "./components/Header";
-import { Sidebar } from "./components/Sidebar";
-import { Dashboard } from "./components/Dashboard";
+import { App } from "./components/App";
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
+import { registerEventHandlers } from "./services/EventService";
 
-${Header()}
+import { updateDemand } from "./services/UpdateDemand";
 
-<div class="main-layout">
+document.querySelector<HTMLDivElement>("#app")!.innerHTML = App();
 
-    ${Sidebar()}
+registerEventHandlers();
 
-    ${Dashboard()}
-
-</div>
-
-`;
+updateDemand();
