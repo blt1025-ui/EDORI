@@ -1,34 +1,43 @@
-import { TimeSection } from "./assessment/TimeSection";
-import { DemandSection } from "./assessment/DemandSection";
-import { HospitalSection } from "./assessment/HospitalSection";
-import { ResourcesSection } from "./assessment/ResourcesSection";
-import { ComplexitySection } from "./assessment/ComplexitySection";
-import { ForecastSection } from "./assessment/ForecastSection";
+export interface SituationAssessment {
+    /*
+     * Time
+     */
+    day: string;
+    hour: number;
 
+    /*
+     * ED Demand
+     */
+    totalEDVolume: number;
+    boardedPatients: number;
 
-export function SituationAssessment() {
+    /*
+     * Hospital Capacity
+     */
+    occupiedMedicalBeds: number;
 
-    return `
+    /*
+     * Clinical Capacity
+     */
+    currentRN: number;
+    currentMD: number;
 
-<div class="panel">
+    /*
+     * Patient Acuity (ESI Distribution)
+     */
+    esi1: number;
+    esi2: number;
+    esi3: number;
+    esi4: number;
+    esi5: number;
 
-    <h2>Situation Assessment</h2>
-
-    ${TimeSection()}
-
-    ${DemandSection()}
-
-    ${HospitalSection()}
-
-    ${ResourcesSection()}
-
-    ${ComplexitySection()}
-
-    ${ForecastSection()}
-
-  
-
-</div>
-
-`;
+    /*
+     * Historical Expectations
+     */
+    expectedVolume: number;
+    expectedBoarders: number;
+    expectedRN: number;
+    expectedMD: number;
+    expectedArrivals: number;
+    expectedDepartures: number;
 }

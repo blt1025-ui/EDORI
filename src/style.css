@@ -1,0 +1,682 @@
+/**
+ * EDORI Application Styles
+ *
+ * Main dashboard styling
+ */
+
+
+/* =========================
+   Global Reset
+========================= */
+
+
+* {
+
+    box-sizing: border-box;
+
+}
+
+
+
+body {
+
+    margin: 0;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background: #f4f6f8;
+
+    color: #222;
+
+}
+
+
+
+
+h1,
+h2,
+h3 {
+
+    margin-top: 0;
+
+}
+
+
+
+
+
+/* =========================
+   Application Layout
+========================= */
+
+
+.main-layout {
+
+    display: flex;
+
+    min-height: 100vh;
+
+}
+
+
+
+
+
+/* =========================
+   Header
+========================= */
+
+
+.header {
+
+    height: 60px;
+
+    background: #12355b;
+
+    color: white;
+
+    display: flex;
+
+    align-items: center;
+
+    padding: 0 25px;
+
+    font-size: 22px;
+
+    font-weight: bold;
+
+}
+
+
+
+
+
+/* =========================
+   Sidebar
+========================= */
+
+
+.sidebar {
+
+    width: 240px;
+
+    background: #1f2937;
+
+    color: white;
+
+    padding: 20px;
+
+}
+
+
+
+
+.sidebar-item {
+
+    padding: 12px;
+
+    margin-bottom: 8px;
+
+    border-radius: 6px;
+
+}
+
+
+
+
+
+/* =========================
+   Dashboard
+========================= */
+
+
+.dashboard {
+
+    flex: 1;
+
+    padding: 25px;
+
+}
+
+
+
+
+
+.dashboard-header {
+
+    margin-bottom: 20px;
+
+}
+
+
+
+
+
+.dashboard-grid {
+
+    display: grid;
+
+    grid-template-columns:
+
+        minmax(400px, 1fr)
+
+        minmax(350px, .8fr);
+
+    gap: 20px;
+
+}
+
+
+
+
+
+.left-column,
+.right-column {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 20px;
+
+}
+
+
+
+
+
+/* =========================
+   Status Banner
+========================= */
+
+
+.status-banner {
+
+    padding: 15px;
+
+    border-radius: 8px;
+
+    background: #d1fae5;
+
+    color: #065f46;
+
+    font-weight: bold;
+
+    margin-bottom: 15px;
+
+    text-align: center;
+
+}
+
+
+
+
+
+/* =========================
+   Summary Cards
+========================= */
+
+
+.summary-cards {
+
+    display: grid;
+
+    grid-template-columns:
+
+        repeat(4,1fr);
+
+    gap:15px;
+
+    margin-bottom:20px;
+
+}
+
+
+
+
+
+.summary-card {
+
+    background:white;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    box-shadow:
+        0 2px 5px
+        rgba(0,0,0,.1);
+
+}
+
+
+
+
+
+/* =========================
+   Assessment Sections
+========================= */
+
+
+.situation-assessment {
+
+    background:white;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    box-shadow:
+        0 2px 5px
+        rgba(0,0,0,.1);
+
+}
+
+
+
+
+
+.assessment-section {
+
+    border-top:
+
+        1px solid #ddd;
+
+    padding-top:15px;
+
+    margin-top:15px;
+
+}
+
+
+
+
+
+.section-header {
+
+    margin-bottom:20px;
+
+}
+
+
+
+
+
+.input-grid {
+
+    display:grid;
+
+    grid-template-columns:
+
+        repeat(2,1fr);
+
+    gap:15px;
+
+}
+
+
+
+
+
+.input-group {
+
+    display:flex;
+
+    flex-direction:column;
+
+}
+
+
+
+
+
+.input-group label {
+
+    font-size:14px;
+
+    font-weight:bold;
+
+    margin-bottom:5px;
+
+}
+
+
+
+
+
+.input-group input {
+
+    padding:10px;
+
+    border:
+
+        1px solid #ccc;
+
+    border-radius:6px;
+
+    font-size:16px;
+
+}
+
+
+
+
+
+.input-group input:focus {
+
+    outline:none;
+
+    border-color:#2563eb;
+
+}
+
+
+
+
+
+/* =========================
+   Metric Cards
+========================= */
+
+
+.metric-grid {
+
+    display:grid;
+
+    grid-template-columns:
+
+        repeat(2,1fr);
+
+    gap:15px;
+
+}
+
+
+
+
+
+.metric-card {
+
+    background:#f8fafc;
+
+    padding:15px;
+
+    border-radius:8px;
+
+    text-align:center;
+
+}
+
+
+
+
+
+.metric-card span {
+
+    display:block;
+
+    font-size:13px;
+
+    color:#666;
+
+}
+
+
+
+
+
+.metric-card strong {
+
+    display:block;
+
+    font-size:28px;
+
+    margin-top:8px;
+
+}
+
+
+
+
+
+/* =========================
+   Gauge
+========================= */
+
+
+.gauge-container {
+
+    background:white;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    text-align:center;
+
+    box-shadow:
+        0 2px 5px
+        rgba(0,0,0,.1);
+
+}
+
+
+
+
+
+.gauge {
+
+    padding:30px;
+
+}
+
+
+
+
+
+.gauge-value {
+
+    font-size:60px;
+
+    font-weight:bold;
+
+}
+
+
+
+
+
+.gauge-status {
+
+    margin-top:10px;
+
+    font-size:20px;
+
+    font-weight:bold;
+
+}
+
+
+
+
+
+/* =========================
+   Drivers
+========================= */
+
+
+.drivers-container,
+.recommendations-container,
+.trend-container {
+
+    background:white;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    box-shadow:
+        0 2px 5px
+        rgba(0,0,0,.1);
+
+}
+
+
+
+
+
+.driver-card {
+
+    background:#f8fafc;
+
+    padding:12px;
+
+    margin-bottom:10px;
+
+    border-radius:6px;
+
+    border-left:
+
+        5px solid #2563eb;
+
+}
+
+
+
+
+
+.driver-card strong {
+
+    display:block;
+
+}
+
+
+
+
+
+/* =========================
+   Recommendations
+========================= */
+
+
+.recommendation-card {
+
+    background:#f8fafc;
+
+    padding:12px;
+
+    margin-bottom:10px;
+
+    border-radius:6px;
+
+    border-left:
+
+        5px solid #16a34a;
+
+}
+
+
+
+
+
+/* =========================
+   Trend Chart
+========================= */
+
+
+.trend-history {
+
+    display:flex;
+
+    gap:8px;
+
+    margin-top:15px;
+
+    flex-wrap:wrap;
+
+}
+
+
+
+
+
+.trend-history span {
+
+    background:#e5e7eb;
+
+    padding:8px 12px;
+
+    border-radius:5px;
+
+}
+
+
+
+
+
+/* =========================
+   Responsive Design
+========================= */
+
+
+@media(max-width:1100px){
+
+
+    .dashboard-grid {
+
+        grid-template-columns:1fr;
+
+    }
+
+
+
+    .summary-cards {
+
+        grid-template-columns:
+
+            repeat(2,1fr);
+
+    }
+
+
+}
+
+
+
+
+
+@media(max-width:700px){
+
+
+    .main-layout {
+
+        flex-direction:column;
+
+    }
+
+
+
+    .sidebar {
+
+        width:100%;
+
+    }
+
+
+
+    .input-grid,
+    .metric-grid,
+    .summary-cards {
+
+        grid-template-columns:
+
+            1fr;
+
+    }
+
+
+}

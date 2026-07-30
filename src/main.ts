@@ -1,15 +1,18 @@
-import "./styles/style.css";
+import "./style.css";
 
 import { App } from "./components/App";
 
-import { registerEventHandlers } from "./services/EventService";
 
-import { updateDemand } from "./services/UpdateDemand";
+const appElement = document.getElementById("app");
 
-document.querySelector<HTMLDivElement>("#app")!.innerHTML = App();
 
-registerEventHandlers();
+if(!appElement){
 
-updateHistoricalValues();
+    throw new Error(
+        "Application root element (#app) not found."
+    );
 
-updateDemand();
+}
+
+
+appElement.innerHTML = App();

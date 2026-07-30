@@ -1,61 +1,259 @@
-export function ResourcesSection(){
+/**
+ * ResourcesSection
+ *
+ * Captures current clinical resources.
+ *
+ * Clinical capacity is evaluated using:
+ *
+ * RN staffing
+ * +
+ * Physician staffing
+ *
+ * in relation to:
+ *
+ * ED volume
+ * +
+ * patient acuity
+ */
 
-return`
 
-<div class="assessment-card">
+import { updateState }
+from "../../services/StateService";
 
-<h3>👨‍⚕️ Clinical Resources</h3>
 
-<div class="input-group">
+import { emit }
+from "../../services/EventService";
 
-<label>Current RNs</label>
 
-<input
-type="number"
-id="currentRN"
-value="0">
 
-</div>
+export function ResourcesSection(): string {
 
-<div class="input-group">
 
-<label>Current Physicians</label>
+    return `
 
-<input
-type="number"
-id="currentMD"
-value="0">
 
-</div>
+    <section class="assessment-section">
 
-<hr>
 
-<div class="calculated-row">
+        <h3>
+            Clinical Resources
+        </h3>
 
-<span>Expected RNs</span>
 
-<strong id="expectedRN">
 
---
 
-</strong>
+        <div class="input-grid">
 
-</div>
 
-<div class="calculated-row">
 
-<span>Expected Physicians</span>
+            <div class="input-group">
 
-<strong id="expectedMD">
 
---
+                <label>
+                    Current RN Staffing
+                </label>
 
-</strong>
 
-</div>
+                <input
 
-</div>
+                    id="edori-current-rn"
 
-`;
+                    type="number"
+
+                    min="0"
+
+                    value="0"
+
+                />
+
+
+                <small>
+                    Registered nurses currently assigned
+                </small>
+
+
+            </div>
+
+
+
+
+
+            <div class="input-group">
+
+
+                <label>
+                    Current Physician Staffing
+                </label>
+
+
+                <input
+
+                    id="edori-current-md"
+
+                    type="number"
+
+                    min="0"
+
+                    value="0"
+
+                />
+
+
+                <small>
+                    Physicians or equivalent providers currently assigned
+                </small>
+
+
+            </div>
+
+
+
+        </div>
+
+
+    </section>
+
+
+    `;
+
+}
+
+
+
+
+
+
+
+/**
+ * Connect resource inputs
+ * to application state.
+ */
+export function initializeResourcesSection():void {
+
+
+
+    const rnInput =
+
+        document.getElementById(
+
+            "edori-current-rn"
+
+        ) as HTMLInputElement;
+
+
+
+
+
+    const mdInput =
+
+        document.getElementById(
+
+            "edori-current-md"
+
+        ) as HTMLInputElement;
+
+
+
+
+
+
+    if(
+
+        !rnInput ||
+
+        !mdInput
+
+    ){
+
+        return;
+
+    }
+
+
+
+
+
+
+
+    function updateResources(){
+
+
+
+        const currentRN =
+
+            Number(
+
+                rnInput.value
+
+            ) || 0;
+
+
+
+
+
+        const currentMD =
+
+            Number(
+
+                mdInput.value
+
+            ) || 0;
+
+
+
+
+
+
+        updateState({
+
+
+            currentRN,
+
+
+            currentMD
+
+
+        });
+
+
+
+
+
+
+        emit(
+
+            "stateChanged"
+
+        );
+
+
+    }
+
+
+
+
+
+
+    rnInput.addEventListener(
+
+        "input",
+
+        updateResources
+
+    );
+
+
+
+
+
+    mdInput.addEventListener(
+
+        "input",
+
+        updateResources
+
+    );
+
+
 
 }

@@ -1,32 +1,69 @@
-import { getHistoricalRecord } from "./HistoricalService";
+/**
+ * TimeService
+ *
+ * Handles changes to the selected day and hour.
+ *
+ * Responsibilities:
+ * 1. Update the current selected time
+ * 2. Retrieve historical expectations
+ * 3. Populate expected operational values
+ */
 
 
-export function updateHistoricalValues() {
+import { getHistoricalRecord } 
+from "./HistoricalService";
 
 
-    const dayElement = document.getElementById("day");
-
-    const hourElement = document.getElementById("hour");
-
-
-    if (!dayElement || !hourElement) {
-
-        console.warn("Time selectors not found");
-
-        return;
-
-    }
+import { updateState } 
+from "./StateService";
 
 
-    const day = 
-        (dayElement as HTMLSelectElement).value;
+
+/**
+ * Updates the selected operational time.
+ *
+ * Example:
+ *
+ * setOperationalTime(
+ *     "Monday",
+ *     14
+ * );
+ *
+ * This will update:
+ *
+ * day = Monday
+ * hour = 14
+ *
+ * and populate the expected baseline values.
+ */
+
+export function setOperationalTime(
+
+    day: string,
+
+    hour: number
+
+): void {
 
 
-    const hour =
-        Number(
-            (hourElement as HTMLSelectElement).value
-        );
 
+    /*
+     * Update current selected time
+     */
+
+    updateState({
+
+        day,
+
+        hour
+
+    });
+
+
+
+    /*
+     * Retrieve historical expectation
+     */
 
     const historical =
         getHistoricalRecord(
@@ -34,8 +71,12 @@ export function updateHistoricalValues() {
             hour
         );
 
-       
 
+
+    /*
+     * If no historical data exists,
+     * leave expected values unchanged.
+     */
 
     if (!historical) {
 
@@ -48,112 +89,35 @@ export function updateHistoricalValues() {
     }
 
 
-    updateText(
-        "expectedVolume",
-        historical.expectedVolume
-    );
+
+    /*
+     * Populate expected operational values
+     */
+
+    updateState({
+
+        expectedVolume:
+            historical.expectedVolume,
 
 
-    updateText(
-        "expectedBoarders",
-        historical.expectedBoarders
-    );
+        expectedBoarders:
+            historical.expectedBoarders,
 
 
-    updateText(
-        "expectedRN",
-        historical.expectedRN
-    );
+        expectedRN:
+            historical.expectedRN,
 
 
-    updateText(
-        "expectedMD",
-        historical.expectedMD
-    );
+        expectedMD:
+            historical.expectedMD,
 
 
-    updateText(
-        "expectedArrivals",
-        historical.expectedArrivals
-    );
+        expectedArrivals:
+            historical.expectedArrivals,
 
 
-    updateText(
-        "expectedDepartures",
-        historical.expectedDepartures
-    );
-
-}
-
-
-
-function updateText(
-
-    elementID:string,
-
-    value:number
-
-) {
-
-
-    const element =
-        document.getElementById(elementID);
-
-
-    if (!element) {
-
-        return;
-
-    }
-
-
-    element.textContent =
-        value.toString();
-
-}
-
-
-
-/*
-Clear values if no historical
-data exists
-*/
-
-function clearHistoricalDisplay(){
-
-
-    const fields = [
-
-        "expectedVolume",
-
-        "expectedBoarders",
-
-        "expectedRN",
-
-        "expectedMD",
-
-        "expectedArrivals",
-
-        "expectedDepartures"
-
-    ];
-
-
-
-    fields.forEach(id=>{
-
-
-        const element =
-            document.getElementById(id);
-
-
-
-        if(element){
-
-            element.textContent = "--";
-
-        }
-
+        expectedDepartures:
+            historical.expectedDepartures
 
     });
 

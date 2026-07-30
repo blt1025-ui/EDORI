@@ -1,254 +1,107 @@
-export function TimeSection() {
+/**
+ * TimeSection
+ *
+ * User interface component for selecting
+ * the operational day and hour.
+ *
+ * Selecting a time automatically loads
+ * historical expectations.
+ */
+
+
+import { setOperationalTime }
+from "../../services/TimeService";
+
+
+
+import { emit }
+from "../../services/EventService";
+
+
+
+export function TimeSection(): string {
+
 
     return `
 
-    <div class="assessment-card">
-
-        <h3>📅 Time Selection</h3>
+    <section class="assessment-section">
 
 
-        <div class="input-row">
-
-            <label for="day">
-                Day of Week
-            </label>
+        <h3>
+            Operational Time
+        </h3>
 
 
-            <select id="day">
-
-                <option value="Monday">
-                    Monday
-                </option>
-
-                <option value="Tuesday">
-                    Tuesday
-                </option>
-
-                <option value="Wednesday">
-                    Wednesday
-                </option>
-
-                <option value="Thursday">
-                    Thursday
-                </option>
-
-                <option value="Friday">
-                    Friday
-                </option>
-
-                <option value="Saturday">
-                    Saturday
-                </option>
-
-                <option value="Sunday">
-                    Sunday
-                </option>
-
-            </select>
-
-        </div>
+        <div class="input-grid">
 
 
+            <div class="input-group">
 
-        <div class="input-row">
-
-            <label for="hour">
-                Hour of Day
-            </label>
-
-
-            <select id="hour">
-
-                <option value="0">
-                    00:00
-                </option>
-
-                <option value="1">
-                    01:00
-                </option>
-
-                <option value="2">
-                    02:00
-                </option>
-
-                <option value="3">
-                    03:00
-                </option>
-
-                <option value="4">
-                    04:00
-                </option>
-
-                <option value="5">
-                    05:00
-                </option>
-
-                <option value="6">
-                    06:00
-                </option>
-
-                <option value="7">
-                    07:00
-                </option>
-
-                <option value="8">
-                    08:00
-                </option>
-
-                <option value="9">
-                    09:00
-                </option>
-
-                <option value="10">
-                    10:00
-                </option>
-
-                <option value="11">
-                    11:00
-                </option>
-
-                <option value="12">
-                    12:00
-                </option>
-
-                <option value="13">
-                    13:00
-                </option>
-
-                <option value="14">
-                    14:00
-                </option>
-
-                <option value="15">
-                    15:00
-                </option>
-
-                <option value="16">
-                    16:00
-                </option>
-
-                <option value="17">
-                    17:00
-                </option>
-
-                <option value="18">
-                    18:00
-                </option>
-
-                <option value="19">
-                    19:00
-                </option>
-
-                <option value="20">
-                    20:00
-                </option>
-
-                <option value="21">
-                    21:00
-                </option>
-
-                <option value="22">
-                    22:00
-                </option>
-
-                <option value="23">
-                    23:00
-                </option>
-
-            </select>
-
-        </div>
+                <label>
+                    Day
+                </label>
 
 
-
-        <div class="calculated-section">
-
-
-            <h4>
-                Historical Expectations
-            </h4>
+                <select id="edori-day">
 
 
+                    <option value="Monday">
+                        Monday
+                    </option>
 
-            <div class="calculated-row">
 
-                <span>
-                    Expected ED Volume
-                </span>
+                    <option value="Tuesday">
+                        Tuesday
+                    </option>
 
-                <strong id="expectedVolume">
-                    --
-                </strong>
+
+                    <option value="Wednesday">
+                        Wednesday
+                    </option>
+
+
+                    <option value="Thursday">
+                        Thursday
+                    </option>
+
+
+                    <option value="Friday">
+                        Friday
+                    </option>
+
+
+                    <option value="Saturday">
+                        Saturday
+                    </option>
+
+
+                    <option value="Sunday">
+                        Sunday
+                    </option>
+
+
+                </select>
+
 
             </div>
 
 
 
-            <div class="calculated-row">
 
-                <span>
-                    Expected Boarders
-                </span>
-
-                <strong id="expectedBoarders">
-                    --
-                </strong>
-
-            </div>
+            <div class="input-group">
 
 
-
-            <div class="calculated-row">
-
-                <span>
-                    Expected RNs
-                </span>
-
-                <strong id="expectedRN">
-                    --
-                </strong>
-
-            </div>
+                <label>
+                    Hour
+                </label>
 
 
+                <select id="edori-hour">
 
-            <div class="calculated-row">
+                    ${generateHours()}
 
-                <span>
-                    Expected Physicians
-                </span>
+                </select>
 
-                <strong id="expectedMD">
-                    --
-                </strong>
-
-            </div>
-
-
-
-            <div class="calculated-row">
-
-                <span>
-                    Expected Arrivals
-                </span>
-
-                <strong id="expectedArrivals">
-                    --
-                </strong>
-
-            </div>
-
-
-
-            <div class="calculated-row">
-
-                <span>
-                    Expected Departures
-                </span>
-
-                <strong id="expectedDepartures">
-                    --
-                </strong>
 
             </div>
 
@@ -256,8 +109,179 @@ export function TimeSection() {
         </div>
 
 
-    </div>
+    </section>
 
     `;
+
+}
+
+
+
+
+/**
+ * Creates the 24 hour selector.
+ */
+function generateHours(): string {
+
+
+    let options = "";
+
+
+    for(let hour = 0; hour < 24; hour++){
+
+
+        options += `
+
+            <option value="${hour}">
+                ${formatHour(hour)}
+            </option>
+
+        `;
+
+
+    }
+
+
+    return options;
+
+}
+
+
+
+
+/**
+ * Converts 0-23 format
+ * into readable time.
+ */
+function formatHour(hour:number):string {
+
+
+    const suffix =
+
+        hour >= 12
+
+        ? "PM"
+
+        : "AM";
+
+
+
+    const display =
+
+        hour % 12 === 0
+
+        ? 12
+
+        : hour % 12;
+
+
+
+    return `${display}:00 ${suffix}`;
+
+}
+
+
+
+
+
+
+/**
+ * Connects HTML inputs
+ * to application services.
+ */
+export function initializeTimeSection():void {
+
+
+
+    const daySelect =
+
+        document.getElementById(
+            "edori-day"
+        ) as HTMLSelectElement;
+
+
+
+    const hourSelect =
+
+        document.getElementById(
+            "edori-hour"
+        ) as HTMLSelectElement;
+
+
+
+
+
+    if(
+
+        !daySelect ||
+
+        !hourSelect
+
+    ){
+
+        return;
+
+    }
+
+
+
+
+
+    function updateTime(){
+
+
+        const day =
+
+            daySelect.value;
+
+
+
+        const hour =
+
+            Number(
+                hourSelect.value
+            );
+
+
+
+        setOperationalTime(
+
+            day,
+
+            hour
+
+        );
+
+
+
+        emit(
+
+            "stateChanged"
+
+        );
+
+    }
+
+
+
+
+
+    daySelect.addEventListener(
+
+        "change",
+
+        updateTime
+
+    );
+
+
+
+    hourSelect.addEventListener(
+
+        "change",
+
+        updateTime
+
+    );
 
 }

@@ -1,48 +1,155 @@
-import { updateHistoricalValues }
-from "./TimeService";
+/**
+ * EventService
+ *
+ * Lightweight application event system.
+ *
+ * Allows components to communicate without
+ * directly depending on each other.
+ */
 
 
-export function registerEventHandlers(){
+
+type EventCallback = () => void;
 
 
-const timeInputs = [
-
-    "day",
-
-    "hour"
-
-];
 
 
-timeInputs.forEach(id=>{
+
+interface EventListeners {
 
 
-const element =
-document.getElementById(id);
+    [event:string]: EventCallback[];
 
 
-if(!element)
-{
-    console.warn(
-        `${id} selector not found`
+}
+
+
+
+
+
+
+const listeners:EventListeners = {};
+
+
+
+
+
+
+
+
+
+/**
+ * Subscribe to an event
+ */
+export function subscribe(
+
+    event:string,
+
+    callback:EventCallback
+
+):void {
+
+
+
+    if(!listeners[event]){
+
+
+        listeners[event] = [];
+
+
+    }
+
+
+
+
+
+    listeners[event].push(
+
+        callback
+
     );
 
-    return;
-}
-
-
-element.addEventListener(
-"change",
-()=>{
-
-    updateHistoricalValues();
 
 }
 
-);
 
 
-});
+
+
+
+
+
+
+/**
+ * Emit an event
+ */
+export function emit(
+
+    event:string
+
+):void {
+
+
+
+    if(!listeners[event]){
+
+        return;
+
+    }
+
+
+
+
+
+
+    listeners[event].forEach(
+
+        callback => {
+
+
+            callback();
+
+
+        }
+
+
+    );
+
+
+}
+
+
+
+
+
+
+
+
+
+/**
+ * Remove all listeners
+ *
+ * Useful for testing/resetting
+ */
+export function clearEvents():void {
+
+
+    Object.keys(
+
+        listeners
+
+    ).forEach(
+
+        event => {
+
+
+            delete listeners[event];
+
+
+        }
+
+
+    );
 
 
 }

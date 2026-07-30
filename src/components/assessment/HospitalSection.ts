@@ -1,38 +1,243 @@
-export function HospitalSection(){
+/**
+ * HospitalSection
+ *
+ * Captures inpatient capacity pressure.
+ *
+ * Uses:
+ *
+ * Occupied Medical Beds / 273
+ *
+ * rather than manually entering hospital occupancy.
+ */
 
-return`
 
-<div class="assessment-card">
+import { updateState }
+from "../../services/StateService";
 
-<h3>🏥 Hospital Throughput</h3>
 
-<div class="input-group">
+import { emit }
+from "../../services/EventService";
 
-<label>Occupied Medical Beds</label>
 
-<input
-type="number"
-id="occupiedMedicalBeds"
-value="0">
+import { HOSPITAL }
+from "../../config/constants";
 
-</div>
 
-<hr>
 
-<div class="calculated-row">
+export function HospitalSection(): string {
 
-<span>Medical Bed Occupancy</span>
 
-<strong id="hospitalOccupancy">
+    return `
 
---
 
-</strong>
+    <section class="assessment-section">
 
-</div>
 
-</div>
+        <h3>
+            Hospital Capacity
+        </h3>
 
-`;
+
+
+        <div class="input-grid">
+
+
+            <div class="input-group">
+
+
+                <label>
+                    Occupied Medical Beds
+                </label>
+
+
+                <input
+
+                    id="edori-medical-beds"
+
+                    type="number"
+
+                    min="0"
+
+                    max="${HOSPITAL.MEDICAL_BEDS}"
+
+                    value="0"
+
+                />
+
+
+                <small>
+
+                    Medical beds currently occupied
+
+                </small>
+
+
+            </div>
+
+
+
+        </div>
+
+
+
+
+
+        <div class="metric-display">
+
+
+            <div>
+
+                Medical Bed Occupancy
+
+                <strong id="edori-medical-occupancy">
+
+                    0%
+
+                </strong>
+
+
+            </div>
+
+
+        </div>
+
+
+
+    </section>
+
+
+    `;
+
+}
+
+
+
+
+
+
+
+/**
+ * Connects hospital inputs
+ * to application state.
+ */
+export function initializeHospitalSection():void {
+
+
+
+    const bedInput =
+
+        document.getElementById(
+
+            "edori-medical-beds"
+
+        ) as HTMLInputElement;
+
+
+
+
+    const occupancyDisplay =
+
+        document.getElementById(
+
+            "edori-medical-occupancy"
+
+        );
+
+
+
+
+
+    if(!bedInput){
+
+        return;
+
+    }
+
+
+
+
+
+
+    function updateHospital(){
+
+
+
+        const occupiedBeds =
+
+            Number(
+
+                bedInput.value
+
+            ) || 0;
+
+
+
+
+
+        updateState({
+
+
+            occupiedMedicalBeds:
+
+                occupiedBeds
+
+
+        });
+
+
+
+
+
+
+        const occupancy =
+
+            (
+
+                occupiedBeds /
+
+                HOSPITAL.MEDICAL_BEDS
+
+            ) * 100;
+
+
+
+
+
+        if(occupancyDisplay){
+
+
+            occupancyDisplay.textContent =
+
+                `${Math.round(occupancy)}%`;
+
+
+        }
+
+
+
+
+
+        emit(
+
+            "stateChanged"
+
+        );
+
+
+    }
+
+
+
+
+
+
+    bedInput.addEventListener(
+
+        "input",
+
+        updateHospital
+
+    );
+
 
 }

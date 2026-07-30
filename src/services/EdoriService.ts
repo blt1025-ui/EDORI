@@ -1,604 +1,144 @@
-import { calculateForecast }
+/**
+ * EdoriService
+ *
+ * Core EDORI calculation engine.
+ *
+ * Converts operational conditions into
+ * a 0-100 surge score.
+ */
+
+
+import type { SituationAssessment } 
+from "../types/SituationAssessment";
+
+import type { EdoriResult }
+from "../types/EdoriResult";
+
+import type { Driver }
+from "../types/Driver";
+
+
+import { HOSPITAL }
+from "../config/constants";
+
+
+import { WEIGHTS }
+from "../config/weights";
+
+
+import { getThreshold }
+from "../config/thresholds";
+
+
+import {
+
+    calculateForecast
+
+}
+
 from "./ForecastService";
 
-import type { SituationAssessment } from "../types/SituationAssessment";
-import type { EdoriResult } from "../types/EdoriResult";
-import type { HistoricalRecord } from "../types/HistoricalRecord";
 
 
-/*
-====================================================
-EDORI CONFIGURATION
-====================================================
-These values will eventually move to a configuration
-file so they can be calibrated using historical data.
-====================================================
-*/
 
-const EDORI_WEIGHTS = {
 
-    demand: 0.25,
+/**
+ * Main EDORI calculation function.
+ */
+export function calculateEdori(
 
-    boarding: 0.25,
+    assessment: SituationAssessment
 
-    hospital: 0.15,
-
-    capacity: 0.20,
-
-    complexity: 0.10,
-
-    forecast: 0.05
-
-};
-
-
-/*
-====================================================
-DEMAND SCORE
-====================================================
-
-Measures deviation from expected ED volume.
-
-0-100 scale
-
-50 = expected volume
-
-Higher = worse than expected
-
-====================================================
-*/
-
-function calculateDemandScore(
-
-    currentVolume:number,
-
-    expectedVolume:number
-
-):number {
-
-
-    if (!expectedVolume || expectedVolume <= 0)
-        return 50;
-
-
-    const difference =
-        currentVolume - expectedVolume;
-
-
-    const score =
-        50 + (difference * 3);
-
-
-    return Math.max(
-        0,
-        Math.min(
-            score,
-            100
-        )
-    );
-
-}
-
-
-
-/*
-====================================================
-BOARDING SCORE
-====================================================
-
-Measures boarding above expected baseline.
-
-====================================================
-*/
-
-
-function calculateBoardingScore(
-
-    currentBoarders:number,
-
-    expectedBoarders:number
-
-):number {
-
-
-    if (!expectedBoarders || expectedBoarders <= 0)
-        return 50;
-
-
-    const difference =
-        currentBoarders - expectedBoarders;
-
-
-    const score =
-        50 + (difference * 4);
-
-
-    return Math.max(
-        0,
-        Math.min(
-            score,
-            100
-        )
-    );
-
-}
-
-
-
-/*
-====================================================
-HOSPITAL THROUGHPUT SCORE
-====================================================
-
-Measures inpatient bed strain.
-
-Uses 273 medical beds.
-
-====================================================
-*/
-
-
-function calculateHospitalScore(
-
-    occupiedMedicalBeds:number
-
-):number {
-
-
-    const occupancy =
-        occupiedMedicalBeds / 273;
-
-
-    /*
-    Expected:
-    <85% = lower concern
-    >95% = increasing concern
-    */
-
-    const score =
-        (occupancy - 0.85) * 300;
-
-
-    return Math.max(
-
-        0,
-
-        Math.min(
-
-            100,
-
-            50 + score
-
-        )
-
-    );
-
-}
-
-
-
-/*
-====================================================
-ACUITY SCORE
-====================================================
-
-Calculates weighted patient complexity.
-
-ESI weights:
-1 = 5
-2 = 4
-3 = 3
-4 = 2
-5 = 1
-
-====================================================
-*/
-
-
-function calculateComplexityScore(
-
-    esi1:number,
-
-    esi2:number,
-
-    esi3:number,
-
-    esi4:number,
-
-    esi5:number
-
-):number {
-
-
-    const acuityUnits =
-
-        (esi1 * 5) +
-
-        (esi2 * 4) +
-
-        (esi3 * 3) +
-
-        (esi4 * 2) +
-
-        (esi5 * 1);
+): EdoriResult {
 
 
 
     /*
-    100 acuity units = moderate workload
-
-    This will be calibrated later.
-    */
-
-    const score =
-        acuityUnits;
-
-
-    return Math.max(
-
-        0,
-
-        Math.min(
-
-            score,
-
-            100
-
-        )
-
-    );
-
-}
-
-
-
-/*
-====================================================
-CLINICAL CAPACITY SCORE
-====================================================
-
-Compares available clinicians
-against expected staffing.
-
-Adjusted by acuity burden.
-
-====================================================
-*/
-
-
-function calculateCapacityScore(
-
-    currentRN:number,
-
-    expectedRN:number,
-
-    currentMD:number,
-
-    expectedMD:number,
-
-    acuityScore:number
-
-):number {
-
-
-    if (
-
-        expectedRN <=0 ||
-        expectedMD <=0
-
-    )
-
-        return 50;
-
-
-
-    const rnRatio =
-        currentRN / expectedRN;
-
-
-    const mdRatio =
-        currentMD / expectedMD;
-
-
-
-    const staffingRatio =
-
-        (
-
-            (rnRatio * 0.6)
-
-            +
-
-            (mdRatio * 0.4)
-
-        );
-
-
-
-    let score =
-
-        100 -
-
-        (staffingRatio * 100);
-
-
-
-    /*
-    Increase concern when
-    acuity is high.
-
-    */
-
-    score +=
-
-        acuityScore * 0.25;
-
-
-
-    return Math.max(
-
-        0,
-
-        Math.min(
-
-            score,
-
-            100
-
-        )
-
-    );
-
-}
-
-
-
-/*
-====================================================
-FORECAST SCORE
-====================================================
-
-Predicts near future strain.
-
-Current formula:
-
-Arrivals - Departures
-
-====================================================
-*/
-
-
-function calculateForecastScore(
-
-    arrivals:number,
-
-    departures:number
-
-):number {
-
-
-    const netChange =
-
-        arrivals - departures;
-
-
-
-    const score =
-
-        50 + (netChange * 5);
-
-
-
-    return Math.max(
-
-        0,
-
-        Math.min(
-
-            score,
-
-            100
-
-        )
-
-    );
-
-}
-
-
-
-/*
-====================================================
-STATUS CLASSIFICATION
-====================================================
-*/
-
-
-function determineStatus(
-
-    score:number
-
-):string {
-
-
-    if(score < 25)
-
-        return "Normal Operations";
-
-
-    if(score < 40)
-
-        return "Increasing Demand";
-
-
-    if(score < 55)
-
-        return "Operational Strain";
-
-
-    if(score < 70)
-
-        return "High Surge Conditions";
-
-
-    return "Crisis Operations";
-
-}
-
-
-
-/*
-====================================================
-MAIN EDORI CALCULATION
-====================================================
-*/
-
-
-export function calculateEDORI(
-
-    assessment:SituationAssessment,
-
-    historical:HistoricalRecord
-
-):EdoriResult {
-
-
+     * Calculate individual domains
+     */
 
     const demandScore =
-
-        calculateDemandScore(
-
-            assessment.totalEDVolume,
-
-            historical.expectedVolume
-
+        calculateDemand(
+            assessment
         );
-
 
 
     const boardingScore =
-
-        calculateBoardingScore(
-
-            assessment.boardedPatients,
-
-            historical.expectedBoarders
-
+        calculateBoarding(
+            assessment
         );
-
 
 
     const hospitalScore =
-
-        calculateHospitalScore(
-
-            assessment.occupiedMedicalBeds
-
+        calculateHospitalCapacity(
+            assessment
         );
-
-
-
-    const complexityScore =
-
-        calculateComplexityScore(
-
-            assessment.esi1,
-
-            assessment.esi2,
-
-            assessment.esi3,
-
-            assessment.esi4,
-
-            assessment.esi5
-
-        );
-
 
 
     const capacityScore =
+        calculateClinicalCapacity(
+            assessment
+        );
 
-        calculateCapacityScore(
 
-            assessment.currentRN,
+    const acuityScore =
+        calculateAcuity(
+            assessment
+        );
 
-            historical.expectedRN,
 
-            assessment.currentMD,
-
-            historical.expectedMD,
-
-            complexityScore
-
+    const forecast =
+        calculateForecast(
+            assessment
         );
 
 
 
-    const forecast =
+    /*
+     * Weighted EDORI score
+     */
 
-calculateForecast(
+    const score = Math.round(
 
-    assessment.totalEDVolume,
-
-    historical.expectedArrivals,
-
-    historical.expectedDepartures
-
-);
-
-
-const forecastScore =
-
-forecast.riskScore;
-
-
-
-
-    const overallScore = Math.round(
-
-        (demandScore *
-            EDORI_WEIGHTS.demand)
+        demandScore * WEIGHTS.demand
 
         +
 
-        (boardingScore *
-            EDORI_WEIGHTS.boarding)
+        boardingScore * WEIGHTS.boarding
 
         +
 
-        (hospitalScore *
-            EDORI_WEIGHTS.hospital)
+        hospitalScore * WEIGHTS.hospital
 
         +
 
-        (capacityScore *
-            EDORI_WEIGHTS.capacity)
+        capacityScore * WEIGHTS.capacity
 
         +
 
-        (complexityScore *
-            EDORI_WEIGHTS.complexity)
+        acuityScore * WEIGHTS.acuity
 
         +
 
-        (forecastScore *
-            EDORI_WEIGHTS.forecast)
+        forecast.forecastScore * WEIGHTS.forecast
 
     );
+
+
+
+    const threshold =
+        getThreshold(score);
 
 
 
     return {
 
 
-        overallScore,
+        score,
 
 
         status:
-
-            determineStatus(
-                overallScore
-            ),
+            threshold.status,
 
 
         demandScore,
@@ -613,12 +153,479 @@ forecast.riskScore;
         capacityScore,
 
 
-        complexityScore,
+        acuityScore,
 
 
-        forecastScore
+        forecastScore:
+            forecast.forecastScore,
 
+
+        drivers:
+            generateDrivers(
+                assessment,
+                forecast.forecastScore
+            ),
+
+
+        recommendations:
+            generateRecommendations(
+                score
+            ),
+
+
+        timestamp:
+            new Date()
 
     };
+
+}
+
+
+
+
+
+
+
+/**
+ * ED Demand Score
+ *
+ * Compares current volume
+ * against historical expectation.
+ */
+function calculateDemand(
+
+    assessment: SituationAssessment
+
+): number {
+
+
+    if (
+        assessment.expectedVolume === 0
+    ) {
+
+        return 0;
+
+    }
+
+
+    const difference =
+
+        assessment.totalEDVolume
+
+        -
+
+        assessment.expectedVolume;
+
+
+
+    return normalize(
+
+        difference,
+
+        25
+
+    );
+
+}
+
+
+
+
+
+
+/**
+ * Boarding Score
+ */
+function calculateBoarding(
+
+    assessment: SituationAssessment
+
+): number {
+
+
+    const difference =
+
+        assessment.boardedPatients
+
+        -
+
+        assessment.expectedBoarders;
+
+
+
+    return normalize(
+
+        difference,
+
+        25
+
+    );
+
+}
+
+
+
+
+
+
+/**
+ * Hospital Capacity Score
+ *
+ * Uses medical/surgical beds only.
+ */
+function calculateHospitalCapacity(
+
+    assessment: SituationAssessment
+
+): number {
+
+
+    const occupancy =
+
+        assessment.occupiedMedicalBeds
+
+        /
+
+        HOSPITAL.MEDICAL_BEDS;
+
+
+
+    return Math.min(
+
+        100,
+
+        occupancy * 100
+
+    );
+
+}
+
+
+
+
+
+
+/**
+ * Clinical Capacity Score
+ *
+ * Evaluates staffing relative
+ * to patient workload.
+ */
+function calculateClinicalCapacity(
+
+    assessment: SituationAssessment
+
+): number {
+
+
+    const providers =
+
+        assessment.currentRN
+
+        +
+
+        assessment.currentMD;
+
+
+
+    if (
+        providers === 0
+    ) {
+
+        return 100;
+
+    }
+
+
+    const workload =
+
+        assessment.totalEDVolume
+
+        /
+
+        providers;
+
+
+
+    return normalize(
+
+        workload - 3,
+
+        10
+
+    );
+
+}
+
+
+
+
+
+
+
+/**
+ * Patient Acuity Score
+ */
+function calculateAcuity(
+
+    assessment: SituationAssessment
+
+): number {
+
+
+    const weightedPatients =
+
+        assessment.esi1 * 5
+
+        +
+
+        assessment.esi2 * 4
+
+        +
+
+        assessment.esi3 * 3
+
+        +
+
+        assessment.esi4 * 2
+
+        +
+
+        assessment.esi5;
+
+
+
+    if (
+        assessment.totalEDVolume === 0
+    ) {
+
+        return 0;
+
+    }
+
+
+    const acuityRatio =
+
+        weightedPatients
+
+        /
+
+        assessment.totalEDVolume;
+
+
+
+    return Math.min(
+
+        100,
+
+        acuityRatio * 20
+
+    );
+
+}
+
+
+
+
+
+
+
+/**
+ * Converts differences into
+ * 0-100 scores.
+ */
+function normalize(
+
+    value:number,
+
+    maximum:number
+
+):number {
+
+
+    if(value <= 0){
+
+        return 0;
+
+    }
+
+
+    return Math.min(
+
+        100,
+
+        (value / maximum) * 100
+
+    );
+
+}
+
+
+
+
+
+
+
+/**
+ * Generates dashboard drivers.
+ */
+function generateDrivers(
+
+    assessment: SituationAssessment,
+
+    forecastScore:number
+
+):Driver[] {
+
+
+    const drivers:Driver[] = [];
+
+
+
+    if(
+
+        assessment.boardedPatients >
+
+        assessment.expectedBoarders
+
+    ){
+
+        drivers.push({
+
+            title:"Boarding",
+
+            description:
+            `Boarding exceeds expected volume by ${
+                assessment.boardedPatients -
+                assessment.expectedBoarders
+            } patients.`,
+
+            severity:
+            calculateBoarding(
+                assessment
+            ),
+
+            currentValue:
+            assessment.boardedPatients,
+
+            expectedValue:
+            assessment.expectedBoarders
+
+        });
+
+    }
+
+
+
+    if(
+
+        assessment.totalEDVolume >
+
+        assessment.expectedVolume
+
+    ){
+
+        drivers.push({
+
+            title:"ED Volume",
+
+            description:
+            "Emergency department volume exceeds historical expectation.",
+
+            severity:
+            calculateDemand(
+                assessment
+            ),
+
+            currentValue:
+            assessment.totalEDVolume,
+
+            expectedValue:
+            assessment.expectedVolume
+
+        });
+
+    }
+
+
+
+    if(
+        forecastScore > 50
+    ){
+
+        drivers.push({
+
+            title:"Forecast",
+
+            description:
+            "Projected conditions indicate increasing operational strain.",
+
+            severity:
+            forecastScore,
+
+            currentValue:
+            forecastScore,
+
+            expectedValue:
+            50
+
+        });
+
+    }
+
+
+    return drivers;
+
+}
+
+
+
+
+
+
+
+/**
+ * Generates operational recommendations.
+ */
+function generateRecommendations(
+
+    score:number
+
+):string[] {
+
+
+    if(score >= 70){
+
+        return [
+
+            "Escalate inpatient throughput review.",
+
+            "Prepare additional surge capacity.",
+
+            "Notify operational leadership."
+
+        ];
+
+    }
+
+
+    if(score >= 40){
+
+        return [
+
+            "Monitor ED flow closely.",
+
+            "Review discharge and admission barriers."
+
+        ];
+
+    }
+
+
+    return [
+
+        "Continue normal operations."
+
+    ];
 
 }

@@ -1,92 +1,73 @@
+import { getState } 
+from "./StateService";
+
+
 import { calculateEDORI }
 from "./EdoriService";
 
-import { getHistoricalRecord }
-from "./HistoricalService";
 
 
 export function updateEDORI(){
 
 
-const day =
-(document.getElementById("day")
-as HTMLSelectElement).value;
-
-
-const hour =
-Number(
-(document.getElementById("hour")
-as HTMLSelectElement).value
-);
+    const state =
+        getState();
 
 
 
-const historical =
-getHistoricalRecord(
-day,
-hour
-);
-
-
-if(!historical)
-return;
+    const result =
+        calculateEDORI(
+            state
+        );
 
 
 
-// Later this will come
-// from StateService
+    updateScoreDisplay(
+        result
+    );
 
-const assessment:any={
 
-day,
-
-hour,
-
-totalEDVolume:
-Number(
-(document.getElementById("totalEDVolume")
-as HTMLInputElement).value
-),
-
-boardedPatients:
-Number(
-(document.getElementById("boardedPatients")
-as HTMLInputElement).value
-)
-
-};
+}
 
 
 
-const result =
-calculateEDORI(
-assessment,
-historical
-);
-
-document
-.getElementById("projectedVolume")!
-.textContent =
-forecast.projectedVolume.toString();
 
 
+function updateScoreDisplay(
 
-document
-.getElementById("forecastRisk")!
-.textContent =
-forecast.riskScore.toString();
+    result:any
 
-document
-.getElementById("edoriScore")!
-.textContent =
-result.overallScore.toString();
+){
+
+
+    const score =
+        document.getElementById(
+            "edoriScore"
+        );
+
+
+    const status =
+        document.getElementById(
+            "edoriStatus"
+        );
 
 
 
-document
-.getElementById("edoriStatus")!
-.textContent =
-result.status;
+    if(score){
+
+        score.textContent =
+            result.score;
+
+    }
+
+
+
+    if(status){
+
+        status.textContent =
+            result.status;
+
+    }
 
 
 }
