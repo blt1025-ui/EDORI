@@ -1,96 +1,72 @@
 /**
- * Represents the complete operational state of the Emergency Department.
- * This object is passed throughout the application and is the primary
- * input to the EDORI calculation engine.
+ * SituationAssessment
+ *
+ * Represents one completed EDORI operational
+ * assessment.
+ *
+ * Staffing is intentionally excluded from the
+ * EDORI assessment and scoring model.
  */
 
 export interface SituationAssessment {
 
+    /*
+     * Assessment metadata
+     */
 
-   /**
- * Assessment metadata
- */
-
-assessmentTime:string;
-
-
-    /* ============================================================
-       TIME
-       ============================================================ */
-
-    /** Day of week selected by the user */
-    day: string;
-
-    /** Hour of day (0-23) */
-    hour: number;
+    assessmentTime:string;
 
 
-    /* ============================================================
-       ED DEMAND
-       ============================================================ */
+    /*
+     * Assessment period
+     */
 
-    /** Total patients physically in the ED */
-    totalEDVolume: number;
+    day:string;
 
-    /** Number of admitted patients boarding in the ED */
-    boardedPatients: number;
+    hour:number;
 
 
-    /* ============================================================
-       HOSPITAL CAPACITY
-       ============================================================ */
+    /*
+     * ED demand
+     */
 
-    /** Occupied medical/surgical beds (0-273) */
-    occupiedMedicalBeds: number;
+    totalEDVolume:number;
 
-
-    /* ============================================================
-       CLINICAL CAPACITY
-       ============================================================ */
-
-    /** Current RN staffing */
-    currentRN: number;
-
-    /** Current physician/APP staffing */
-    currentMD: number;
+    boardedPatients:number;
 
 
-    /* ============================================================
-       PATIENT ACUITY
-       ============================================================ */
+    /*
+     * Hospital capacity
+     */
 
-    /** Number of ESI-1 patients */
-    esi1: number;
-
-    /** Number of ESI-2 patients */
-    esi2: number;
-
-    /** Number of ESI-3 patients */
-    esi3: number;
-
-    /** Number of ESI-4 patients */
-    esi4: number;
-
-    /** Number of ESI-5 patients */
-    esi5: number;
+    occupiedMedicalBeds:number;
 
 
-    /* ============================================================
-       HISTORICAL EXPECTATIONS
-       These values are automatically populated from historical.json
-       after the user selects the day and hour.
-       ============================================================ */
+    /*
+     * Patient acuity distribution
+     */
 
-    expectedVolume: number;
+    esi1:number;
 
-    expectedBoarders: number;
+    esi2:number;
 
-    expectedRN: number;
+    esi3:number;
 
-    expectedMD: number;
+    esi4:number;
 
-    expectedArrivals: number;
+    esi5:number;
 
-    expectedDepartures: number;
+
+    /*
+     * Historical expectations
+     */
+
+    expectedVolume:number;
+
+    expectedBoarders:number;
+
+    expectedArrivals:number;
+
+    expectedDepartures:number;
 
 }

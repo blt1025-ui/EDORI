@@ -1,21 +1,17 @@
 /**
  * AssessmentService
  *
- * Maintains draft assessment data
- * separately from committed EDORI data.
+ * Maintains temporary draft assessment data
+ * separately from the committed EDORI state.
  *
- * Draft:
- * - Changes while typing
- * - Does not trigger calculations
+ * Draft changes do not trigger calculations.
  *
- * Submitted:
- * - Used by EDORI engine
+ * A completed SituationAssessment is created only
+ * when the user selects Calculate EDORI.
  */
-
 
 import type { SituationAssessment }
 from "../types/SituationAssessment";
-
 
 
 let draftAssessment:
@@ -23,19 +19,20 @@ let draftAssessment:
 Partial<SituationAssessment> = {};
 
 
-
-
 /**
- * Update temporary form values
+ * Update one draft field.
  */
-export function updateDraft(
+export function updateDraft<
 
-    field:string,
+    Field extends keyof SituationAssessment
 
-    value:number
+>(
+
+    field:Field,
+
+    value:SituationAssessment[Field]
 
 ):void {
-
 
     draftAssessment = {
 
@@ -48,40 +45,71 @@ export function updateDraft(
 }
 
 
-
 /**
- * Return current draft
+ * Update multiple draft fields.
  */
-export function getDraft():
+export function updateDraftFields(
 
-Partial<SituationAssessment>{
+    updates:Partial<SituationAssessment>
 
-    return draftAssessment;
+):void {
+
+    draftAssessment = {
+
+        ...draftAssessment,
+
+        ...updates
+
+    };
 
 }
 
 
+/**
+ * Return a defensive copy of the current draft.
+ */
+export function getDraft():
+
+Partial<SituationAssessment> {
+
+    return {
+
+        ...draftAssessment
+
+    };
+
+}
+
 
 /**
- * Create completed assessment
+ * Clear all draft values.
+ */
+export function clearDraft():void {
+
+    draftAssessment = {};
+
+}
+
+
+/**
+ * Create a completed SituationAssessment.
+ *
+ * Returns null if required current-state inputs
+ * have not been provided.
  */
 export function submitAssessment():
 
 SituationAssessment | null {
 
+    const requiredFields:
 
-
-    const requiredFields = [
+    Array<keyof SituationAssessment> = [
 
         "totalEDVolume",
 
         "boardedPatients",
 
         "occupiedMedicalBeds",
-
-        "currentRN",
-
-        "currentMD",
 
         "esi1",
 
@@ -91,22 +119,24 @@ SituationAssessment | null {
 
         "esi4",
 
-        "esi5"
+        "esi5",
+
+        "expectedVolume",
+
+        "expectedBoarders",
+
+        "expectedArrivals",
+
+        "expectedDepartures"
 
     ];
 
 
-
-    for(
-
-        const field of requiredFields
-
-    ){
-
+    for(const field of requiredFields){
 
         if(
 
-            draftAssessment[field as keyof SituationAssessment]
+            draftAssessment[field]
 
             ===
 
@@ -118,102 +148,166 @@ SituationAssessment | null {
 
         }
 
-
     }
-
 
 
     return {
 
+        assessmentTime:
+            normalizeString(
 
-    assessmentTime:
+                draftAssessment.assessmentTime
 
-        new Date().toISOString(),
+            ),
 
+        day:
+            normalizeString(
 
-    day:
+                draftAssessment.day
 
-        new Date()
-
-        .toISOString()
-
-        .split("T")[0],
-
-
+            ),
 
         hour:
+            normalizeNumber(
 
-            new Date()
+                draftAssessment.hour
 
-            .getHours(),
-
-
+            ),
 
         totalEDVolume:
+            normalizeNumber(
 
-            draftAssessment.totalEDVolume || 0,
+                draftAssessment.totalEDVolume
 
+            ),
 
         boardedPatients:
+            normalizeNumber(
 
-            draftAssessment.boardedPatients || 0,
+                draftAssessment.boardedPatients
 
+            ),
 
         occupiedMedicalBeds:
+            normalizeNumber(
 
-            draftAssessment.occupiedMedicalBeds || 0,
+                draftAssessment.occupiedMedicalBeds
 
-
-        currentRN:
-
-            draftAssessment.currentRN || 0,
-
-
-        currentMD:
-
-            draftAssessment.currentMD || 0,
-
+            ),
 
         esi1:
+            normalizeNumber(
 
-            draftAssessment.esi1 || 0,
+                draftAssessment.esi1
 
+            ),
 
         esi2:
+            normalizeNumber(
 
-            draftAssessment.esi2 || 0,
+                draftAssessment.esi2
 
+            ),
 
         esi3:
+            normalizeNumber(
 
-            draftAssessment.esi3 || 0,
+                draftAssessment.esi3
 
+            ),
 
         esi4:
+            normalizeNumber(
 
-            draftAssessment.esi4 || 0,
+                draftAssessment.esi4
 
+            ),
 
         esi5:
+            normalizeNumber(
 
-            draftAssessment.esi5 || 0,
+                draftAssessment.esi5
 
+            ),
 
+        expectedVolume:
+            normalizeNumber(
 
-        expectedVolume:0,
+                draftAssessment.expectedVolume
 
-        expectedBoarders:0,
+            ),
 
-        expectedRN:0,
+        expectedBoarders:
+            normalizeNumber(
 
-        expectedMD:0,
+                draftAssessment.expectedBoarders
 
-        expectedArrivals:0,
+            ),
 
-        expectedDepartures:0
+        expectedArrivals:
+            normalizeNumber(
 
+                draftAssessment.expectedArrivals
+
+            ),
+
+        expectedDepartures:
+            normalizeNumber(
+
+                draftAssessment.expectedDepartures
+
+            )
 
     };
 
+}
+
+
+/**
+ * Convert a draft value into a safe number.
+ */
+function normalizeNumber(
+
+    value:unknown
+
+):number {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Convert a draft value into a safe string.
+ */
+function normalizeString(
+
+    value:unknown
+
+):string {
+
+    if(typeof value !== "string"){
+
+        return "";
+
+    }
+
+
+    return value;
 
 }

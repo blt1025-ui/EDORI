@@ -671,3 +671,115 @@ h1,h2,h3{margin-top:0}
     }
 
 }
+
+/* =========================
+   Historical Expectations
+========================= */
+
+.historical-expectations-section {
+    background:#f8fafc;
+    border:1px solid #dbe3eb;
+    border-radius:10px;
+    padding:16px;
+}
+
+.historical-section-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:15px;
+}
+
+.historical-section-header h3 {
+    margin-bottom:4px;
+}
+
+.historical-section-header p {
+    margin:0;
+    color:#64748b;
+    font-size:13px;
+}
+
+.historical-data-status {
+    display:inline-flex;
+    align-items:center;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+.historical-data-available {
+    background:#dcfce7;
+    color:#166534;
+}
+
+.historical-data-missing {
+    background:#fef2f2;
+    color:#991b1b;
+}
+
+.historical-expectations-grid {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:12px;
+}
+
+.historical-expectation-card {
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:12px;
+}
+
+.historical-expectation-label {
+    display:block;
+    margin-bottom:6px;
+    color:#64748b;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+}
+
+.historical-expectation-value {
+    color:#172b4d;
+    font-size:23px;
+}
+
+.input-group select {
+    width:100%;
+    padding:10px;
+    border:1px solid #ccd3da;
+    border-radius:6px;
+    background:#ffffff;
+    font-size:15px;
+}
+
+.input-group select:focus {
+    outline:none;
+    border-color:#2563eb;
+    box-shadow:0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+@media (max-width:900px) {
+
+    .historical-expectations-grid {
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+}
+
+@media (max-width:600px) {
+
+    .historical-section-header {
+        flex-direction:column;
+    }
+
+    .historical-expectations-grid {
+        grid-template-columns:1fr;
+    }
+
+}

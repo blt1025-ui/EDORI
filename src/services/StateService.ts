@@ -1,11 +1,12 @@
 /**
  * StateService
  *
- * Stores the current committed EDORI assessment.
+ * Stores the most recently committed EDORI
+ * operational assessment.
  *
- * The most recently submitted assessment is
- * persisted in browser localStorage so the
- * dashboard can restore after a page refresh.
+ * The committed assessment is persisted in
+ * browser localStorage so the dashboard can
+ * restore after a page refresh.
  */
 
 import type { SituationAssessment }
@@ -31,10 +32,6 @@ const DEFAULT_STATE:SituationAssessment = {
 
     occupiedMedicalBeds:0,
 
-    currentRN:0,
-
-    currentMD:0,
-
     esi1:0,
 
     esi2:0,
@@ -49,10 +46,6 @@ const DEFAULT_STATE:SituationAssessment = {
 
     expectedBoarders:0,
 
-    expectedRN:0,
-
-    expectedMD:0,
-
     expectedArrivals:0,
 
     expectedDepartures:0
@@ -66,7 +59,8 @@ let state:SituationAssessment =
 
 
 /**
- * Return a copy of the current committed assessment.
+ * Return a defensive copy of the current
+ * committed assessment.
  */
 export function getState():
 
@@ -82,7 +76,8 @@ SituationAssessment {
 
 
 /**
- * Update and persist the committed assessment.
+ * Update and persist part or all of the
+ * committed assessment.
  */
 export function updateState(
 
@@ -126,7 +121,22 @@ export function setState(
 
 
 /**
- * Reset the committed assessment.
+ * Determine whether a committed assessment
+ * currently exists.
+ */
+export function hasCommittedAssessment():boolean {
+
+    return Boolean(
+
+        state.assessmentTime
+
+    );
+
+}
+
+
+/**
+ * Clear the committed assessment.
  */
 export function clearState():void {
 
@@ -147,21 +157,7 @@ export function clearState():void {
 
 
 /**
- * Determine whether a submitted assessment exists.
- */
-export function hasCommittedAssessment():boolean {
-
-    return Boolean(
-
-        state.assessmentTime
-
-    );
-
-}
-
-
-/**
- * Save the current assessment.
+ * Persist the current committed assessment.
  */
 function saveState():void {
 
@@ -196,7 +192,8 @@ function saveState():void {
 
 
 /**
- * Restore the most recent committed assessment.
+ * Restore the most recently committed
+ * assessment from localStorage.
  */
 function loadStoredState():
 
@@ -229,11 +226,121 @@ SituationAssessment {
         ) as Partial<SituationAssessment>;
 
 
+        /*
+         * Only copy properties that remain part
+         * of the current assessment model.
+         *
+         * Older stored assessments may still contain
+         * currentRN, currentMD, expectedRN, or
+         * expectedMD. Those properties are ignored.
+         */
+
         return {
 
-            ...DEFAULT_STATE,
+            assessmentTime:
+                normalizeString(
 
-            ...parsed
+                    parsed.assessmentTime
+
+                ),
+
+            day:
+                normalizeString(
+
+                    parsed.day
+
+                ),
+
+            hour:
+                normalizeNumber(
+
+                    parsed.hour
+
+                ),
+
+            totalEDVolume:
+                normalizeNumber(
+
+                    parsed.totalEDVolume
+
+                ),
+
+            boardedPatients:
+                normalizeNumber(
+
+                    parsed.boardedPatients
+
+                ),
+
+            occupiedMedicalBeds:
+                normalizeNumber(
+
+                    parsed.occupiedMedicalBeds
+
+                ),
+
+            esi1:
+                normalizeNumber(
+
+                    parsed.esi1
+
+                ),
+
+            esi2:
+                normalizeNumber(
+
+                    parsed.esi2
+
+                ),
+
+            esi3:
+                normalizeNumber(
+
+                    parsed.esi3
+
+                ),
+
+            esi4:
+                normalizeNumber(
+
+                    parsed.esi4
+
+                ),
+
+            esi5:
+                normalizeNumber(
+
+                    parsed.esi5
+
+                ),
+
+            expectedVolume:
+                normalizeNumber(
+
+                    parsed.expectedVolume
+
+                ),
+
+            expectedBoarders:
+                normalizeNumber(
+
+                    parsed.expectedBoarders
+
+                ),
+
+            expectedArrivals:
+                normalizeNumber(
+
+                    parsed.expectedArrivals
+
+                ),
+
+            expectedDepartures:
+                normalizeNumber(
+
+                    parsed.expectedDepartures
+
+                )
 
         };
 
@@ -263,5 +370,55 @@ SituationAssessment {
         };
 
     }
+
+}
+
+
+/**
+ * Normalize a stored numeric value.
+ */
+function normalizeNumber(
+
+    value:unknown
+
+):number {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Normalize a stored string value.
+ */
+function normalizeString(
+
+    value:unknown
+
+):string {
+
+    if(typeof value !== "string"){
+
+        return "";
+
+    }
+
+
+    return value;
 
 }

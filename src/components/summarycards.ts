@@ -1,18 +1,11 @@
 /**
  * SummaryCards
  *
- * Displays the most recently committed EDORI
- * assessment and calculation result.
+ * Displays the latest committed EDORI assessment
+ * and authoritative calculation result.
  *
- * This component does not calculate EDORI.
- *
- * Data sources:
- *
- * StateService
- *      - committed assessment values
- *
- * ResultService
- *      - authoritative EDORI calculation result
+ * Staffing is intentionally excluded from the
+ * EDORI score and from this summary display.
  */
 
 import {
@@ -110,26 +103,6 @@ export function SummaryCards():string {
                 <div class="card">
 
                     <h3>
-                        Clinical Capacity
-                    </h3>
-
-                    <h1 id="capacityCard">
-                        --
-                    </h1>
-
-                    <p
-                        id="capacityDetail"
-                        class="card-detail"
-                    >
-                        Current nursing and physician coverage
-                    </p>
-
-                </div>
-
-
-                <div class="card">
-
-                    <h3>
                         Hospital Occupancy
                     </h3>
 
@@ -142,6 +115,26 @@ export function SummaryCards():string {
                         class="card-detail"
                     >
                         Occupied medical beds
+                    </p>
+
+                </div>
+
+
+                <div class="card">
+
+                    <h3>
+                        Patient Acuity
+                    </h3>
+
+                    <h1 id="acuityCard">
+                        --
+                    </h1>
+
+                    <p
+                        id="acuityDetail"
+                        class="card-detail"
+                    >
+                        Current high-acuity patient volume
                     </p>
 
                 </div>
@@ -192,12 +185,13 @@ export function initializeSummaryCards():void {
 
 
 /**
- * Update cards using the committed assessment
+ * Update all cards from the committed assessment
  * and latest authoritative EDORI result.
  */
 function updateSummaryCards():void {
 
     const state = getState();
+
 
     const result = getLatestResult();
 
@@ -221,6 +215,26 @@ function updateSummaryCards():void {
         calculateHospitalOccupancy(
 
             state.occupiedMedicalBeds
+
+        );
+
+
+    const highAcuityPatients =
+
+        state.esi1
+
+        +
+
+        state.esi2;
+
+
+    const highAcuityPercentage =
+
+        calculateHighAcuityPercentage(
+
+            highAcuityPatients,
+
+            state.totalEDVolume
 
         );
 
@@ -270,30 +284,6 @@ function updateSummaryCards():void {
 
     setCardText(
 
-        "capacityCard",
-
-        `${state.currentRN} RN / ${state.currentMD} MD`
-
-    );
-
-
-    setCardText(
-
-        "capacityDetail",
-
-        createCapacityDetail(
-
-            state.expectedRN,
-
-            state.expectedMD
-
-        )
-
-    );
-
-
-    setCardText(
-
         "medicalBedsCard",
 
         `${hospitalOccupancy}%`
@@ -306,6 +296,28 @@ function updateSummaryCards():void {
         "medicalBedsDetail",
 
         `${state.occupiedMedicalBeds} of ${MEDICAL_BED_CAPACITY} beds occupied`
+
+    );
+
+
+    setCardText(
+
+        "acuityCard",
+
+        String(
+
+            highAcuityPatients
+
+        )
+
+    );
+
+
+    setCardText(
+
+        "acuityDetail",
+
+        `${highAcuityPercentage}% of ED patients are ESI 1 or ESI 2`
 
     );
 
@@ -361,7 +373,9 @@ function calculateHospitalOccupancy(
 
             occupiedMedicalBeds
 
-        ) ||
+        )
+
+        ||
 
         occupiedMedicalBeds < 0
 
@@ -376,11 +390,15 @@ function calculateHospitalOccupancy(
 
         (
 
-            occupiedMedicalBeds /
+            occupiedMedicalBeds
+
+            /
 
             MEDICAL_BED_CAPACITY
 
-        ) * 100
+        )
+
+        * 100
 
     );
 
@@ -388,36 +406,65 @@ function calculateHospitalOccupancy(
 
 
 /**
- * Create the expected clinical-resource detail.
+ * Calculate the percentage of current ED patients
+ * categorized as ESI 1 or ESI 2.
  */
-function createCapacityDetail(
+function calculateHighAcuityPercentage(
 
-    expectedRN:number,
+    highAcuityPatients:number,
 
-    expectedMD:number
+    totalEDVolume:number
 
-):string {
+):number {
 
     if(
 
-        expectedRN <= 0 &&
+        !Number.isFinite(
 
-        expectedMD <= 0
+            highAcuityPatients
+
+        )
+
+        ||
+
+        !Number.isFinite(
+
+            totalEDVolume
+
+        )
+
+        ||
+
+        totalEDVolume <= 0
 
     ){
 
-        return "Current nursing and physician coverage";
+        return 0;
 
     }
 
 
-    return `Expected: ${expectedRN} RN / ${expectedMD} MD`;
+    return Math.round(
+
+        (
+
+            highAcuityPatients
+
+            /
+
+            totalEDVolume
+
+        )
+
+        * 100
+
+    );
 
 }
 
 
 /**
- * Safely update an element's text.
+ * Safely update card text.
  */
 function setCardText(
 
@@ -453,7 +500,7 @@ function setCardText(
 
 
 /**
- * Reset cards before the first calculation.
+ * Reset all cards before the first calculation.
  */
 function resetSummaryCards():void {
 
@@ -486,24 +533,6 @@ function resetSummaryCards():void {
 
     setCardText(
 
-        "capacityCard",
-
-        "--"
-
-    );
-
-
-    setCardText(
-
-        "capacityDetail",
-
-        "Current nursing and physician coverage"
-
-    );
-
-
-    setCardText(
-
         "medicalBedsCard",
 
         "--"
@@ -516,6 +545,24 @@ function resetSummaryCards():void {
         "medicalBedsDetail",
 
         "Occupied medical beds"
+
+    );
+
+
+    setCardText(
+
+        "acuityCard",
+
+        "--"
+
+    );
+
+
+    setCardText(
+
+        "acuityDetail",
+
+        "Current high-acuity patient volume"
 
     );
 
