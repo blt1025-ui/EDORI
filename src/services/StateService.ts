@@ -1,11 +1,15 @@
 /**
  * StateService
  *
- * Stores current EDORI operational state.
+ * Stores current committed EDORI operational state.
+ *
+ * The state represents the last submitted
+ * operational assessment.
  */
 
 
 import type { SituationAssessment }
+
 from "../types/SituationAssessment";
 
 
@@ -14,96 +18,68 @@ from "../types/SituationAssessment";
 let state:SituationAssessment = {
 
 
-    day:
-
-        "",
+    assessmentTime:"",
 
 
-    hour:
-
-        0,
+    day:"",
 
 
-
-    totalEDVolume:
-
-        0,
+    hour:0,
 
 
 
-    boardedPatients:
-
-        0,
+    totalEDVolume:0,
 
 
-
-    expectedBoarders:
-
-        0,
+    boardedPatients:0,
 
 
 
-    expectedVolume:
-
-        0,
+    expectedBoarders:0,
 
 
-
-    occupiedMedicalBeds:
-
-        0,
+    expectedVolume:0,
 
 
 
-    currentRN:
-
-        0,
+    occupiedMedicalBeds:0,
 
 
 
-    currentMD:
-
-        0,
+    currentRN:0,
 
 
-
-    esi1:
-
-        0,
+    currentMD:0,
 
 
 
-    esi2:
-
-        0,
+    esi1:0,
 
 
-
-    esi3:
-
-        0,
+    esi2:0,
 
 
+    esi3:0,
 
-    esi4:
 
-        0,
+    esi4:0,
+
+
+    esi5:0,
 
 
 
-    esi5:
-
-        0,
+    expectedArrivals:0,
 
 
-    expectedArrivals:
-
-        0,
+    expectedDepartures:0,
 
 
-    expectedDepartures:
+    expectedRN:0,
 
-        0
+
+    expectedMD:0
+
 
 };
 
@@ -113,12 +89,20 @@ let state:SituationAssessment = {
 
 
 
+
+/**
+ * Returns the current committed assessment.
+ */
 export function getState():
 
 SituationAssessment {
 
 
-    return state;
+    return {
+
+        ...state
+
+    };
 
 
 }
@@ -129,6 +113,17 @@ SituationAssessment {
 
 
 
+
+
+/**
+ * Updates committed assessment.
+ *
+ * Called only after:
+ *
+ * User completes assessment
+ *        ↓
+ * Calculate EDORI clicked
+ */
 export function updateState(
 
     updates:Partial<SituationAssessment>

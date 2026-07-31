@@ -195,19 +195,129 @@ h3 {
 
 .status-banner {
 
-    padding: 15px;
+    width:100%;
 
-    border-radius: 8px;
+    background:
+        linear-gradient(
+            135deg,
+            #ffffff,
+            #f7f9fc
+        );
 
-    background: #d1fae5;
 
-    color: #065f46;
+    border-radius:14px;
 
-    font-weight: bold;
 
-    margin-bottom: 15px;
+    padding:24px;
 
-    text-align: center;
+
+    margin-bottom:24px;
+
+
+    border-left:
+        10px solid #2E7D32;
+
+
+    box-shadow:
+
+        0 8px 18px rgba(0,0,0,.08);
+
+
+    transition:
+        all .25s ease;
+
+}
+
+
+.status-banner:hover {
+
+    transform:
+        translateY(-2px);
+
+}
+
+
+
+.status-header {
+
+    display:flex;
+
+    align-items:center;
+
+    gap:15px;
+
+}
+
+
+
+#statusIcon {
+
+    font-size:42px;
+
+}
+
+
+
+#statusTitle {
+
+    font-size:28px;
+
+    font-weight:700;
+
+    color:#1f2937;
+
+}
+
+
+
+.status-score {
+
+    margin-top:15px;
+
+    font-size:18px;
+
+    font-weight:600;
+
+}
+
+
+
+.status-recommendation {
+
+    margin-top:12px;
+
+    padding-top:12px;
+
+    border-top:
+        1px solid #e5e7eb;
+
+
+    color:#374151;
+
+    line-height:1.5;
+
+}
+
+
+
+@media(max-width:768px){
+
+
+    .status-header{
+
+        flex-direction:column;
+
+        align-items:flex-start;
+
+    }
+
+
+    #statusTitle{
+
+        font-size:22px;
+
+    }
+
 
 }
 
@@ -587,6 +697,13 @@ h3 {
    Trend Chart
 ========================= */
 
+.trend-chart-wrapper {
+
+    height:300px;
+
+    width:100%;
+
+}
 
 .trend-history {
 
@@ -677,6 +794,81 @@ h3 {
             1fr;
 
     }
+
+
+}
+
+.trend-container {
+
+    background:white;
+
+    border-radius:14px;
+
+    padding:20px;
+
+    box-shadow:
+        0 5px 15px rgba(0,0,0,.08);
+
+}
+
+
+
+.trend-summary {
+
+    font-size:18px;
+
+    line-height:1.8;
+
+    margin-bottom:20px;
+
+}
+
+
+
+.trend-history {
+
+    display:flex;
+
+    gap:8px;
+
+    flex-wrap:wrap;
+
+}
+
+
+
+.trend-history span {
+
+
+    display:flex;
+
+
+    align-items:center;
+
+
+    justify-content:center;
+
+
+
+    width:38px;
+
+
+    height:38px;
+
+
+
+    border-radius:50%;
+
+
+
+    background:#f1f5f9;
+
+
+
+    font-weight:600;
+
+
+    font-size:14px;
 
 
 }

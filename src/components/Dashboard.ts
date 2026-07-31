@@ -17,112 +17,176 @@
  */
 
 
-import { SummaryCards }
+import {
+    SummaryStatus,
+    initializeSummaryStatus
+}
+from "./SummaryStatus";
+
+
+import {
+    SummaryCards
+}
 from "./SummaryCards";
 
 
-import { SituationAssessment }
+import {
+    SituationAssessment,
+    initializeSituationAssessment
+}
 from "./assessment/SituationAssessment";
 
 
-import { Gauge }
+import {
+    Gauge,
+    initializeGauge
+}
 from "./Gauge";
 
 
-import { Drivers }
+import {
+    Drivers,
+    initializeDrivers
+}
 from "./Drivers";
 
 
-import { Recommendations }
+import {
+    Recommendations,
+    initializeRecommendations
+}
 from "./Recommendations";
 
 
-import { TrendChart }
+import {
+    TrendChart,
+    initializeTrendChart
+}
 from "./TrendChart";
 
 
-
-import { initializeSituationAssessment }
-from "./assessment/SituationAssessment";
-
-
-import { initializeGauge }
-from "./Gauge";
-
-
-import { initializeDrivers }
-from "./Drivers";
-
-
-import { initializeRecommendations }
-from "./Recommendations";
-
-
-import { initializeTrendChart }
-from "./TrendChart";
-
-
-
-import { subscribe }
+import {
+    subscribe
+}
 from "../services/EventService";
 
 
-import { getState }
+import {
+    getState
+}
 from "../services/StateService";
 
 
-import { calculateEdori }
+import {
+    calculateEdori
+}
 from "../services/EdoriService";
 
 
-import { validateState }
+import {
+    validateState
+}
 from "../services/ValidationService";
 
 
+import type {
+    SituationAssessment as SituationAssessmentType
+}
+from "../types/SituationAssessment";
 
 
 
-export function Dashboard(): string {
+
+
+export function Dashboard():string {
 
 
     return `
 
 
-    <main class="dashboard">
+<main class="dashboard">
 
 
 
-        <div class="dashboard-header">
-
-
-            <div
-
-                id="statusBanner"
-
-                class="status-banner"
-
-            >
-
-                Normal Operations
-
-            </div>
+    <div class="dashboard-header">
 
 
 
-            <h2>
+        <div
 
-                Emergency Department Dashboard
+        id="statusBanner"
 
-            </h2>
+        class="status-banner"
+
+        >
+
+            Normal Operations
+
+        </div>
 
 
 
-            <p>
 
-                Operational Readiness Overview
 
-            </p>
+        <h2>
 
+            Emergency Department Dashboard
+
+        </h2>
+
+
+
+
+        <p>
+
+            Operational Readiness Overview
+
+        </p>
+
+
+
+
+        <div
+
+        id="assessmentFreshness"
+
+        class="assessment-freshness"
+
+        >
+
+            Assessment not yet calculated.
+
+        </div>
+
+
+
+    </div>
+
+
+
+
+
+
+    ${SummaryCards()}
+
+
+
+    ${SummaryStatus()}
+
+
+
+
+
+
+
+    <div class="dashboard-grid">
+
+
+
+        <div class="left-column">
+
+
+            ${SituationAssessment()}
 
 
         </div>
@@ -131,44 +195,22 @@ export function Dashboard(): string {
 
 
 
-        ${SummaryCards()}
+        <div class="right-column">
+
+
+            ${Gauge()}
 
 
 
-
-
-        <div class="dashboard-grid">
-
-
-
-            <div class="left-column">
-
-
-                ${SituationAssessment()}
-
-
-            </div>
+            ${Drivers()}
 
 
 
+            ${Recommendations()}
 
 
-            <div class="right-column">
 
-
-                ${Gauge()}
-
-
-                ${Drivers()}
-
-
-                ${Recommendations()}
-
-
-                ${TrendChart()}
-
-
-            </div>
+            ${TrendChart()}
 
 
 
@@ -176,12 +218,20 @@ export function Dashboard(): string {
 
 
 
-    </main>
+    </div>
 
 
-    `;
+
+
+
+</main>
+
+
+
+`;
 
 }
+
 
 
 
@@ -197,18 +247,21 @@ export function initializeDashboard():void {
 
 
 
-    /*
-     * Start assessment inputs
-     */
+    //
+    // Input components
+    //
 
     initializeSituationAssessment();
 
 
 
 
-    /*
-     * Start dashboard displays
-     */
+    //
+    // Dashboard widgets
+    //
+
+    initializeSummaryStatus();
+
 
     initializeGauge();
 
@@ -225,9 +278,10 @@ export function initializeDashboard():void {
 
 
 
-    /*
-     * Initial calculation
-     */
+
+    //
+    // Initial calculation
+    //
 
     updateDashboard();
 
@@ -235,9 +289,11 @@ export function initializeDashboard():void {
 
 
 
-    /*
-     * Listen for changes
-     */
+
+
+    //
+    // Listen for committed assessments
+    //
 
     subscribe(
 
@@ -246,6 +302,7 @@ export function initializeDashboard():void {
         updateDashboard
 
     );
+
 
 
 }
@@ -296,10 +353,18 @@ function updateDashboard():void {
         );
 
 
+        updateAssessmentFreshness(
+
+            state
+
+        );
+
+
         return;
 
 
     }
+
 
 
 
@@ -318,9 +383,21 @@ function updateDashboard():void {
 
 
 
+
+
     updateStatusBanner(
 
         result.status
+
+    );
+
+
+
+
+
+    updateAssessmentFreshness(
+
+        state
 
     );
 
@@ -382,6 +459,7 @@ function updateStatusBanner(
 
 
 
+
 /**
  * Displays validation problems
  */
@@ -417,11 +495,121 @@ function showValidationErrors(
 
     banner.textContent =
 
-        errors.join(
+        errors.join(" | ");
 
-            " | "
+
+
+}
+
+
+
+
+
+
+
+
+
+/**
+ * Displays assessment age
+ */
+function updateAssessmentFreshness(
+
+    state:SituationAssessmentType
+
+):void {
+
+
+
+    const element =
+
+        document.getElementById(
+
+            "assessmentFreshness"
 
         );
+
+
+
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+
+
+
+
+    if(!state.assessmentTime){
+
+
+        element.textContent =
+
+            "Assessment not yet calculated.";
+
+
+        return;
+
+
+    }
+
+
+
+
+
+
+
+    const assessmentDate =
+
+        new Date(
+
+            state.assessmentTime
+
+        );
+
+
+
+
+
+    const now =
+
+        new Date();
+
+
+
+
+
+    const minutes =
+
+        Math.floor(
+
+            (
+
+                now.getTime()
+
+                -
+
+                assessmentDate.getTime()
+
+            )
+
+            /
+
+            60000
+
+        );
+
+
+
+
+
+
+    element.textContent =
+
+        `Last calculated ${minutes} minutes ago`;
 
 
 

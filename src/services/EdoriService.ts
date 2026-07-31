@@ -8,26 +8,50 @@
  */
 
 
-import type { SituationAssessment } 
+import type { SituationAssessment }
+
 from "../types/SituationAssessment";
 
+
 import type { EdoriResult }
+
 from "../types/EdoriResult";
 
+
 import type { Driver }
+
 from "../types/Driver";
 
 
-import { HOSPITAL }
+
+import {
+
+    HOSPITAL
+
+}
+
 from "../config/constants";
 
 
-import { WEIGHTS }
+
+import {
+
+    WEIGHTS
+
+}
+
 from "../config/weights";
 
 
-import { getThreshold }
+
+import {
+
+    getThreshold
+
+}
+
 from "../config/thresholds";
+
 
 
 import {
@@ -40,63 +64,94 @@ from "./ForecastService";
 
 
 
+import {
+
+    saveSnapshot,
+
+    shouldCreateSnapshot
+
+}
+
+from "./SnapshotService";
 
 
-/**
- * Main EDORI calculation function.
- */
+
+
+
+
+
+
 export function calculateEdori(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): EdoriResult {
+):EdoriResult {
 
 
-
-    /*
-     * Calculate individual domains
-     */
 
     const demandScore =
+
         calculateDemand(
+
             assessment
+
         );
+
 
 
     const boardingScore =
+
         calculateBoarding(
+
             assessment
+
         );
+
 
 
     const hospitalScore =
+
         calculateHospitalCapacity(
+
             assessment
+
         );
+
 
 
     const capacityScore =
+
         calculateClinicalCapacity(
+
             assessment
+
         );
+
 
 
     const acuityScore =
+
         calculateAcuity(
+
             assessment
+
         );
+
 
 
     const forecast =
+
         calculateForecast(
+
             assessment
+
         );
 
 
 
-    /*
-     * Weighted EDORI score
-     */
+
+
+
 
     const score = Math.round(
 
@@ -126,8 +181,72 @@ export function calculateEdori(
 
 
 
+
+
+
     const threshold =
-        getThreshold(score);
+
+        getThreshold(
+
+            score
+
+        );
+
+
+
+
+
+
+
+    const snapshot = {
+
+
+        score,
+
+
+        status:
+
+            threshold.status,
+
+
+        operationalState:
+
+            threshold.state,
+
+
+        timestamp:
+
+            new Date()
+
+
+    };
+
+
+
+
+
+
+    if(
+
+        shouldCreateSnapshot(
+
+            snapshot
+
+        )
+
+    ){
+
+        saveSnapshot(
+
+            snapshot
+
+        );
+
+    }
+
+
+
+
 
 
 
@@ -138,7 +257,9 @@ export function calculateEdori(
 
 
         status:
+
             threshold.status,
+
 
 
         demandScore,
@@ -156,27 +277,42 @@ export function calculateEdori(
         acuityScore,
 
 
+
         forecastScore:
+
             forecast.forecastScore,
 
 
+
         drivers:
+
             generateDrivers(
+
                 assessment,
+
                 forecast.forecastScore
+
             ),
+
 
 
         recommendations:
+
             generateRecommendations(
+
                 score
+
             ),
 
 
+
         timestamp:
+
             new Date()
 
+
     };
+
 
 }
 
@@ -186,41 +322,32 @@ export function calculateEdori(
 
 
 
-/**
- * ED Demand Score
- *
- * Compares current volume
- * against historical expectation.
- */
+
+
 function calculateDemand(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): number {
+):number {
 
 
-    if (
+    if(
+
         assessment.expectedVolume === 0
-    ) {
+
+    ){
 
         return 0;
 
     }
 
 
-    const difference =
-
-        assessment.totalEDVolume
-
-        -
-
-        assessment.expectedVolume;
-
-
 
     return normalize(
 
-        difference,
+        assessment.totalEDVolume -
+
+        assessment.expectedVolume,
 
         25
 
@@ -233,29 +360,21 @@ function calculateDemand(
 
 
 
-/**
- * Boarding Score
- */
+
+
+
 function calculateBoarding(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): number {
-
-
-    const difference =
-
-        assessment.boardedPatients
-
-        -
-
-        assessment.expectedBoarders;
-
+):number {
 
 
     return normalize(
 
-        difference,
+        assessment.boardedPatients -
+
+        assessment.expectedBoarders,
 
         25
 
@@ -268,23 +387,19 @@ function calculateBoarding(
 
 
 
-/**
- * Hospital Capacity Score
- *
- * Uses medical/surgical beds only.
- */
+
+
+
 function calculateHospitalCapacity(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): number {
+):number {
 
 
     const occupancy =
 
-        assessment.occupiedMedicalBeds
-
-        /
+        assessment.occupiedMedicalBeds /
 
         HOSPITAL.MEDICAL_BEDS;
 
@@ -305,51 +420,40 @@ function calculateHospitalCapacity(
 
 
 
-/**
- * Clinical Capacity Score
- *
- * Evaluates staffing relative
- * to patient workload.
- */
+
+
+
 function calculateClinicalCapacity(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): number {
+):number {
 
 
     const providers =
 
-        assessment.currentRN
-
-        +
+        assessment.currentRN +
 
         assessment.currentMD;
 
 
 
-    if (
-        providers === 0
-    ) {
+
+    if(providers === 0){
 
         return 100;
 
     }
 
 
-    const workload =
-
-        assessment.totalEDVolume
-
-        /
-
-        providers;
 
 
 
     return normalize(
 
-        workload - 3,
+        assessment.totalEDVolume /
+
+        providers - 3,
 
         10
 
@@ -363,54 +467,39 @@ function calculateClinicalCapacity(
 
 
 
-/**
- * Patient Acuity Score
- */
+
+
 function calculateAcuity(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): number {
+):number {
 
 
     const weightedPatients =
 
-        assessment.esi1 * 5
+        assessment.esi1 * 5 +
 
-        +
+        assessment.esi2 * 4 +
 
-        assessment.esi2 * 4
+        assessment.esi3 * 3 +
 
-        +
-
-        assessment.esi3 * 3
-
-        +
-
-        assessment.esi4 * 2
-
-        +
+        assessment.esi4 * 2 +
 
         assessment.esi5;
 
 
 
-    if (
+
+    if(
+
         assessment.totalEDVolume === 0
-    ) {
+
+    ){
 
         return 0;
 
     }
-
-
-    const acuityRatio =
-
-        weightedPatients
-
-        /
-
-        assessment.totalEDVolume;
 
 
 
@@ -418,7 +507,15 @@ function calculateAcuity(
 
         100,
 
-        acuityRatio * 20
+        (
+
+            weightedPatients /
+
+            assessment.totalEDVolume
+
+        )
+
+        *20
 
     );
 
@@ -430,10 +527,8 @@ function calculateAcuity(
 
 
 
-/**
- * Converts differences into
- * 0-100 scores.
- */
+
+
 function normalize(
 
     value:number,
@@ -443,18 +538,27 @@ function normalize(
 ):number {
 
 
-    if(value <= 0){
+    if(value <=0){
 
         return 0;
 
     }
 
 
+
     return Math.min(
 
         100,
 
-        (value / maximum) * 100
+        (
+
+            value /
+
+            maximum
+
+        )
+
+        *100
 
     );
 
@@ -466,12 +570,11 @@ function normalize(
 
 
 
-/**
- * Generates dashboard drivers.
- */
+
+
 function generateDrivers(
 
-    assessment: SituationAssessment,
+    assessment:SituationAssessment,
 
     forecastScore:number
 
@@ -490,30 +593,40 @@ function generateDrivers(
 
     ){
 
+
         drivers.push({
 
             title:"Boarding",
 
             description:
+
             `Boarding exceeds expected volume by ${
                 assessment.boardedPatients -
                 assessment.expectedBoarders
             } patients.`,
 
             severity:
-            calculateBoarding(
-                assessment
-            ),
+
+                calculateBoarding(
+
+                    assessment
+
+                ),
 
             currentValue:
-            assessment.boardedPatients,
+
+                assessment.boardedPatients,
 
             expectedValue:
-            assessment.expectedBoarders
+
+                assessment.expectedBoarders
+
 
         });
 
     }
+
+
 
 
 
@@ -525,53 +638,76 @@ function generateDrivers(
 
     ){
 
+
         drivers.push({
 
             title:"ED Volume",
 
             description:
+
             "Emergency department volume exceeds historical expectation.",
 
             severity:
-            calculateDemand(
-                assessment
-            ),
+
+                calculateDemand(
+
+                    assessment
+
+                ),
 
             currentValue:
-            assessment.totalEDVolume,
+
+                assessment.totalEDVolume,
 
             expectedValue:
-            assessment.expectedVolume
+
+                assessment.expectedVolume
+
 
         });
+
 
     }
 
 
 
+
+
+
     if(
+
         forecastScore > 50
+
     ){
+
 
         drivers.push({
 
             title:"Forecast",
 
             description:
+
             "Projected conditions indicate increasing operational strain.",
 
             severity:
-            forecastScore,
+
+                forecastScore,
 
             currentValue:
-            forecastScore,
+
+                forecastScore,
 
             expectedValue:
-            50
+
+                50
+
 
         });
 
+
     }
+
+
 
 
     return drivers;
@@ -584,9 +720,8 @@ function generateDrivers(
 
 
 
-/**
- * Generates operational recommendations.
- */
+
+
 function generateRecommendations(
 
     score:number
@@ -594,7 +729,9 @@ function generateRecommendations(
 ):string[] {
 
 
-    if(score >= 70){
+
+    if(score >=70){
+
 
         return [
 
@@ -606,10 +743,15 @@ function generateRecommendations(
 
         ];
 
+
     }
 
 
-    if(score >= 40){
+
+
+
+    if(score >=40){
+
 
         return [
 
@@ -619,7 +761,12 @@ function generateRecommendations(
 
         ];
 
+
     }
+
+
+
+
 
 
     return [

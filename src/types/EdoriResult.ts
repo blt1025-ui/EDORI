@@ -1,49 +1,81 @@
-import type { Driver } from "./Driver";
-
 /**
- * Result returned by the EDORI calculation engine.
+ * EdoriResult
+ *
+ * Output of the EDORI calculation engine.
  */
+
+import type { Driver } 
+from "./Driver";
+
+
+import type { OperationalState }
+from "../config/operationalStates";
+
+
+
 export interface EdoriResult {
 
-    /**
-     * Overall EDORI score (0-100)
-     */
-    score: number;
 
     /**
-     * Operational status.
+     * Overall EDORI score
+     * 0-100
      */
-    status:
-        | "Normal Operations"
-        | "Elevated Awareness"
-        | "Capacity Strain"
-        | "High Surge"
-        | "Severe Surge"
-        | "Critical Operations";
+    score:number;
+
+
 
     /**
-     * Individual domain scores.
+     * Basic status label
      */
-    demandScore: number;
-    boardingScore: number;
-    hospitalScore: number;
-    capacityScore: number;
-    acuityScore: number;
-    forecastScore: number;
+    status:string;
+
+
 
     /**
-     * Major contributors to the score.
+     * Expanded operational interpretation
      */
-    drivers: Driver[];
+    operationalState:OperationalState;
+
+
 
     /**
-     * Recommended operational actions.
+     * Individual scoring domains
      */
-    recommendations: string[];
+
+    demandScore:number;
+
+    boardingScore:number;
+
+    hospitalScore:number;
+
+    capacityScore:number;
+
+    acuityScore:number;
+
+    forecastScore:number;
+
+
 
     /**
-     * Time the score was calculated.
+     * Explanation of score
      */
-    timestamp: Date;
+
+    drivers:Driver[];
+
+
+
+    /**
+     * Recommended actions
+     */
+
+    recommendations:string[];
+
+
+
+    /**
+     * Calculation timestamp
+     */
+
+    timestamp:Date;
 
 }

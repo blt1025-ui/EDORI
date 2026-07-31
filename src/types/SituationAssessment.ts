@@ -6,6 +6,14 @@
 
 export interface SituationAssessment {
 
+
+   /**
+ * Assessment metadata
+ */
+
+assessmentTime:string;
+
+
     /* ============================================================
        TIME
        ============================================================ */

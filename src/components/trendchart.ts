@@ -3,32 +3,94 @@
  *
  * Displays EDORI operational trend.
  *
- * Initial version:
- * - Stores recent EDORI scores
- * - Displays trend direction
+ * Uses:
+ * - Chart.js visualization
+ * - Persistent EDORI snapshots
  *
- * Future:
- * - Historical database integration
- * - Predictive modeling
+ * Data flow:
+ *
+ * EdoriService
+ *       ↓
+ * SnapshotService
+ *       ↓
+ * TrendService
+ *       ↓
+ * TrendChart
  */
 
 
-import { subscribe }
+import {
+
+    Chart,
+
+    LineController,
+
+    LineElement,
+
+    PointElement,
+
+    LinearScale,
+
+    CategoryScale,
+
+    Tooltip,
+
+    Legend
+
+}
+
+from "chart.js";
+
+
+
+import {
+
+    getTrendHistory
+
+}
+
+from "../services/TrendService";
+
+
+
+import {
+
+    subscribe
+
+}
+
 from "../services/EventService";
 
 
-import { getState }
+
+import {
+
+    getState
+
+}
+
 from "../services/StateService";
 
 
-import { calculateEdori }
+
+import {
+
+    calculateEdori
+
+}
+
 from "../services/EdoriService";
 
 
 
 
 
-const trendHistory:number[] = [];
+
+let chart:Chart | null = null;
+
+
+
+
 
 
 
@@ -40,33 +102,52 @@ export function TrendChart():string {
     return `
 
 
-    <section class="trend-container">
+<section class="trend-container">
 
 
-        <h3>
-            EDORI Trend
-        </h3>
-
-
-
-        <div id="trend-display">
-
-
-            <p>
-                No trend data available.
-            </p>
-
-
-        </div>
+<h3>
+EDORI Trend
+</h3>
 
 
 
-    </section>
+<div class="trend-chart-wrapper">
 
 
-    `;
+<canvas
+
+id="edoriTrendChart"
+
+></canvas>
+
+
+</div>
+
+
+
+
+<div
+
+id="trend-summary"
+
+class="trend-summary"
+
+>
+
+Awaiting assessment data.
+
+</div>
+
+
+
+</section>
+
+
+`;
 
 }
+
+
 
 
 
@@ -77,7 +158,30 @@ export function TrendChart():string {
 export function initializeTrendChart():void {
 
 
+    Chart.register(
+
+        LineController,
+
+        LineElement,
+
+        PointElement,
+
+        LinearScale,
+
+        CategoryScale,
+
+        Tooltip,
+
+        Legend
+
+    );
+
+
+
+
     updateTrend();
+
+
 
 
 
@@ -99,7 +203,240 @@ export function initializeTrendChart():void {
 
 
 
+
 function updateTrend():void {
+
+
+
+    /*
+     * Trigger EDORI calculation.
+     *
+     * Snapshot creation occurs
+     * inside EdoriService.
+     */
+
+    calculateEdori(
+
+        getState()
+
+    );
+
+
+
+    renderChart();
+
+
+
+}
+
+
+
+
+
+
+
+
+
+function renderChart():void {
+
+
+
+    const canvas =
+
+        document.getElementById(
+
+            "edoriTrendChart"
+
+        ) as HTMLCanvasElement | null;
+
+
+
+
+
+    if(!canvas){
+
+        return;
+
+    }
+
+
+
+
+
+
+
+    const history =
+
+        getTrendHistory();
+
+
+
+
+
+
+    if(chart){
+
+
+        chart.destroy();
+
+
+    }
+
+
+
+
+
+
+
+
+    chart = new Chart(
+
+        canvas,
+
+        {
+
+
+            type:"line",
+
+
+
+            data:{
+
+
+                labels:
+
+                    history.map(
+
+                        point =>
+
+                        point.timestamp
+
+                        .toLocaleTimeString(
+
+                            [],
+
+                            {
+
+                                hour:"2-digit",
+
+                                minute:"2-digit"
+
+                            }
+
+                        )
+
+                    ),
+
+
+
+                datasets:[
+
+                    {
+
+                        label:
+
+                        "EDORI Score",
+
+
+                        data:
+
+                        history.map(
+
+                            point =>
+
+                            point.score
+
+                        ),
+
+
+
+                        tension:.3,
+
+
+                        borderWidth:3,
+
+
+                        pointRadius:5
+
+
+                    }
+
+                ]
+
+            },
+
+
+
+
+            options:{
+
+
+                responsive:true,
+
+
+                maintainAspectRatio:false,
+
+
+
+                scales:{
+
+
+                    y:{
+
+
+                        min:0,
+
+
+                        max:100
+
+
+                    }
+
+
+                },
+
+
+
+                plugins:{
+
+
+                    legend:{
+
+
+                        display:true
+
+
+                    }
+
+
+                }
+
+
+
+            }
+
+
+        }
+
+    );
+
+
+
+
+
+    updateTrendSummary();
+
+}
+
+
+
+
+
+
+
+
+
+function updateTrendSummary():void {
 
 
 
@@ -107,7 +444,7 @@ function updateTrend():void {
 
         document.getElementById(
 
-            "trend-display"
+            "trend-summary"
 
         );
 
@@ -125,49 +462,29 @@ function updateTrend():void {
 
 
 
-    const state =
 
-        getState();
+    const history =
 
-
-
-
-
-    const result =
-
-        calculateEdori(
-
-            state
-
-        );
+        getTrendHistory();
 
 
 
 
 
-    trendHistory.push(
 
-        result.score
-
-    );
+    if(history.length === 0){
 
 
+        container.textContent =
+
+            "No EDORI assessments recorded.";
 
 
+        return;
 
-    /*
-     * Keep last 10 values
-     */
-
-    if(
-
-        trendHistory.length > 10
-
-    ){
-
-        trendHistory.shift();
 
     }
+
 
 
 
@@ -176,11 +493,34 @@ function updateTrend():void {
 
     const current =
 
-        Math.round(
+        history[
 
-            result.score
+            history.length - 1
 
-        );
+        ];
+
+
+
+
+
+
+
+    if(history.length === 1){
+
+
+        container.textContent =
+
+
+        `Current Score: ${current.score}`;
+
+
+
+        return;
+
+
+    }
+
+
 
 
 
@@ -188,23 +528,11 @@ function updateTrend():void {
 
     const previous =
 
-        trendHistory.length > 1
+        history[
 
-        ?
+            history.length - 2
 
-        Math.round(
-
-            trendHistory[
-
-                trendHistory.length - 2
-
-            ]
-
-        )
-
-        :
-
-        current;
+        ];
 
 
 
@@ -212,7 +540,7 @@ function updateTrend():void {
 
 
 
-    let direction =
+    let trend =
 
         "Stable";
 
@@ -220,23 +548,13 @@ function updateTrend():void {
 
 
 
-    if(current > previous){
-
-        direction =
-
-            "Increasing";
-
-    }
+    if(current.score > previous.score){
 
 
+        trend =
 
+        "Increasing";
 
-
-    if(current < previous){
-
-        direction =
-
-            "Improving";
 
     }
 
@@ -245,76 +563,26 @@ function updateTrend():void {
 
 
 
-
-    container.innerHTML =
-
-
-    `
+    if(current.score < previous.score){
 
 
-    <div class="trend-summary">
+        trend =
+
+        "Improving";
 
 
-        <strong>
-
-            Current Score:
-
-        </strong>
-
-        ${current}
+    }
 
 
 
-        <br>
 
 
 
-        <strong>
 
-            Trend:
-
-        </strong>
-
-        ${direction}
+    container.textContent =
 
 
-
-    </div>
-
-
-
-    <div class="trend-history">
-
-
-        ${
-
-            trendHistory
-
-            .map(
-
-                value =>
-
-                `
-
-                <span>
-
-                    ${Math.round(value)}
-
-                </span>
-
-                `
-
-            )
-
-            .join("")
-
-        }
-
-
-    </div>
-
-
-    `;
+    `Current Score: ${current.score} | Trend: ${trend}`;
 
 
 

@@ -9,18 +9,48 @@
  * - Hospital capacity
  * - Staffing
  * - Patient acuity
+ *
+ * Workflow:
+ *
+ * User enters data
+ *        ↓
+ * Draft assessment
+ *        ↓
+ * Calculate EDORI button
+ *        ↓
+ * Commit assessment
+ *        ↓
+ * EDORI recalculation
  */
 
 
-import { updateState }
+import {
+
+    updateDraft,
+
+    submitAssessment
+
+}
+
+from "../../services/AssessmentService";
+
+
+import {
+
+    updateState
+
+}
+
 from "../../services/StateService";
 
 
-import { emit }
+import {
+
+    emit
+
+}
+
 from "../../services/EventService";
-
-
-
 
 
 
@@ -280,6 +310,43 @@ ${createESIInput(5)}
 
 
 
+
+
+<div class="assessment-actions">
+
+
+<button
+
+id="calculateEdoriButton"
+
+class="calculate-button"
+
+>
+
+Calculate EDORI
+
+</button>
+
+
+
+
+<p
+
+id="assessmentMessage"
+
+>
+
+Enter all operational data then calculate.
+
+</p>
+
+
+</div>
+
+
+
+
+
 </section>
 
 
@@ -346,6 +413,7 @@ value="0"
 export function initializeSituationAssessment():void {
 
 
+
     const fields = [
 
 
@@ -378,6 +446,8 @@ export function initializeSituationAssessment():void {
 
 
 
+
+
     fields.forEach(
 
         (field)=>{
@@ -390,7 +460,6 @@ export function initializeSituationAssessment():void {
                     field
 
                 ) as HTMLInputElement | null;
-
 
 
 
@@ -416,7 +485,7 @@ export function initializeSituationAssessment():void {
                 ()=>{
 
 
-                    updateField(
+                    updateDraft(
 
                         field,
 
@@ -431,17 +500,107 @@ export function initializeSituationAssessment():void {
 
                 }
 
-
             );
 
 
         }
 
-
     );
 
 
-}
+
+
+
+
+
+
+
+    const button =
+
+        document.getElementById(
+
+            "calculateEdoriButton"
+
+        );
+
+
+
+
+
+    if(button){
+
+
+        button.addEventListener(
+
+            "click",
+
+            ()=>{
+
+
+                const assessment =
+
+                    submitAssessment();
+
+
+
+
+
+                const message =
+
+                    document.getElementById(
+
+                        "assessmentMessage"
+
+                    );
+
+
+
+
+
+
+
+                if(!assessment){
+
+
+                    if(message){
+
+
+                        message.textContent =
+
+                        "Please complete all fields before calculating.";
+
+
+                    }
+
+
+                    return;
+
+
+                }
+
+
+
+
+
+
+
+                updateState(
+
+                    assessment
+
+                );
+
+
+
+
+
+
+
+                emit(
+
+                    "stateChanged"
+
+                );
 
 
 
@@ -450,32 +609,24 @@ export function initializeSituationAssessment():void {
 
 
 
-
-function updateField(
-
-    field:string,
-
-    value:number
-
-):void {
+                if(message){
 
 
+                    message.textContent =
 
-    updateState({
+                    "EDORI calculated successfully.";
 
-        [field]: value
 
-    });
+                }
 
 
 
+            }
+
+        );
 
 
-    emit(
-
-        "stateChanged"
-
-    );
+    }
 
 
 }
