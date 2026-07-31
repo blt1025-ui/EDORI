@@ -7,20 +7,10 @@
  *
  * - Does not calculate EDORI.
  * - Does not create snapshots.
- * - Only reads snapshots already saved after the user
- *   clicks Calculate EDORI.
- *
- * Data flow:
- *
- * Submitted Assessment
- *        ↓
- * SnapshotService
- *        ↓
- * TrendService
- *        ↓
- * TrendChart
+ * - Reads snapshots already saved after the user
+ *   selects Calculate EDORI.
+ * - Refreshes only when a completed result is published.
  */
-
 
 import {
 
@@ -63,15 +53,18 @@ import {
 from "../services/TrendService";
 
 
+interface TrendPoint {
 
+    timestamp:Date;
+
+    score:number;
+
+}
 
 
 let chart:Chart | null = null;
 
 let chartRegistered = false;
-
-
-
 
 
 /**
@@ -103,13 +96,9 @@ export function TrendChart():string {
             <div class="trend-chart-wrapper">
 
                 <canvas
-
                     id="edoriTrendChart"
-
                     aria-label="EDORI score trend chart"
-
                     role="img"
-
                 >
                 </canvas>
 
@@ -117,11 +106,9 @@ export function TrendChart():string {
 
 
             <div
-
                 id="trend-summary"
-
                 class="trend-summary"
-
+                aria-live="polite"
             >
 
                 No EDORI assessments recorded.
@@ -135,12 +122,9 @@ export function TrendChart():string {
 }
 
 
-
-
-
 /**
- * Initialize Chart.js and subscribe to submitted
- * assessment updates.
+ * Initialize Chart.js and subscribe to completed
+ * EDORI result updates.
  */
 export function initializeTrendChart():void {
 
@@ -148,9 +132,10 @@ export function initializeTrendChart():void {
 
     updateTrend();
 
+
     subscribe(
 
-        "stateChanged",
+        "resultChanged",
 
         updateTrend
 
@@ -159,11 +144,8 @@ export function initializeTrendChart():void {
 }
 
 
-
-
-
 /**
- * Register Chart.js components once.
+ * Register required Chart.js components once.
  */
 function registerChartComponents():void {
 
@@ -198,14 +180,10 @@ function registerChartComponents():void {
 }
 
 
-
-
-
 /**
- * Refresh the chart from existing snapshots.
+ * Refresh the chart using saved snapshots.
  *
- * This function intentionally does not call
- * calculateEdori().
+ * No EDORI calculation occurs here.
  */
 function updateTrend():void {
 
@@ -214,11 +192,8 @@ function updateTrend():void {
 }
 
 
-
-
-
 /**
- * Draw or redraw the persistent EDORI trend.
+ * Draw or redraw the trend chart.
  */
 function renderChart():void {
 
@@ -239,13 +214,7 @@ function renderChart():void {
     const history = getTrendHistory();
 
 
-    if(chart){
-
-        chart.destroy();
-
-        chart = null;
-
-    }
+    destroyExistingChart();
 
 
     if(history.length === 0){
@@ -282,7 +251,11 @@ function renderChart():void {
 
     const values = history.map(
 
-        point => point.score
+        point => Math.round(
+
+            point.score
+
+        )
 
     );
 
@@ -405,7 +378,10 @@ function renderChart():void {
 
                             label:(context) => {
 
-                                const value = context.parsed.y;
+                                const value =
+
+                                    context.parsed.y;
+
 
                                 return `EDORI Score: ${value}`;
 
@@ -433,21 +409,31 @@ function renderChart():void {
 }
 
 
+/**
+ * Destroy the previous Chart.js instance.
+ */
+function destroyExistingChart():void {
 
+    if(!chart){
+
+        return;
+
+    }
+
+
+    chart.destroy();
+
+    chart = null;
+
+}
 
 
 /**
- * Update the summary beneath the chart.
+ * Update the text summary beneath the chart.
  */
 function updateTrendSummary(
 
-    history:{
-
-        timestamp:Date;
-
-        score:number;
-
-    }[]
+    history:TrendPoint[]
 
 ):void {
 
@@ -503,38 +489,22 @@ function updateTrendSummary(
 
     const difference = Math.round(
 
-        current.score - previous.score
+        current.score -
 
-    );
-
-
-    const direction = getTrendDirection(
-
-        difference
-
-    );
-
-
-    const differenceText = formatDifference(
-
-        difference
+        previous.score
 
     );
 
 
     container.textContent =
 
-        `Current Score: ${Math.round(current.score)} | Trend: ${direction} (${differenceText})`;
+        `Current Score: ${Math.round(current.score)} | Trend: ${getTrendDirection(difference)} (${formatDifference(difference)})`;
 
 }
 
 
-
-
-
 /**
- * Determine whether conditions are worsening,
- * improving, or unchanged.
+ * Determine trend direction.
  */
 function getTrendDirection(
 
@@ -561,11 +531,8 @@ function getTrendDirection(
 }
 
 
-
-
-
 /**
- * Format the change between the last two scores.
+ * Format score change.
  */
 function formatDifference(
 
@@ -589,11 +556,8 @@ function formatDifference(
 }
 
 
-
-
-
 /**
- * Format a snapshot timestamp for the x-axis.
+ * Format a timestamp for the chart axis.
  */
 function formatTimestamp(
 
@@ -636,11 +600,8 @@ function formatTimestamp(
 }
 
 
-
-
-
 /**
- * Clear residual chart pixels when history is empty.
+ * Clear chart pixels when there is no history.
  */
 function clearCanvas(
 

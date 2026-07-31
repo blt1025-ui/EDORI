@@ -3,11 +3,11 @@
  *
  * Main EDORI data-entry panel.
  *
- * Submission flow:
+ * Workflow:
  *
  * User enters values
  *        ↓
- * Draft assessment
+ * Draft assessment only
  *        ↓
  * Calculate EDORI
  *        ↓
@@ -21,7 +21,14 @@
  *        ↓
  * Save one historical snapshot
  *        ↓
- * Notify dashboard components
+ * Emit resultChanged
+ *
+ * On page reload:
+ *
+ * - The last committed assessment is restored.
+ * - Draft fields are repopulated.
+ * - No new calculation occurs.
+ * - No new snapshot is created.
  */
 
 import {
@@ -36,6 +43,10 @@ from "../../services/AssessmentService";
 
 
 import {
+
+    getState,
+
+    hasCommittedAssessment,
 
     updateState
 
@@ -101,7 +112,7 @@ from "../../types/SituationAssessment";
 
 
 /**
- * IDs for all assessment input fields.
+ * Numeric fields displayed in the assessment form.
  */
 const ASSESSMENT_FIELDS:[
 
@@ -341,7 +352,10 @@ export function SituationAssessment():string {
 
                     id="assessmentMessage"
 
-                    class="assessment-message"
+                    class="
+                        assessment-message
+                        assessment-message-default
+                    "
 
                     aria-live="polite"
 
@@ -361,7 +375,7 @@ export function SituationAssessment():string {
 
 
 /**
- * Create a reusable numeric input.
+ * Create a reusable numeric assessment input.
  */
 function createNumberInput(
 
@@ -421,8 +435,7 @@ function createNumberInput(
 
 
 /**
- * Initialize draft input listeners and the
- * Calculate EDORI submission button.
+ * Initialize all assessment behavior.
  */
 export function initializeSituationAssessment():void {
 
@@ -430,16 +443,26 @@ export function initializeSituationAssessment():void {
 
     initializeCalculateButton();
 
+    updateInitialAssessmentMessage();
+
 }
 
 
 /**
- * Store input changes as draft data only.
+ * Initialize assessment inputs.
  *
- * No stateChanged or resultChanged event occurs
- * while the user is typing.
+ * If a committed assessment exists, restore
+ * its values into both the form and draft service.
  */
 function initializeDraftInputs():void {
+
+    const committedState = getState();
+
+
+    const restoreCommittedValues =
+
+        hasCommittedAssessment();
+
 
     ASSESSMENT_FIELDS.forEach(
 
@@ -465,21 +488,35 @@ function initializeDraftInputs():void {
             }
 
 
-            /*
-             * Initialize the draft with the displayed
-             * input value. This allows zero to be treated
-             * as a completed value rather than an omitted field.
-             */
+            const initialValue = restoreCommittedValues
+
+                ? getNumericFieldValue(
+
+                    committedState,
+
+                    field
+
+                )
+
+                : parseInputValue(
+
+                    element.value
+
+                );
+
+
+            element.value = String(
+
+                initialValue
+
+            );
+
 
             updateDraft(
 
                 field,
 
-                parseInputValue(
-
-                    element.value
-
-                )
+                initialValue
 
             );
 
@@ -490,15 +527,18 @@ function initializeDraftInputs():void {
 
                 () => {
 
+                    const value = parseInputValue(
+
+                        element.value
+
+                    );
+
+
                     updateDraft(
 
                         field,
 
-                        parseInputValue(
-
-                            element.value
-
-                        )
+                        value
 
                     );
 
@@ -553,8 +593,8 @@ function initializeCalculateButton():void {
 
 
 /**
- * Commit, calculate, store, and publish one
- * completed EDORI assessment.
+ * Commit, validate, calculate, persist,
+ * and publish one EDORI assessment.
  */
 function submitAndCalculateAssessment():void {
 
@@ -622,6 +662,9 @@ function submitAndCalculateAssessment():void {
 
         /*
          * Commit the validated assessment.
+         *
+         * StateService also persists this assessment
+         * to localStorage.
          */
 
         updateState(
@@ -643,8 +686,7 @@ function submitAndCalculateAssessment():void {
 
 
         /*
-         * Store the authoritative result for
-         * dashboard display components.
+         * Store and persist the authoritative result.
          */
 
         setLatestResult(
@@ -655,7 +697,7 @@ function submitAndCalculateAssessment():void {
 
 
         /*
-         * Save a single historical snapshot.
+         * Save one historical snapshot.
          */
 
         const snapshotTimestamp =
@@ -708,21 +750,8 @@ function submitAndCalculateAssessment():void {
 
 
         /*
-         * Maintain stateChanged temporarily for
-         * components that have not yet migrated
-         * to ResultService.
-         */
-
-        emit(
-
-            "stateChanged"
-
-        );
-
-
-        /*
-         * Notify components that consume the
-         * authoritative EdoriResult.
+         * Notify every dashboard display that a new
+         * authoritative result is available.
          */
 
         emit(
@@ -777,6 +806,73 @@ function submitAndCalculateAssessment():void {
 
 
 /**
+ * Display an appropriate message when the
+ * component first loads.
+ */
+function updateInitialAssessmentMessage():void {
+
+    if(hasCommittedAssessment()){
+
+        showAssessmentMessage(
+
+            "The most recently submitted assessment has been restored. Change values as needed, then select Calculate EDORI.",
+
+            "default"
+
+        );
+
+        return;
+
+    }
+
+
+    showAssessmentMessage(
+
+        "Enter all operational data, then calculate.",
+
+        "default"
+
+    );
+
+}
+
+
+/**
+ * Read a numeric value from the committed
+ * SituationAssessment safely.
+ */
+function getNumericFieldValue(
+
+    assessment:SituationAssessmentType,
+
+    field:keyof SituationAssessmentType
+
+):number {
+
+    const value = assessment[field];
+
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
  * Convert an input string into a safe number.
  */
 function parseInputValue(
@@ -805,8 +901,8 @@ function parseInputValue(
 
 
 /**
- * Indicate that draft values have changed but
- * the score has not yet been recalculated.
+ * Indicate that draft values have changed
+ * without recalculating EDORI.
  */
 function showDraftChangedMessage():void {
 
@@ -822,7 +918,7 @@ function showDraftChangedMessage():void {
 
 
 /**
- * Update the assessment message.
+ * Update the assessment message and style.
  */
 function showAssessmentMessage(
 
@@ -880,8 +976,7 @@ function showAssessmentMessage(
 
 
 /**
- * Disable the calculation button while a
- * submission is being processed.
+ * Disable the button while submitting.
  */
 function setSubmissionState(
 
