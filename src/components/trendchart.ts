@@ -1,20 +1,23 @@
 /**
  * TrendChart
  *
- * Displays EDORI operational trend.
+ * Displays persistent EDORI operational history.
  *
- * Uses:
- * - Chart.js visualization
- * - Persistent EDORI snapshots
+ * Important behavior:
+ *
+ * - Does not calculate EDORI.
+ * - Does not create snapshots.
+ * - Only reads snapshots already saved after the user
+ *   clicks Calculate EDORI.
  *
  * Data flow:
  *
- * EdoriService
- *       ↓
+ * Submitted Assessment
+ *        ↓
  * SnapshotService
- *       ↓
+ *        ↓
  * TrendService
- *       ↓
+ *        ↓
  * TrendChart
  */
 
@@ -42,6 +45,14 @@ import {
 from "chart.js";
 
 
+import {
+
+    subscribe
+
+}
+
+from "../services/EventService";
+
 
 import {
 
@@ -53,97 +64,73 @@ from "../services/TrendService";
 
 
 
-import {
-
-    subscribe
-
-}
-
-from "../services/EventService";
-
-
-
-import {
-
-    getState
-
-}
-
-from "../services/StateService";
-
-
-
-import {
-
-    calculateEdori
-
-}
-
-from "../services/EdoriService";
-
-
-
-
 
 
 let chart:Chart | null = null;
 
+let chartRegistered = false;
 
 
 
 
 
-
-
-
+/**
+ * Render the trend panel.
+ */
 export function TrendChart():string {
-
 
     return `
 
+        <section class="trend-container">
 
-<section class="trend-container">
+            <div class="panel-header">
 
+                <div>
 
-<h3>
-EDORI Trend
-</h3>
+                    <h3>
+                        EDORI Trend
+                    </h3>
 
+                    <p class="panel-description">
+                        Submitted EDORI assessments over time
+                    </p>
 
+                </div>
 
-<div class="trend-chart-wrapper">
-
-
-<canvas
-
-id="edoriTrendChart"
-
-></canvas>
-
-
-</div>
+            </div>
 
 
+            <div class="trend-chart-wrapper">
+
+                <canvas
+
+                    id="edoriTrendChart"
+
+                    aria-label="EDORI score trend chart"
+
+                    role="img"
+
+                >
+                </canvas>
+
+            </div>
 
 
-<div
+            <div
 
-id="trend-summary"
+                id="trend-summary"
 
-class="trend-summary"
+                class="trend-summary"
 
->
+            >
 
-Awaiting assessment data.
+                No EDORI assessments recorded.
 
-</div>
+            </div>
 
+        </section>
 
-
-</section>
-
-
-`;
+    `;
 
 }
 
@@ -151,11 +138,40 @@ Awaiting assessment data.
 
 
 
-
-
-
-
+/**
+ * Initialize Chart.js and subscribe to submitted
+ * assessment updates.
+ */
 export function initializeTrendChart():void {
+
+    registerChartComponents();
+
+    updateTrend();
+
+    subscribe(
+
+        "stateChanged",
+
+        updateTrend
+
+    );
+
+}
+
+
+
+
+
+/**
+ * Register Chart.js components once.
+ */
+function registerChartComponents():void {
+
+    if(chartRegistered){
+
+        return;
+
+    }
 
 
     Chart.register(
@@ -177,22 +193,7 @@ export function initializeTrendChart():void {
     );
 
 
-
-
-    updateTrend();
-
-
-
-
-
-    subscribe(
-
-        "stateChanged",
-
-        updateTrend
-
-    );
-
+    chartRegistered = true;
 
 }
 
@@ -200,57 +201,32 @@ export function initializeTrendChart():void {
 
 
 
-
-
-
-
+/**
+ * Refresh the chart from existing snapshots.
+ *
+ * This function intentionally does not call
+ * calculateEdori().
+ */
 function updateTrend():void {
-
-
-
-    /*
-     * Trigger EDORI calculation.
-     *
-     * Snapshot creation occurs
-     * inside EdoriService.
-     */
-
-    calculateEdori(
-
-        getState()
-
-    );
-
-
 
     renderChart();
 
-
-
 }
 
 
 
 
 
-
-
-
-
+/**
+ * Draw or redraw the persistent EDORI trend.
+ */
 function renderChart():void {
 
+    const canvas = document.getElementById(
 
+        "edoriTrendChart"
 
-    const canvas =
-
-        document.getElementById(
-
-            "edoriTrendChart"
-
-        ) as HTMLCanvasElement | null;
-
-
-
+    ) as HTMLCanvasElement | null;
 
 
     if(!canvas){
@@ -260,33 +236,55 @@ function renderChart():void {
     }
 
 
-
-
-
-
-
-    const history =
-
-        getTrendHistory();
-
-
-
-
+    const history = getTrendHistory();
 
 
     if(chart){
 
-
         chart.destroy();
 
+        chart = null;
 
     }
 
 
+    if(history.length === 0){
+
+        clearCanvas(
+
+            canvas
+
+        );
 
 
+        updateTrendSummary(
+
+            history
+
+        );
 
 
+        return;
+
+    }
+
+
+    const labels = history.map(
+
+        point => formatTimestamp(
+
+            point.timestamp
+
+        )
+
+    );
+
+
+    const values = history.map(
+
+        point => point.score
+
+    );
 
 
     chart = new Chart(
@@ -295,69 +293,29 @@ function renderChart():void {
 
         {
 
-
             type:"line",
-
-
 
             data:{
 
-
-                labels:
-
-                    history.map(
-
-                        point =>
-
-                        point.timestamp
-
-                        .toLocaleTimeString(
-
-                            [],
-
-                            {
-
-                                hour:"2-digit",
-
-                                minute:"2-digit"
-
-                            }
-
-                        )
-
-                    ),
-
-
+                labels,
 
                 datasets:[
 
                     {
 
-                        label:
+                        label:"EDORI Score",
 
-                        "EDORI Score",
-
-
-                        data:
-
-                        history.map(
-
-                            point =>
-
-                            point.score
-
-                        ),
-
-
-
-                        tension:.3,
-
+                        data:values,
 
                         borderWidth:3,
 
+                        pointRadius:5,
 
-                        pointRadius:5
+                        pointHoverRadius:7,
 
+                        tension:0.25,
+
+                        fill:false
 
                     }
 
@@ -365,66 +323,112 @@ function renderChart():void {
 
             },
 
-
-
-
             options:{
-
 
                 responsive:true,
 
-
                 maintainAspectRatio:false,
 
+                animation:{
 
-
-                scales:{
-
-
-                    y:{
-
-
-                        min:0,
-
-
-                        max:100
-
-
-                    }
-
+                    duration:250
 
                 },
 
+                interaction:{
 
+                    intersect:false,
 
-                plugins:{
+                    mode:"index"
 
+                },
 
-                    legend:{
+                scales:{
 
+                    x:{
 
-                        display:true
+                        title:{
 
+                            display:true,
+
+                            text:"Assessment Time"
+
+                        },
+
+                        ticks:{
+
+                            maxRotation:45,
+
+                            minRotation:0
+
+                        }
+
+                    },
+
+                    y:{
+
+                        min:0,
+
+                        max:100,
+
+                        title:{
+
+                            display:true,
+
+                            text:"EDORI Score"
+
+                        },
+
+                        ticks:{
+
+                            stepSize:20
+
+                        }
 
                     }
 
+                },
+
+                plugins:{
+
+                    legend:{
+
+                        display:true,
+
+                        position:"bottom"
+
+                    },
+
+                    tooltip:{
+
+                        callbacks:{
+
+                            label:(context) => {
+
+                                const value = context.parsed.y;
+
+                                return `EDORI Score: ${value}`;
+
+                            }
+
+                        }
+
+                    }
 
                 }
 
-
-
             }
-
 
         }
 
     );
 
 
+    updateTrendSummary(
 
+        history
 
-
-    updateTrendSummary();
+    );
 
 }
 
@@ -432,24 +436,26 @@ function renderChart():void {
 
 
 
+/**
+ * Update the summary beneath the chart.
+ */
+function updateTrendSummary(
 
+    history:{
 
+        timestamp:Date;
 
+        score:number;
 
-function updateTrendSummary():void {
+    }[]
 
+):void {
 
+    const container = document.getElementById(
 
-    const container =
+        "trend-summary"
 
-        document.getElementById(
-
-            "trend-summary"
-
-        );
-
-
-
+    );
 
 
     if(!container){
@@ -459,131 +465,213 @@ function updateTrendSummary():void {
     }
 
 
-
-
-
-
-    const history =
-
-        getTrendHistory();
-
-
-
-
-
-
     if(history.length === 0){
-
 
         container.textContent =
 
             "No EDORI assessments recorded.";
 
-
         return;
-
 
     }
 
 
+    const current = history[
 
+        history.length - 1
 
-
-
-
-    const current =
-
-        history[
-
-            history.length - 1
-
-        ];
-
-
-
-
-
+    ];
 
 
     if(history.length === 1){
 
-
         container.textContent =
 
-
-        `Current Score: ${current.score}`;
-
-
+            `Current Score: ${Math.round(current.score)} | One submitted assessment`;
 
         return;
 
-
     }
 
 
+    const previous = history[
+
+        history.length - 2
+
+    ];
 
 
+    const difference = Math.round(
+
+        current.score - previous.score
+
+    );
 
 
+    const direction = getTrendDirection(
 
-    const previous =
+        difference
 
-        history[
-
-            history.length - 2
-
-        ];
+    );
 
 
+    const differenceText = formatDifference(
 
+        difference
 
-
-
-
-    let trend =
-
-        "Stable";
-
-
-
-
-
-    if(current.score > previous.score){
-
-
-        trend =
-
-        "Increasing";
-
-
-    }
-
-
-
-
-
-
-    if(current.score < previous.score){
-
-
-        trend =
-
-        "Improving";
-
-
-    }
-
-
-
-
-
+    );
 
 
     container.textContent =
 
+        `Current Score: ${Math.round(current.score)} | Trend: ${direction} (${differenceText})`;
 
-    `Current Score: ${current.score} | Trend: ${trend}`;
+}
 
 
+
+
+
+/**
+ * Determine whether conditions are worsening,
+ * improving, or unchanged.
+ */
+function getTrendDirection(
+
+    difference:number
+
+):string {
+
+    if(difference > 0){
+
+        return "Increasing";
+
+    }
+
+
+    if(difference < 0){
+
+        return "Improving";
+
+    }
+
+
+    return "Stable";
+
+}
+
+
+
+
+
+/**
+ * Format the change between the last two scores.
+ */
+function formatDifference(
+
+    difference:number
+
+):string {
+
+    if(difference > 0){
+
+        return `+${difference}`;
+
+    }
+
+
+    return String(
+
+        difference
+
+    );
+
+}
+
+
+
+
+
+/**
+ * Format a snapshot timestamp for the x-axis.
+ */
+function formatTimestamp(
+
+    timestamp:Date
+
+):string {
+
+    const date = timestamp instanceof Date
+
+        ? timestamp
+
+        : new Date(
+
+            timestamp
+
+        );
+
+
+    if(Number.isNaN(date.getTime())){
+
+        return "Unknown";
+
+    }
+
+
+    return date.toLocaleTimeString(
+
+        [],
+
+        {
+
+            hour:"2-digit",
+
+            minute:"2-digit"
+
+        }
+
+    );
+
+}
+
+
+
+
+
+/**
+ * Clear residual chart pixels when history is empty.
+ */
+function clearCanvas(
+
+    canvas:HTMLCanvasElement
+
+):void {
+
+    const context = canvas.getContext(
+
+        "2d"
+
+    );
+
+
+    if(!context){
+
+        return;
+
+    }
+
+
+    context.clearRect(
+
+        0,
+
+        0,
+
+        canvas.width,
+
+        canvas.height
+
+    );
 
 }

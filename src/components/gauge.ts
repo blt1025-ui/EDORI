@@ -1,186 +1,311 @@
 /**
  * Gauge
  *
- * Displays current EDORI score.
+ * Displays the latest authoritative EDORI result.
+ *
+ * This component does not calculate EDORI.
+ * It reads the stored result from ResultService.
  */
 
+import {
 
-import { subscribe }
+    subscribe
+
+}
+
 from "../services/EventService";
 
 
-import { getState }
-from "../services/StateService";
+import {
+
+    getLatestResult
+
+}
+
+from "../services/ResultService";
 
 
-import { calculateEdori }
-from "../services/EdoriService";
-
-
-
-
+/**
+ * Render the EDORI gauge.
+ */
 export function Gauge():string {
-
 
     return `
 
+        <section class="gauge-container">
 
-    <section class="gauge-container">
+            <div class="panel-header">
+
+                <div>
+
+                    <h3>
+                        EDORI Score
+                    </h3>
+
+                    <p class="panel-description">
+                        Current operational readiness index
+                    </p>
+
+                </div>
+
+            </div>
 
 
-        <h3>
-            EDORI Score
-        </h3>
+            <div class="gauge">
+
+                <div
+                    id="edori-icon"
+                    class="gauge-icon"
+                >
+
+                    ⚪
+
+                </div>
 
 
+                <div
+                    id="edori-score"
+                    class="gauge-value"
+                >
 
-        <div class="gauge">
+                    --
+
+                </div>
 
 
-            <div
+                <div
+                    id="edori-status"
+                    class="gauge-status"
+                >
 
-                id="edori-score"
+                    Awaiting Assessment
 
-                class="gauge-value"
-
-            >
-
-                0
+                </div>
 
             </div>
 
 
             <div
-
-                id="edori-status"
-
-                class="gauge-status"
-
+                id="edori-recommendation"
+                class="gauge-recommendation"
             >
 
-                Normal Operations
+                Complete and calculate the situation assessment.
 
             </div>
 
-
-        </div>
-
-
-
-    </section>
-
+        </section>
 
     `;
 
 }
 
 
-
-
-
-
-
+/**
+ * Initialize the gauge.
+ */
 export function initializeGauge():void {
-
 
     updateGauge();
 
 
-
     subscribe(
 
-        "stateChanged",
+        "resultChanged",
 
         updateGauge
 
     );
 
+}
+
+
+/**
+ * Update the gauge from the latest stored result.
+ */
+function updateGauge():void {
+
+    const result = getLatestResult();
+
+
+    if(!result){
+
+        resetGauge();
+
+        return;
+
+    }
+
+
+    const operationalState =
+
+        result.operationalState;
+
+
+    setElementText(
+
+        "edori-icon",
+
+        operationalState.icon
+
+    );
+
+
+    setElementText(
+
+        "edori-score",
+
+        String(
+
+            Math.round(
+
+                result.score
+
+            )
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "edori-status",
+
+        operationalState.title
+
+    );
+
+
+    setElementText(
+
+        "edori-recommendation",
+
+        operationalState.recommendation
+
+    );
+
+
+    updateGaugeColor(
+
+        operationalState.color
+
+    );
 
 }
 
 
+/**
+ * Reset the gauge before the first result exists.
+ */
+function resetGauge():void {
+
+    setElementText(
+
+        "edori-icon",
+
+        "⚪"
+
+    );
 
 
+    setElementText(
+
+        "edori-score",
+
+        "--"
+
+    );
 
 
+    setElementText(
+
+        "edori-status",
+
+        "Awaiting Assessment"
+
+    );
 
 
-function updateGauge():void {
+    setElementText(
+
+        "edori-recommendation",
+
+        "Complete and calculate the situation assessment."
+
+    );
 
 
+    updateGaugeColor(
 
-    const state =
+        "#94a3b8"
 
-        getState();
+    );
+
+}
 
 
+/**
+ * Safely update a gauge element.
+ */
+function setElementText(
+
+    elementId:string,
+
+    value:string
+
+):void {
+
+    const element = document.getElementById(
+
+        elementId
+
+    );
 
 
+    if(!element){
 
-    const result =
+        console.warn(
 
-        calculateEdori(
-
-            state
+            `Gauge could not find element: ${elementId}`
 
         );
 
-
-
-
-
-    const scoreElement =
-
-        document.getElementById(
-
-            "edori-score"
-
-        );
-
-
-
-
-
-    const statusElement =
-
-        document.getElementById(
-
-            "edori-status"
-
-        );
-
-
-
-
-
-    if(scoreElement){
-
-        scoreElement.textContent =
-
-            String(
-
-                Math.round(
-
-                    result.score
-
-                )
-
-            );
+        return;
 
     }
 
 
+    element.textContent = value;
+
+}
 
 
+/**
+ * Apply the operational-state color.
+ */
+function updateGaugeColor(
 
-    if(statusElement){
+    color:string
 
-        statusElement.textContent =
+):void {
 
-            result.status;
+    const gauge = document.querySelector(
+
+        ".gauge"
+
+    ) as HTMLElement | null;
+
+
+    if(!gauge){
+
+        return;
 
     }
 
 
+    gauge.style.borderColor = color;
+
+    gauge.style.color = color;
 
 }
