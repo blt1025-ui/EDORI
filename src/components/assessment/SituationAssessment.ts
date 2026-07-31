@@ -3,102 +3,40 @@
  *
  * Main EDORI operational data-entry panel.
  *
- * Workflow:
+ * Responsibilities:
  *
- * User enters current operational values
- *        ↓
- * Selects Calculate EDORI
- *        ↓
- * Current weekday and hour are captured
- *        ↓
- * Historical expectations are loaded
- *        ↓
- * Assessment is validated and committed
- *        ↓
- * EDORI is calculated once
- *        ↓
- * Latest result is stored
- *        ↓
- * One historical snapshot is saved
- *        ↓
- * resultChanged is emitted
+ * - Render assessment inputs
+ * - Restore the latest committed values
+ * - Maintain draft input values
+ * - Display ESI totals
+ * - Display historical expectations
+ * - Call EdoriEngine when the user selects
+ *   Calculate EDORI
  *
- * Staffing is intentionally excluded from:
+ * This component does not:
  *
- * - The assessment form
- * - Historical expectations
- * - EDORI scoring
- * - Drivers
- * - Recommendations
+ * - Validate the completed assessment
+ * - Calculate EDORI
+ * - Persist committed state
+ * - Persist the result
+ * - Save snapshots
+ * - Emit resultChanged
+ *
+ * Those responsibilities belong to EdoriEngine.
  */
 
 import {
 
-    submitAssessment,
-
-    updateDraft
+    runEdoriAssessment
 
 }
 
-from "../../services/AssessmentService";
+from "../../core/EdoriEngine";
 
 
 import {
 
-    getState,
-
-    hasCommittedAssessment,
-
-    updateState
-
-}
-
-from "../../services/StateService";
-
-
-import {
-
-    calculateEdori
-
-}
-
-from "../../services/EdoriService";
-
-
-import {
-
-    getResultInvalidationReason,
-
-    setLatestResult
-
-}
-
-from "../../services/ResultService";
-
-
-import {
-
-    saveSnapshot,
-
-    shouldCreateSnapshot
-
-}
-
-from "../../services/SnapshotService";
-
-
-import {
-
-    validateState
-
-}
-
-from "../../services/ValidationService";
-
-
-import {
-
-    emit
+    subscribe
 
 }
 
@@ -118,13 +56,33 @@ import {
 from "../../services/HistoricalDataService";
 
 
-import type {
+import {
 
-    ExpectedOperationalValues
+    getResultInvalidationReason
 
 }
 
-from "../../services/HistoricalDataService";
+from "../../services/ResultService";
+
+
+import {
+
+    getState,
+
+    hasCommittedAssessment
+
+}
+
+from "../../services/StateService";
+
+
+import type {
+
+    EdoriAssessmentInput
+
+}
+
+from "../../types/EdoriAssessmentInput";
 
 
 import type {
@@ -146,14 +104,11 @@ from "../../types/SituationAssessment";
 
 
 /**
- * Current operational values entered by the user.
- *
- * Historical expectation values are populated
- * automatically at calculation time.
+ * Current operational inputs shown in the form.
  */
 const CURRENT_VALUE_FIELDS:Array<
 
-    keyof SituationAssessmentType
+    keyof EdoriAssessmentInput
 
 > = [
 
@@ -174,6 +129,33 @@ const CURRENT_VALUE_FIELDS:Array<
     "esi5"
 
 ];
+
+
+/**
+ * Local draft maintained by this component.
+ *
+ * The committed StateService assessment is not
+ * modified while the user types.
+ */
+let draftInput:EdoriAssessmentInput = {
+
+    totalEDVolume:0,
+
+    boardedPatients:0,
+
+    occupiedMedicalBeds:0,
+
+    esi1:0,
+
+    esi2:0,
+
+    esi3:0,
+
+    esi4:0,
+
+    esi5:0
+
+};
 
 
 /**
@@ -267,9 +249,7 @@ export function SituationAssessment():string {
 
 
                 <p class="section-description">
-
                     Enter the number of current ED patients in each Emergency Severity Index category.
-
                 </p>
 
 
@@ -337,9 +317,7 @@ export function SituationAssessment():string {
                     class="esi-total-summary"
                     aria-live="polite"
                 >
-
                     ESI Total: 0
-
                 </div>
 
             </div>
@@ -361,9 +339,7 @@ export function SituationAssessment():string {
                         </h3>
 
                         <p id="historicalPeriodDisplay">
-
                             Based on the weekday and hour when EDORI is calculated.
-
                         </p>
 
                     </div>
@@ -373,9 +349,7 @@ export function SituationAssessment():string {
                         id="historicalDataStatus"
                         class="historical-data-status"
                     >
-
                         Awaiting calculation
-
                     </span>
 
                 </div>
@@ -430,9 +404,7 @@ export function SituationAssessment():string {
                     class="calculate-button"
                     type="button"
                 >
-
                     Calculate EDORI
-
                 </button>
 
 
@@ -444,9 +416,7 @@ export function SituationAssessment():string {
                     "
                     aria-live="polite"
                 >
-
                     Enter all operational data, then calculate.
-
                 </p>
 
             </div>
@@ -459,11 +429,11 @@ export function SituationAssessment():string {
 
 
 /**
- * Create a numeric assessment input.
+ * Create a reusable numeric input.
  */
 function createNumberInput(
 
-    id:keyof SituationAssessmentType,
+    id:keyof EdoriAssessmentInput,
 
     label:string,
 
@@ -487,9 +457,7 @@ function createNumberInput(
         <div class="input-group">
 
             <label for="${id}">
-
                 ${label}
-
             </label>
 
 
@@ -526,9 +494,7 @@ function createExpectationDisplay(
         <div class="historical-expectation-card">
 
             <span class="historical-expectation-label">
-
                 ${label}
-
             </span>
 
 
@@ -536,9 +502,7 @@ function createExpectationDisplay(
                 id="${id}"
                 class="historical-expectation-value"
             >
-
                 --
-
             </strong>
 
         </div>
@@ -549,9 +513,11 @@ function createExpectationDisplay(
 
 
 /**
- * Initialize assessment behavior.
+ * Initialize all form behavior.
  */
 export function initializeSituationAssessment():void {
+
+    restoreDraftInput();
 
     initializeCurrentValueInputs();
 
@@ -563,27 +529,96 @@ export function initializeSituationAssessment():void {
 
     updateInitialAssessmentMessage();
 
-
     subscribeToHistoricalDataChanges();
 
 }
 
 
 /**
- * Initialize current-value input fields.
- *
- * If a committed assessment exists, restore
- * its values after a page refresh.
+ * Restore the last committed assessment into
+ * the component draft.
+ */
+function restoreDraftInput():void {
+
+    if(!hasCommittedAssessment()){
+
+        draftInput = createEmptyDraft();
+
+        return;
+
+    }
+
+
+    const state = getState();
+
+
+    draftInput = {
+
+        totalEDVolume:
+            normalizeStoredNumber(
+
+                state.totalEDVolume
+
+            ),
+
+        boardedPatients:
+            normalizeStoredNumber(
+
+                state.boardedPatients
+
+            ),
+
+        occupiedMedicalBeds:
+            normalizeStoredNumber(
+
+                state.occupiedMedicalBeds
+
+            ),
+
+        esi1:
+            normalizeStoredNumber(
+
+                state.esi1
+
+            ),
+
+        esi2:
+            normalizeStoredNumber(
+
+                state.esi2
+
+            ),
+
+        esi3:
+            normalizeStoredNumber(
+
+                state.esi3
+
+            ),
+
+        esi4:
+            normalizeStoredNumber(
+
+                state.esi4
+
+            ),
+
+        esi5:
+            normalizeStoredNumber(
+
+                state.esi5
+
+            )
+
+    };
+
+}
+
+
+/**
+ * Initialize form fields and local draft updates.
  */
 function initializeCurrentValueInputs():void {
-
-    const committedState = getState();
-
-
-    const restoreCommittedValues =
-
-        hasCommittedAssessment();
-
 
     CURRENT_VALUE_FIELDS.forEach(
 
@@ -604,41 +639,14 @@ function initializeCurrentValueInputs():void {
 
                 );
 
-
                 return;
 
             }
 
 
-            const initialValue = restoreCommittedValues
-
-                ? getNumericFieldValue(
-
-                    committedState,
-
-                    field
-
-                )
-
-                : parseInputValue(
-
-                    element.value
-
-                );
-
-
             element.value = String(
 
-                initialValue
-
-            );
-
-
-            updateDraft(
-
-                field,
-
-                initialValue
+                draftInput[field]
 
             );
 
@@ -656,16 +664,17 @@ function initializeCurrentValueInputs():void {
                     );
 
 
-                    updateDraft(
+                    draftInput = {
 
-                        field,
+                        ...draftInput,
 
-                        value
+                        [field]:
+                            value
 
-                    );
+                    };
 
 
-                    if(isEsiField(field)){
+                    if(isEsiRelatedField(field)){
 
                         updateEsiTotalSummary();
 
@@ -705,7 +714,6 @@ function initializeCalculateButton():void {
 
         );
 
-
         return;
 
     }
@@ -715,7 +723,7 @@ function initializeCalculateButton():void {
 
         "click",
 
-        submitAndCalculateAssessment
+        submitAssessmentToEngine
 
     );
 
@@ -723,75 +731,9 @@ function initializeCalculateButton():void {
 
 
 /**
- * Respond when historical expectations are
- * imported or restored.
+ * Send the current local draft to EdoriEngine.
  */
-function subscribeToHistoricalDataChanges():void {
-
-    /*
-     * EventService callbacks do not receive payloads.
-     * The display is reset so the user knows that
-     * the next calculation will use the new dataset.
-     */
-
-    import(
-
-        "../../services/EventService"
-
-    )
-
-        .then(
-
-            module => {
-
-                module.subscribe(
-
-                    "historicalDataChanged",
-
-                    () => {
-
-                        resetHistoricalDisplay();
-
-
-                        showAssessmentMessage(
-
-                            "Historical expectations changed. Review the current values and select Calculate EDORI to create an updated result.",
-
-                            "draft"
-
-                        );
-
-                    }
-
-                );
-
-            }
-
-        )
-
-        .catch(
-
-            error => {
-
-                console.error(
-
-                    "Unable to subscribe to historical data changes:",
-
-                    error
-
-                );
-
-            }
-
-        );
-
-}
-
-
-/**
- * Submit and calculate one completed assessment.
- */
-function submitAndCalculateAssessment():void {
+function submitAssessmentToEngine():void {
 
     const button = document.getElementById(
 
@@ -812,190 +754,47 @@ function submitAndCalculateAssessment():void {
     try {
 
         /*
-         * Capture one authoritative calculation time.
+         * Capture one timestamp for:
+         *
+         * - weekday/hour lookup
+         * - assessmentTime
+         * - snapshot timestamp
          */
 
         const calculationTime = new Date();
 
 
-        const period = getAssessmentPeriod(
+        /*
+         * Update the historical display before
+         * calling the engine so the user can see
+         * the period being evaluated.
+         */
+
+        previewHistoricalExpectation(
 
             calculationTime
 
         );
 
 
-        /*
-         * Do not calculate with missing historical
-         * expectations because zero defaults would
-         * create a misleading EDORI score.
-         */
+        const engineResult = runEdoriAssessment(
 
-        const historicalDataAvailable =
+            {
 
-            hasHistoricalExpectation(
+                ...draftInput
 
-                period.day,
+            },
 
-                period.hour
+            calculationTime
 
-            );
+        );
 
 
-        if(!historicalDataAvailable){
-
-            updateHistoricalPeriodDisplay(
-
-                period.day,
-
-                period.hour
-
-            );
-
-
-            updateHistoricalDataStatus(
-
-                false
-
-            );
-
-
-            clearExpectedValueDisplays();
-
+        if(!engineResult.success){
 
             showAssessmentMessage(
 
-                `Historical expectations are not available for ${period.day} at ${formatHour(period.hour)}. EDORI cannot be calculated until this record is available.`,
-
-                "error"
-
-            );
-
-
-            return;
-
-        }
-
-
-        const expectedValues =
-
-            getExpectedOperationalValues(
-
-                period.day,
-
-                period.hour
-
-            );
-
-
-        /*
-         * Add automatically selected metadata and
-         * historical expectations to the draft.
-         */
-
-        applyHistoricalValuesToDraft(
-
-            period.day,
-
-            period.hour,
-
-            calculationTime,
-
-            expectedValues
-
-        );
-
-
-        updateHistoricalDisplay(
-
-            period.day,
-
-            period.hour,
-
-            expectedValues
-
-        );
-
-
-        updateHistoricalDataStatus(
-
-            true
-
-        );
-
-
-        const assessment = submitAssessment();
-
-
-        if(!assessment){
-
-            showAssessmentMessage(
-
-                "Please complete all assessment fields before calculating.",
-
-                "error"
-
-            );
-
-
-            return;
-
-        }
-
-
-        /*
-         * Assign metadata explicitly so the final
-         * committed assessment uses the same time
-         * that selected the historical record.
-         */
-
-        assessment.assessmentTime =
-
-            calculationTime.toISOString();
-
-
-        assessment.day =
-
-            period.day;
-
-
-        assessment.hour =
-
-            period.hour;
-
-
-        assessment.expectedVolume =
-
-            expectedValues.expectedVolume;
-
-
-        assessment.expectedBoarders =
-
-            expectedValues.expectedBoarders;
-
-
-        assessment.expectedArrivals =
-
-            expectedValues.expectedArrivals;
-
-
-        assessment.expectedDepartures =
-
-            expectedValues.expectedDepartures;
-
-
-        const validation = validateState(
-
-            assessment
-
-        );
-
-
-        if(!validation.valid){
-
-            showAssessmentMessage(
-
-                validation.errors.join(
+                engineResult.errors.join(
 
                     " | "
 
@@ -1012,95 +811,51 @@ function submitAndCalculateAssessment():void {
 
 
         /*
-         * Commit the assessment.
+         * Keep the draft synchronized with the
+         * authoritative committed assessment.
          */
 
-        updateState(
+        draftInput = {
 
-            assessment
+            totalEDVolume:
+                engineResult.assessment.totalEDVolume,
 
-        );
+            boardedPatients:
+                engineResult.assessment.boardedPatients,
 
+            occupiedMedicalBeds:
+                engineResult.assessment.occupiedMedicalBeds,
 
-        /*
-         * Calculate EDORI exactly once.
-         */
+            esi1:
+                engineResult.assessment.esi1,
 
-        const result = calculateEdori(
+            esi2:
+                engineResult.assessment.esi2,
 
-            assessment
+            esi3:
+                engineResult.assessment.esi3,
 
-        );
+            esi4:
+                engineResult.assessment.esi4,
 
-
-        /*
-         * Store and persist the authoritative result.
-         *
-         * This also clears any existing result
-         * invalidation reason.
-         */
-
-        setLatestResult(
-
-            result
-
-        );
-
-
-        /*
-         * Create one historical snapshot.
-         */
-
-        const snapshot = {
-
-            score:
-                result.score,
-
-            status:
-                result.status,
-
-            operationalState:
-                result.operationalState,
-
-            timestamp:
-                calculationTime
+            esi5:
+                engineResult.assessment.esi5
 
         };
 
 
-        if(
+        const snapshotMessage =
 
-            shouldCreateSnapshot(
+            engineResult.snapshotSaved
 
-                snapshot
+                ? " A new trend snapshot was saved."
 
-            )
-
-        ){
-
-            saveSnapshot(
-
-                snapshot
-
-            );
-
-        }
-
-
-        /*
-         * Notify every result-driven component.
-         */
-
-        emit(
-
-            "resultChanged"
-
-        );
+                : " No duplicate trend snapshot was needed.";
 
 
         showAssessmentMessage(
 
-            `EDORI calculated successfully for ${period.day} at ${formatHour(period.hour)}. Score: ${Math.round(result.score)}.`,
+            `EDORI calculated successfully for ${engineResult.assessment.day} at ${formatHour(engineResult.assessment.hour)}. Score: ${Math.round(engineResult.result.score)}.${snapshotMessage}`,
 
             "success"
 
@@ -1111,7 +866,7 @@ function submitAndCalculateAssessment():void {
 
         console.error(
 
-            "Unable to calculate EDORI:",
+            "Unable to submit EDORI assessment:",
 
             error
 
@@ -1143,185 +898,65 @@ function submitAndCalculateAssessment():void {
 
 
 /**
- * Apply metadata and historical expectations
- * to the draft assessment.
+ * Preview the historical expectation that the
+ * engine will use for the submitted time.
  */
-function applyHistoricalValuesToDraft(
+function previewHistoricalExpectation(
 
-    day:DayOfWeek,
-
-    hour:number,
-
-    calculationTime:Date,
-
-    values:ExpectedOperationalValues
+    calculationTime:Date
 
 ):void {
 
-    updateDraft(
+    const period = getAssessmentPeriod(
 
-        "assessmentTime",
-
-        calculationTime.toISOString()
+        calculationTime
 
     );
 
 
-    updateDraft(
+    updateHistoricalPeriodDisplay(
 
-        "day",
+        period.day,
 
-        day
-
-    );
-
-
-    updateDraft(
-
-        "hour",
-
-        hour
+        period.hour
 
     );
 
 
-    updateDraft(
+    const available = hasHistoricalExpectation(
 
-        "expectedVolume",
+        period.day,
 
-        values.expectedVolume
-
-    );
-
-
-    updateDraft(
-
-        "expectedBoarders",
-
-        values.expectedBoarders
-
-    );
-
-
-    updateDraft(
-
-        "expectedArrivals",
-
-        values.expectedArrivals
-
-    );
-
-
-    updateDraft(
-
-        "expectedDepartures",
-
-        values.expectedDepartures
-
-    );
-
-}
-
-
-/**
- * Restore historical values from the most
- * recently committed assessment.
- */
-function restoreHistoricalDisplay():void {
-
-    if(!hasCommittedAssessment()){
-
-        resetHistoricalDisplay();
-
-
-        return;
-
-    }
-
-
-    const state = getState();
-
-
-    const normalizedDay = normalizeDay(
-
-        state.day
-
-    );
-
-
-    if(!normalizedDay){
-
-        resetHistoricalDisplay();
-
-
-        return;
-
-    }
-
-
-    const values:ExpectedOperationalValues = {
-
-        expectedVolume:
-            state.expectedVolume,
-
-        expectedBoarders:
-            state.expectedBoarders,
-
-        expectedArrivals:
-            state.expectedArrivals,
-
-        expectedDepartures:
-            state.expectedDepartures
-
-    };
-
-
-    updateHistoricalDisplay(
-
-        normalizedDay,
-
-        state.hour,
-
-        values
+        period.hour
 
     );
 
 
     updateHistoricalDataStatus(
 
-        hasHistoricalExpectation(
-
-            normalizedDay,
-
-            state.hour
-
-        )
+        available
 
     );
 
-}
+
+    if(!available){
+
+        clearExpectedValueDisplays();
+
+        return;
+
+    }
 
 
-/**
- * Update historical period and values.
- */
-function updateHistoricalDisplay(
+    const expectedValues =
 
-    day:DayOfWeek,
+        getExpectedOperationalValues(
 
-    hour:number,
+            period.day,
 
-    values:ExpectedOperationalValues
+            period.hour
 
-):void {
-
-    updateHistoricalPeriodDisplay(
-
-        day,
-
-        hour
-
-    );
+        );
 
 
     setElementText(
@@ -1330,7 +965,7 @@ function updateHistoricalDisplay(
 
         formatHistoricalValue(
 
-            values.expectedVolume
+            expectedValues.expectedVolume
 
         )
 
@@ -1343,7 +978,7 @@ function updateHistoricalDisplay(
 
         formatHistoricalValue(
 
-            values.expectedBoarders
+            expectedValues.expectedBoarders
 
         )
 
@@ -1356,7 +991,7 @@ function updateHistoricalDisplay(
 
         formatHistoricalValue(
 
-            values.expectedArrivals
+            expectedValues.expectedArrivals
 
         )
 
@@ -1369,7 +1004,7 @@ function updateHistoricalDisplay(
 
         formatHistoricalValue(
 
-            values.expectedDepartures
+            expectedValues.expectedDepartures
 
         )
 
@@ -1379,7 +1014,147 @@ function updateHistoricalDisplay(
 
 
 /**
- * Update the historical lookup period.
+ * Restore historical values associated with the
+ * most recently committed assessment.
+ */
+function restoreHistoricalDisplay():void {
+
+    if(!hasCommittedAssessment()){
+
+        resetHistoricalDisplay();
+
+        return;
+
+    }
+
+
+    const state = getState();
+
+
+    const day = normalizeDay(
+
+        state.day
+
+    );
+
+
+    if(!day){
+
+        resetHistoricalDisplay();
+
+        return;
+
+    }
+
+
+    updateHistoricalPeriodDisplay(
+
+        day,
+
+        state.hour
+
+    );
+
+
+    setElementText(
+
+        "expectedVolumeDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedVolume
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedBoardersDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedBoarders
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedArrivalsDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedArrivals
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedDeparturesDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedDepartures
+
+        )
+
+    );
+
+
+    updateHistoricalDataStatus(
+
+        hasHistoricalExpectation(
+
+            day,
+
+            state.hour
+
+        )
+
+    );
+
+}
+
+
+/**
+ * Respond when historical data are imported
+ * or restored.
+ */
+function subscribeToHistoricalDataChanges():void {
+
+    subscribe(
+
+        "historicalDataChanged",
+
+        () => {
+
+            resetHistoricalDisplay();
+
+
+            showAssessmentMessage(
+
+                "Historical expectations changed. Review the current values and select Calculate EDORI to create an updated result.",
+
+                "draft"
+
+            );
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Update the historical period label.
  */
 function updateHistoricalPeriodDisplay(
 
@@ -1401,7 +1176,7 @@ function updateHistoricalPeriodDisplay(
 
 
 /**
- * Update historical-data availability status.
+ * Update historical-data availability.
  */
 function updateHistoricalDataStatus(
 
@@ -1466,8 +1241,7 @@ function updateHistoricalDataStatus(
 
 
 /**
- * Reset historical values before a calculation
- * or after the active dataset changes.
+ * Reset the historical panel.
  */
 function resetHistoricalDisplay():void {
 
@@ -1483,26 +1257,26 @@ function resetHistoricalDisplay():void {
     clearExpectedValueDisplays();
 
 
-    const statusElement = document.getElementById(
+    const element = document.getElementById(
 
         "historicalDataStatus"
 
     );
 
 
-    if(!statusElement){
+    if(!element){
 
         return;
 
     }
 
 
-    statusElement.textContent =
+    element.textContent =
 
         "Awaiting calculation";
 
 
-    statusElement.classList.remove(
+    element.classList.remove(
 
         "historical-data-available",
 
@@ -1514,7 +1288,7 @@ function resetHistoricalDisplay():void {
 
 
 /**
- * Clear historical expectation values.
+ * Clear expectation values.
  */
 function clearExpectedValueDisplays():void {
 
@@ -1548,58 +1322,29 @@ function clearExpectedValueDisplays():void {
 
 
 /**
- * Update the displayed ESI patient total.
+ * Update the displayed ESI total.
  */
 function updateEsiTotalSummary():void {
 
-    const total =
+    const esiTotal =
 
-        getInputNumericValue(
-
-            "esi1"
-
-        )
+        draftInput.esi1
 
         +
 
-        getInputNumericValue(
-
-            "esi2"
-
-        )
+        draftInput.esi2
 
         +
 
-        getInputNumericValue(
-
-            "esi3"
-
-        )
+        draftInput.esi3
 
         +
 
-        getInputNumericValue(
-
-            "esi4"
-
-        )
+        draftInput.esi4
 
         +
 
-        getInputNumericValue(
-
-            "esi5"
-
-        );
-
-
-    const totalEdVolume =
-
-        getInputNumericValue(
-
-            "totalEDVolume"
-
-        );
+        draftInput.esi5;
 
 
     const element = document.getElementById(
@@ -1625,19 +1370,19 @@ function updateEsiTotalSummary():void {
     );
 
 
-    element.textContent =
+    if(draftInput.totalEDVolume <= 0){
 
-        `ESI Total: ${total}`;
+        element.textContent =
 
+            `ESI Total: ${esiTotal}`;
 
-    if(totalEdVolume <= 0){
 
         return;
 
     }
 
 
-    if(total === totalEdVolume){
+    if(esiTotal === draftInput.totalEDVolume){
 
         element.classList.add(
 
@@ -1648,7 +1393,7 @@ function updateEsiTotalSummary():void {
 
         element.textContent =
 
-            `ESI Total: ${total} — matches total ED volume`;
+            `ESI Total: ${esiTotal} — matches total ED volume`;
 
 
         return;
@@ -1663,9 +1408,20 @@ function updateEsiTotalSummary():void {
     );
 
 
+    if(esiTotal > draftInput.totalEDVolume){
+
+        element.textContent =
+
+            `ESI Total: ${esiTotal} — exceeds total ED volume of ${draftInput.totalEDVolume}`;
+
+        return;
+
+    }
+
+
     element.textContent =
 
-        `ESI Total: ${total} — total ED volume is ${totalEdVolume}`;
+        `ESI Total: ${esiTotal} — ${draftInput.totalEDVolume - esiTotal} patients do not have an entered ESI category`;
 
 }
 
@@ -1690,7 +1446,6 @@ function updateInitialAssessmentMessage():void {
 
         );
 
-
         return;
 
     }
@@ -1705,7 +1460,6 @@ function updateInitialAssessmentMessage():void {
             "default"
 
         );
-
 
         return;
 
@@ -1724,18 +1478,41 @@ function updateInitialAssessmentMessage():void {
 
 
 /**
- * Safely read a numeric assessment property.
+ * Create an empty draft.
  */
-function getNumericFieldValue(
+function createEmptyDraft():EdoriAssessmentInput {
 
-    assessment:SituationAssessmentType,
+    return {
 
-    field:keyof SituationAssessmentType
+        totalEDVolume:0,
+
+        boardedPatients:0,
+
+        occupiedMedicalBeds:0,
+
+        esi1:0,
+
+        esi2:0,
+
+        esi3:0,
+
+        esi4:0,
+
+        esi5:0
+
+    };
+
+}
+
+
+/**
+ * Normalize a stored numeric value.
+ */
+function normalizeStoredNumber(
+
+    value:unknown
 
 ):number {
-
-    const value = assessment[field];
-
 
     if(
 
@@ -1743,11 +1520,11 @@ function getNumericFieldValue(
 
         ||
 
-        !Number.isFinite(
+        !Number.isFinite(value)
 
-            value
+        ||
 
-        )
+        value < 0
 
     ){
 
@@ -1762,216 +1539,7 @@ function getNumericFieldValue(
 
 
 /**
- * Return a numeric value from a form input.
- */
-function getInputNumericValue(
-
-    elementId:string
-
-):number {
-
-    const element = document.getElementById(
-
-        elementId
-
-    ) as HTMLInputElement | null;
-
-
-    if(!element){
-
-        return 0;
-
-    }
-
-
-    return parseInputValue(
-
-        element.value
-
-    );
-
-}
-
-
-/**
- * Determine whether a field is an ESI field.
- */
-function isEsiField(
-
-    field:keyof SituationAssessmentType
-
-):boolean {
-
-    return [
-
-        "esi1",
-
-        "esi2",
-
-        "esi3",
-
-        "esi4",
-
-        "esi5",
-
-        "totalEDVolume"
-
-    ].includes(
-
-        field
-
-    );
-
-}
-
-
-/**
- * Normalize a stored weekday string.
- */
-function normalizeDay(
-
-    value:string
-
-):DayOfWeek | null {
-
-    const days:DayOfWeek[] = [
-
-        "Sunday",
-
-        "Monday",
-
-        "Tuesday",
-
-        "Wednesday",
-
-        "Thursday",
-
-        "Friday",
-
-        "Saturday"
-
-    ];
-
-
-    const match = days.find(
-
-        day => day === value
-
-    );
-
-
-    return match ?? null;
-
-}
-
-
-/**
- * Format an hourly historical bucket.
- */
-function formatHour(
-
-    hour:number
-
-):string {
-
-    const normalizedHour = Math.min(
-
-        23,
-
-        Math.max(
-
-            0,
-
-            Math.floor(
-
-                hour
-
-            )
-
-        )
-
-    );
-
-
-    const date = new Date();
-
-
-    date.setHours(
-
-        normalizedHour,
-
-        0,
-
-        0,
-
-        0
-
-    );
-
-
-    const clockTime = date.toLocaleTimeString(
-
-        [],
-
-        {
-
-            hour:"numeric",
-
-            minute:"2-digit"
-
-        }
-
-    );
-
-
-    return `${String(normalizedHour).padStart(2, "0")}:00 (${clockTime})`;
-
-}
-
-
-/**
- * Format historical values while preserving
- * meaningful decimal values.
- */
-function formatHistoricalValue(
-
-    value:number
-
-):string {
-
-    if(!Number.isFinite(value)){
-
-        return "--";
-
-    }
-
-
-    if(Number.isInteger(value)){
-
-        return String(value);
-
-    }
-
-
-    return value.toFixed(
-
-        2
-
-    )
-
-        .replace(
-
-            /\.?0+$/,
-
-            ""
-
-        );
-
-}
-
-
-/**
- * Convert an input string into a safe number.
+ * Parse one numeric input.
  */
 function parseInputValue(
 
@@ -2005,7 +1573,170 @@ function parseInputValue(
 
 
 /**
- * Safely update an element's text.
+ * Determine whether changing a field requires
+ * recalculating the ESI summary.
+ */
+function isEsiRelatedField(
+
+    field:keyof EdoriAssessmentInput
+
+):boolean {
+
+    return field === "totalEDVolume"
+
+        ||
+
+        field === "esi1"
+
+        ||
+
+        field === "esi2"
+
+        ||
+
+        field === "esi3"
+
+        ||
+
+        field === "esi4"
+
+        ||
+
+        field === "esi5";
+
+}
+
+
+/**
+ * Normalize a stored weekday.
+ */
+function normalizeDay(
+
+    value:string
+
+):DayOfWeek | null {
+
+    const days:DayOfWeek[] = [
+
+        "Sunday",
+
+        "Monday",
+
+        "Tuesday",
+
+        "Wednesday",
+
+        "Thursday",
+
+        "Friday",
+
+        "Saturday"
+
+    ];
+
+
+    return days.find(
+
+        day => day === value
+
+    )
+
+        ?? null;
+
+}
+
+
+/**
+ * Format an hourly bucket.
+ */
+function formatHour(
+
+    hour:number
+
+):string {
+
+    const safeHour = Math.min(
+
+        23,
+
+        Math.max(
+
+            0,
+
+            Math.floor(hour)
+
+        )
+
+    );
+
+
+    const meridiem =
+
+        safeHour >= 12
+
+            ? "PM"
+
+            : "AM";
+
+
+    const twelveHour =
+
+        safeHour % 12 === 0
+
+            ? 12
+
+            : safeHour % 12;
+
+
+    return `${String(safeHour).padStart(2, "0")}:00 (${twelveHour}:00 ${meridiem})`;
+
+}
+
+
+/**
+ * Format an expectation value.
+ */
+function formatHistoricalValue(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "--";
+
+    }
+
+
+    if(Number.isInteger(value)){
+
+        return String(value);
+
+    }
+
+
+    return value
+
+        .toFixed(
+
+            2
+
+        )
+
+        .replace(
+
+            /\.?0+$/,
+
+            ""
+
+        );
+
+}
+
+
+/**
+ * Safely update element text.
  */
 function setElementText(
 
@@ -2032,8 +1763,7 @@ function setElementText(
 
 
 /**
- * Indicate that draft values changed without
- * recalculating the dashboard.
+ * Show that draft values changed.
  */
 function showDraftChangedMessage():void {
 
@@ -2107,7 +1837,7 @@ function showAssessmentMessage(
 
 
 /**
- * Disable or enable the Calculate button.
+ * Update Calculate button state.
  */
 function setSubmissionState(
 
