@@ -23,6 +23,16 @@
 
 import {
 
+    HistoricalDataManager,
+
+    initializeHistoricalDataManager
+
+}
+
+from "./HistoricalDataManager";
+
+import {
+
     AssessmentHistory,
 
     initializeAssessmentHistory
@@ -235,6 +245,8 @@ export function Dashboard():string {
 
                     ${AssessmentHistory()}
 
+                    ${HistoricalDataManager()}
+
                 </div>
 
             </div>
@@ -264,6 +276,8 @@ export function initializeDashboard():void {
     initializeTrendChart();
 
     initializeAssessmentHistory();
+
+    initializeHistoricalDataManager();
 
 
     /*

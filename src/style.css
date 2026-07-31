@@ -783,3 +783,234 @@ h1,h2,h3{margin-top:0}
     }
 
 }
+
+/* =========================
+   Historical Data Manager
+========================= */
+
+.historical-manager-container {
+    background:#ffffff;
+    border-radius:12px;
+    padding:20px;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+}
+
+.historical-source-summary {
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:12px;
+    margin-bottom:18px;
+}
+
+.historical-source-item {
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:12px;
+}
+
+.historical-source-label {
+    display:block;
+    margin-bottom:5px;
+    color:#64748b;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+}
+
+.historical-source-value {
+    color:#172b4d;
+    font-size:18px;
+}
+
+.historical-source-imported {
+    color:#166534;
+}
+
+.historical-source-built-in {
+    color:#1d4ed8;
+}
+
+.historical-upload-area {
+    padding:16px;
+    background:#f8fafc;
+    border:1px dashed #94a3b8;
+    border-radius:9px;
+}
+
+.historical-file-label {
+    display:block;
+    margin-bottom:8px;
+    font-weight:700;
+}
+
+.historical-file-input {
+    width:100%;
+}
+
+.historical-file-help {
+    margin:9px 0 0;
+    color:#64748b;
+    font-size:12px;
+    line-height:1.4;
+}
+
+.historical-manager-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:16px;
+}
+
+.secondary-button,
+.danger-secondary-button {
+    padding:10px 16px;
+    border-radius:7px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.secondary-button {
+    background:#ffffff;
+    border:1px solid #2563eb;
+    color:#1d4ed8;
+}
+
+.danger-secondary-button {
+    background:#ffffff;
+    border:1px solid #dc2626;
+    color:#b91c1c;
+}
+
+.secondary-button:disabled,
+.danger-secondary-button:disabled {
+    cursor:not-allowed;
+    opacity:.6;
+}
+
+.historical-import-message {
+    margin-top:14px;
+    padding:11px 13px;
+    border-radius:7px;
+    font-size:13px;
+    line-height:1.4;
+}
+
+.historical-import-message-default {
+    background:#f1f5f9;
+    color:#475569;
+}
+
+.historical-import-message-success {
+    background:#f0fdf4;
+    color:#166534;
+}
+
+.historical-import-message-error {
+    background:#fef2f2;
+    color:#991b1b;
+}
+
+.historical-validation-results {
+    margin-top:16px;
+}
+
+.historical-validation-summary {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:10px;
+}
+
+.historical-validation-metric {
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:10px;
+}
+
+.historical-validation-metric span {
+    display:block;
+    margin-bottom:5px;
+    color:#64748b;
+    font-size:11px;
+}
+
+.historical-validation-metric strong {
+    font-size:20px;
+}
+
+.validation-value-valid {
+    color:#166534;
+}
+
+.validation-value-invalid {
+    color:#b91c1c;
+}
+
+.historical-validation-success {
+    margin-top:12px;
+    padding:12px;
+    background:#f0fdf4;
+    border:1px solid #86efac;
+    border-radius:8px;
+    color:#166534;
+    font-weight:700;
+}
+
+.historical-validation-errors,
+.historical-validation-warnings {
+    margin-top:12px;
+    padding:13px;
+    border-radius:8px;
+}
+
+.historical-validation-errors {
+    background:#fef2f2;
+    border:1px solid #fecaca;
+    color:#991b1b;
+}
+
+.historical-validation-warnings {
+    background:#fffbeb;
+    border:1px solid #fde68a;
+    color:#92400e;
+}
+
+.historical-validation-errors h4,
+.historical-validation-warnings h4 {
+    margin:0 0 8px;
+}
+
+.historical-validation-errors ul,
+.historical-validation-warnings ul {
+    margin:0;
+    padding-left:20px;
+}
+
+@media (max-width:900px) {
+
+    .historical-source-summary,
+    .historical-validation-summary {
+        grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+
+}
+
+@media (max-width:600px) {
+
+    .historical-source-summary,
+    .historical-validation-summary {
+        grid-template-columns:1fr;
+    }
+
+    .historical-manager-actions {
+        flex-direction:column;
+    }
+
+    .historical-manager-actions button {
+        width:100%;
+    }
+
+}
