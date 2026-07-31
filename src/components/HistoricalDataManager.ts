@@ -5,12 +5,12 @@
  *
  * - Select a historical-expectation CSV
  * - Validate the candidate dataset
- * - Import a valid dataset
+ * - Import a valid 168-record dataset
  * - View the active data source
  * - Restore the built-in dataset
  *
- * CSV data are not saved until the user selects
- * Import Validated Dataset.
+ * Changing the active historical dataset invalidates
+ * the current EDORI result and requires recalculation.
  */
 
 import {
@@ -41,6 +41,15 @@ from "../services/HistoricalDataRepository";
 
 import {
 
+    invalidateLatestResult
+
+}
+
+from "../services/ResultService";
+
+
+import {
+
     emit
 
 }
@@ -66,6 +75,10 @@ import type {
 from "../types/HistoricalExpectation";
 
 
+/**
+ * Candidate dataset that has passed validation
+ * but has not yet been imported.
+ */
 let validatedDataset:
 
 HistoricalExpectation[] | null = null;
@@ -165,8 +178,13 @@ export function HistoricalDataManager():string {
 
 
                 <p class="historical-file-help">
-                    Required columns: day, hour, expectedVolume,
-                    expectedBoarders, expectedArrivals, expectedDepartures.
+
+                    Required columns:
+
+                    day, hour, expectedVolume,
+                    expectedBoarders, expectedArrivals,
+                    expectedDepartures.
+
                 </p>
 
             </div>
@@ -212,7 +230,9 @@ export function HistoricalDataManager():string {
                 "
                 aria-live="polite"
             >
+
                 Select a completed CSV file and validate it before importing.
+
             </div>
 
 
@@ -236,20 +256,20 @@ export function initializeHistoricalDataManager():void {
 
     updateActiveSourceDisplay();
 
+    initializeFileInput();
+
     initializeValidateButton();
 
     initializeImportButton();
 
     initializeRestoreButton();
 
-    initializeFileInput();
-
 }
 
 
 /**
- * Reset candidate validation when a new file
- * is selected.
+ * Reset the candidate validation whenever
+ * a different file is selected.
  */
 function initializeFileInput():void {
 
@@ -261,6 +281,12 @@ function initializeFileInput():void {
 
 
     if(!input){
+
+        console.warn(
+
+            "HistoricalDataManager could not find historicalCsvFile."
+
+        );
 
         return;
 
@@ -274,6 +300,7 @@ function initializeFileInput():void {
         () => {
 
             validatedDataset = null;
+
 
             setImportButtonEnabled(
 
@@ -297,6 +324,7 @@ function initializeFileInput():void {
                     "default"
 
                 );
+
 
                 return;
 
@@ -331,6 +359,12 @@ function initializeValidateButton():void {
 
 
     if(!button){
+
+        console.warn(
+
+            "HistoricalDataManager could not find validateHistoricalCsvButton."
+
+        );
 
         return;
 
@@ -381,6 +415,7 @@ async function validateSelectedCsv():Promise<void> {
 
     validatedDataset = null;
 
+
     setImportButtonEnabled(
 
         false
@@ -393,6 +428,9 @@ async function validateSelectedCsv():Promise<void> {
         true
 
     );
+
+
+    clearValidationResults();
 
 
     showImportMessage(
@@ -436,11 +474,15 @@ async function validateSelectedCsv():Promise<void> {
         }
 
 
-        validatedDataset = [
+        validatedDataset = result.records.map(
 
-            ...result.records
+            record => ({
 
-        ];
+                ...record
+
+            })
+
+        );
 
 
         setImportButtonEnabled(
@@ -506,6 +548,12 @@ function initializeImportButton():void {
 
     if(!button){
 
+        console.warn(
+
+            "HistoricalDataManager could not find importHistoricalCsvButton."
+
+        );
+
         return;
 
     }
@@ -523,7 +571,8 @@ function initializeImportButton():void {
 
 
 /**
- * Save the validated dataset.
+ * Save the validated dataset and invalidate
+ * the current EDORI result.
  */
 function importValidatedDataset():void {
 
@@ -560,6 +609,13 @@ function importValidatedDataset():void {
         );
 
 
+        invalidateLatestResult(
+
+            "Historical expectations changed after a new CSV dataset was imported."
+
+        );
+
+
         validatedDataset = null;
 
 
@@ -575,16 +631,33 @@ function importValidatedDataset():void {
 
         showImportMessage(
 
-            "Historical expectations were imported successfully.",
+            "Historical expectations were imported successfully. Recalculate EDORI using the active dataset.",
 
             "success"
 
         );
 
 
+        /*
+         * Notify components that the historical
+         * dataset changed.
+         */
+
         emit(
 
             "historicalDataChanged"
+
+        );
+
+
+        /*
+         * Notify result-driven components so they
+         * immediately reset to recalculation state.
+         */
+
+        emit(
+
+            "resultChanged"
 
         );
 
@@ -627,6 +700,12 @@ function initializeRestoreButton():void {
 
     if(!button){
 
+        console.warn(
+
+            "HistoricalDataManager could not find restoreBuiltInDataButton."
+
+        );
+
         return;
 
     }
@@ -644,7 +723,8 @@ function initializeRestoreButton():void {
 
 
 /**
- * Clear imported data and restore built-in records.
+ * Clear imported data and return to the
+ * built-in historical dataset.
  */
 function restoreBuiltInDataset():void {
 
@@ -666,7 +746,7 @@ function restoreBuiltInDataset():void {
 
     const confirmed = window.confirm(
 
-        "Remove the imported historical dataset and restore the built-in data?"
+        "Remove the imported historical dataset and restore the built-in data? The current EDORI result will require recalculation."
 
     );
 
@@ -678,36 +758,80 @@ function restoreBuiltInDataset():void {
     }
 
 
-    clearImportedHistoricalDataset();
+    try {
+
+        clearImportedHistoricalDataset();
 
 
-    validatedDataset = null;
+        invalidateLatestResult(
+
+            "Historical expectations changed after the built-in dataset was restored."
+
+        );
 
 
-    setImportButtonEnabled(
-
-        false
-
-    );
+        validatedDataset = null;
 
 
-    updateActiveSourceDisplay();
+        setImportButtonEnabled(
+
+            false
+
+        );
 
 
-    showImportMessage(
-
-        "Imported historical data were removed. The built-in dataset is now active.",
-
-        "success"
-
-    );
+        resetFileInput();
 
 
-    emit(
+        clearValidationResults();
 
-        "historicalDataChanged"
 
-    );
+        updateActiveSourceDisplay();
+
+
+        showImportMessage(
+
+            "Imported historical data were removed. The built-in dataset is active and EDORI must be recalculated.",
+
+            "success"
+
+        );
+
+
+        emit(
+
+            "historicalDataChanged"
+
+        );
+
+
+        emit(
+
+            "resultChanged"
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to restore built-in historical data:",
+
+            error
+
+        );
+
+
+        showImportMessage(
+
+            "The built-in historical dataset could not be restored.",
+
+            "error"
+
+        );
+
+    }
 
 }
 
@@ -777,11 +901,27 @@ function updateActiveSourceDisplay():void {
 
     }
 
+
+    const restoreButton = document.getElementById(
+
+        "restoreBuiltInDataButton"
+
+    ) as HTMLButtonElement | null;
+
+
+    if(restoreButton){
+
+        restoreButton.disabled =
+
+            source === "built-in";
+
+    }
+
 }
 
 
 /**
- * Display parser and dataset validation results.
+ * Display parser and dataset-validation results.
  */
 function displayValidationResult(
 
@@ -862,6 +1002,21 @@ function displayValidationResult(
         : "";
 
 
+    const successHtml = result.valid
+
+        ? `
+
+            <div class="historical-validation-success">
+
+                ✓ The dataset contains all 168 required weekday and hour records.
+
+            </div>
+
+        `
+
+        : "";
+
+
     const errorsHtml = result.errors.length > 0
 
         ? createMessageList(
@@ -888,21 +1043,6 @@ function displayValidationResult(
             "historical-validation-warnings"
 
         )
-
-        : "";
-
-
-    const successHtml = result.valid
-
-        ? `
-
-            <div class="historical-validation-success">
-
-                ✓ The dataset contains all 168 required weekday and hour records.
-
-            </div>
-
-        `
 
         : "";
 
@@ -940,8 +1080,11 @@ function createValidationMetric(
         <div class="historical-validation-metric">
 
             <span>
+
                 ${escapeHtml(label)}
+
             </span>
+
 
             <strong
                 class="${
@@ -954,7 +1097,9 @@ function createValidationMetric(
 
                 }"
             >
+
                 ${value}
+
             </strong>
 
         </div>
@@ -965,7 +1110,7 @@ function createValidationMetric(
 
 
 /**
- * Create a validation message list.
+ * Create a validation error or warning list.
  */
 function createMessageList(
 
@@ -982,7 +1127,9 @@ function createMessageList(
         <div class="${className}">
 
             <h4>
+
                 ${escapeHtml(heading)}
+
             </h4>
 
 
@@ -1016,7 +1163,7 @@ function createMessageList(
 
 
 /**
- * Set validation-button processing state.
+ * Set validation processing state.
  */
 function setValidationState(
 
@@ -1079,6 +1226,27 @@ function setImportButtonEnabled(
 
 
 /**
+ * Reset the file input.
+ */
+function resetFileInput():void {
+
+    const input = document.getElementById(
+
+        "historicalCsvFile"
+
+    ) as HTMLInputElement | null;
+
+
+    if(input){
+
+        input.value = "";
+
+    }
+
+}
+
+
+/**
  * Clear previous validation output.
  */
 function clearValidationResults():void {
@@ -1100,7 +1268,7 @@ function clearValidationResults():void {
 
 
 /**
- * Update the import status message.
+ * Update the import-status message.
  */
 function showImportMessage(
 

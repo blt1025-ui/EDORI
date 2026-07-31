@@ -19,8 +19,7 @@ export interface SituationAssessment {
     /*
      * Clinical Capacity
      */
-    currentRN: number;
-    currentMD: number;
+
 
     /*
      * Patient Acuity (ESI Distribution)

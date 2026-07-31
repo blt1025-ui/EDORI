@@ -94,6 +94,27 @@ h1,h2,h3{margin-top:0}
 .status-banner.surge{border-left-color:#EF6C00}
 .status-banner.severe-surge{border-left-color:#C62828}
 
+/* ===========================
+   Recalculation Required
+=========================== */
+
+.status-recalculation-required {
+    background: #FFF8E1;
+    border-left: 6px solid #F59E0B;
+}
+
+.status-recalculation-required #statusTitle {
+    color: #92400E;
+}
+
+.status-recalculation-required .status-score {
+    color: #78350F;
+}
+
+.status-recalculation-required .status-recommendation {
+    color: #78350F;
+}
+
 .status-awaiting {
     border-left-color:#94a3b8;
     background:#f8fafc;
@@ -127,6 +148,11 @@ h1,h2,h3{margin-top:0}
     color:#991b1b;
 }
 
+.assessment-recalculation {
+    background: #FFF8E1;
+    color: #92400E;
+    border-left: 4px solid #F59E0B;
+}
 
 .assessment-message {
     margin:12px 0 0;

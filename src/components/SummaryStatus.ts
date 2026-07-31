@@ -100,15 +100,7 @@ function updateSummaryStatus(): void {
         `${state.occupiedMedicalBeds} / ${HOSPITAL.MEDICAL_BEDS}`
     );
 
-    setText(
-        "summaryRN",
-        state.currentRN
-    );
-
-    setText(
-        "summaryMD",
-        state.currentMD
-    );
+   
 
     setText(
         "summaryScore",
