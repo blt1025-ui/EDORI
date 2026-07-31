@@ -201,25 +201,25 @@ export function calculateEdori(
     const snapshot = {
 
 
-        score,
+    score,
 
 
-        status:
+    status:
 
-            threshold.status,
-
-
-        operationalState:
-
-            threshold.state,
+        threshold.operationalState.title,
 
 
-        timestamp:
+    operationalState:
 
-            new Date()
+        threshold.operationalState,
 
 
-    };
+    timestamp:
+
+        new Date()
+
+
+};
 
 
 

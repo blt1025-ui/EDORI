@@ -16,6 +16,23 @@
  * Dashboard Displays
  */
 
+import {
+
+    getThreshold
+
+}
+
+from "../config/thresholds";
+
+import {
+
+    AssessmentHistory,
+
+    initializeAssessmentHistory
+
+}
+
+from "./AssessmentHistory";
 
 import {
     SummaryStatus,
@@ -212,6 +229,8 @@ export function Dashboard():string {
 
             ${TrendChart()}
 
+${AssessmentHistory()}
+
 
 
         </div>
@@ -274,7 +293,7 @@ export function initializeDashboard():void {
 
     initializeTrendChart();
 
-
+initializeAssessmentHistory();
 
 
 
@@ -387,9 +406,9 @@ function updateDashboard():void {
 
     updateStatusBanner(
 
-        result.status
+    result.score
 
-    );
+);
 
 
 
@@ -418,10 +437,9 @@ function updateDashboard():void {
  */
 function updateStatusBanner(
 
-    status:string
+    score:number
 
 ):void {
-
 
 
     const banner =
@@ -434,8 +452,6 @@ function updateStatusBanner(
 
 
 
-
-
     if(!banner){
 
         return;
@@ -445,8 +461,104 @@ function updateStatusBanner(
 
 
 
+    const threshold =
 
-    banner.textContent = status;
+        getThreshold(
+
+            score
+
+        );
+
+
+
+    const state =
+
+        threshold.operationalState;
+
+
+
+
+
+
+
+    banner.className =
+
+        `status-banner ${
+
+            threshold.operationalState.title
+
+            .toLowerCase()
+
+            .replaceAll(
+
+                " ",
+
+                "-"
+
+            )
+
+        }`;
+
+
+
+
+
+
+
+    banner.innerHTML = `
+
+
+
+<div class="status-header">
+
+
+<div id="statusIcon">
+
+${state.icon}
+
+</div>
+
+
+
+<div>
+
+
+<div id="statusTitle">
+
+${state.title}
+
+</div>
+
+
+
+<div class="status-score">
+
+EDORI Score: ${score}
+
+</div>
+
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+<div class="status-recommendation">
+
+
+${state.recommendation}
+
+
+</div>
+
+
+
+`;
 
 
 

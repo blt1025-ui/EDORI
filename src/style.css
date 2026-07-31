@@ -321,7 +321,58 @@ h3 {
 
 }
 
+/* =========================
+   Operational State Styles
+========================= */
 
+
+.status-banner {
+
+    border-left-width:10px;
+
+    transition:.3s ease;
+
+}
+
+
+
+.status-banner.normal-operations {
+
+    border-left-color:#2E7D32;
+
+}
+
+
+
+.status-banner.elevated-activity {
+
+    border-left-color:#1565C0;
+
+}
+
+
+
+.status-banner.busy {
+
+    border-left-color:#F9A825;
+
+}
+
+
+
+.status-banner.surge {
+
+    border-left-color:#EF6C00;
+
+}
+
+
+
+.status-banner.severe-surge {
+
+    border-left-color:#C62828;
+
+}
 
 
 
@@ -870,5 +921,55 @@ h3 {
 
     font-size:14px;
 
+
+}
+
+/* =========================
+   Assessment History
+========================= */
+
+
+.history-container {
+
+    background:white;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    box-shadow:
+        0 2px 5px rgba(0,0,0,.1);
+
+}
+
+
+
+.history-table {
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+
+
+.history-table th {
+
+    text-align:left;
+
+    padding:10px;
+
+    border-bottom:1px solid #ddd;
+
+}
+
+
+
+.history-table td {
+
+    padding:10px;
+
+    border-bottom:1px solid #eee;
 
 }
