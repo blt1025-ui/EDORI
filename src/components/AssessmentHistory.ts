@@ -118,6 +118,14 @@ export function initializeAssessmentHistory():void {
 
 );
 
+subscribe(
+
+    APP_EVENTS.HISTORY_CHANGED,
+
+    updateHistory
+
+);
+
 }
 
 
