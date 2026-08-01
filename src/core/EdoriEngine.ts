@@ -81,7 +81,7 @@ from "../services/SnapshotService";
 
 import {
 
-    updateState
+    setState
 
 }
 
@@ -330,11 +330,9 @@ export function runEdoriAssessment(
      * Persist the authoritative assessment.
      */
 
-    updateState(
-
-        assessment
-
-    );
+    setState(
+    assessment
+);
 
 
     /*

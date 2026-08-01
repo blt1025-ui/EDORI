@@ -3,12 +3,15 @@
  *
  * Displays recently submitted EDORI assessments.
  *
+ * SnapshotService is the single source of truth.
+ *
  * This component:
  *
- * - Does not calculate EDORI.
- * - Does not create snapshots.
- * - Reads persistent history from SnapshotService.
- * - Refreshes only after a completed EDORI result.
+ * - Does not calculate EDORI
+ * - Does not create snapshots
+ * - Reads persistent history from SnapshotService
+ * - Supports clearing history with confirmation
+ * - Refreshes after result or history changes
  */
 
 import {
@@ -31,7 +34,11 @@ from "../services/EventService";
 
 import {
 
-    getSnapshots
+    clearSnapshots,
+
+    getSnapshots,
+
+    getSnapshotCount
 
 }
 
@@ -59,7 +66,7 @@ export function AssessmentHistory():string {
 
         <section class="history-container">
 
-            <div class="panel-header">
+            <div class="panel-header history-panel-header">
 
                 <div>
 
@@ -73,6 +80,36 @@ export function AssessmentHistory():string {
 
                 </div>
 
+
+                <div class="history-header-actions">
+
+                    <span
+                        id="historyRecordCount"
+                        class="history-record-count"
+                    >
+                        0 records
+                    </span>
+
+
+                    <button
+                        id="clearHistoryButton"
+                        class="danger-secondary-button history-clear-button"
+                        type="button"
+                        disabled
+                    >
+                        Clear History
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div
+                id="historyMessage"
+                class="history-message"
+                aria-live="polite"
+            >
             </div>
 
 
@@ -107,31 +144,162 @@ export function AssessmentHistory():string {
  */
 export function initializeAssessmentHistory():void {
 
+    initializeClearHistoryButton();
+
     updateHistory();
 
 
     subscribe(
 
-    APP_EVENTS.RESULT_CHANGED,
+        APP_EVENTS.RESULT_CHANGED,
 
-    updateHistory
+        updateHistory
 
-);
+    );
 
-subscribe(
 
-    APP_EVENTS.HISTORY_CHANGED,
+    subscribe(
 
-    updateHistory
+        APP_EVENTS.HISTORY_CHANGED,
 
-);
+        updateHistory
+
+    );
+
+}
+
+
+/**
+ * Initialize the clear-history action.
+ */
+function initializeClearHistoryButton():void {
+
+    const button = document.getElementById(
+
+        "clearHistoryButton"
+
+    ) as HTMLButtonElement | null;
+
+
+    if(!button){
+
+        console.warn(
+
+            "AssessmentHistory could not find clearHistoryButton."
+
+        );
+
+        return;
+
+    }
+
+
+    button.addEventListener(
+
+        "click",
+
+        clearHistoryWithConfirmation
+
+    );
+
+}
+
+
+/**
+ * Confirm and clear persistent EDORI history.
+ */
+function clearHistoryWithConfirmation():void {
+
+    const recordCount = getSnapshotCount();
+
+
+    if(recordCount === 0){
+
+        showHistoryMessage(
+
+            "There is no assessment history to clear.",
+
+            "default"
+
+        );
+
+        return;
+
+    }
+
+
+    const confirmationMessage =
+
+        recordCount === 1
+
+            ? "Permanently remove the stored EDORI assessment history? This will remove 1 record from the trend chart and history table."
+
+            : `Permanently remove the stored EDORI assessment history? This will remove ${recordCount} records from the trend chart and history table.`;
+
+
+    const confirmed = window.confirm(
+
+        confirmationMessage
+
+    );
+
+
+    if(!confirmed){
+
+        showHistoryMessage(
+
+            "Assessment history was not changed.",
+
+            "default"
+
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        clearSnapshots();
+
+
+        showHistoryMessage(
+
+            "Assessment history was cleared successfully.",
+
+            "success"
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to clear EDORI assessment history:",
+
+            error
+
+        );
+
+
+        showHistoryMessage(
+
+            "Assessment history could not be cleared.",
+
+            "error"
+
+        );
+
+    }
 
 }
 
 
 /**
  * Refresh the history table from persistent
- * EDORI snapshots.
+ * snapshots.
  */
 function updateHistory():void {
 
@@ -149,7 +317,24 @@ function updateHistory():void {
     }
 
 
-    const snapshots = getSnapshots()
+    const allSnapshots = getSnapshots();
+
+
+    updateHistoryRecordCount(
+
+        allSnapshots.length
+
+    );
+
+
+    updateClearButtonState(
+
+        allSnapshots.length > 0
+
+    );
+
+
+    const visibleSnapshots = allSnapshots
 
         .slice()
 
@@ -161,7 +346,11 @@ function updateHistory():void {
 
                 second
 
-            ) => second.timestamp.getTime() -
+            ) =>
+
+                second.timestamp.getTime()
+
+                -
 
                 first.timestamp.getTime()
 
@@ -176,7 +365,7 @@ function updateHistory():void {
         );
 
 
-    if(snapshots.length === 0){
+    if(visibleSnapshots.length === 0){
 
         renderEmptyHistory(
 
@@ -191,7 +380,9 @@ function updateHistory():void {
 
     container.innerHTML = createHistoryTable(
 
-        snapshots
+        visibleSnapshots,
+
+        allSnapshots.length
 
     );
 
@@ -203,9 +394,49 @@ function updateHistory():void {
  */
 function createHistoryTable(
 
-    snapshots:EdoriSnapshot[]
+    snapshots:EdoriSnapshot[],
+
+    totalRecordCount:number
 
 ):string {
+
+    const additionalRecordCount =
+
+        Math.max(
+
+            0,
+
+            totalRecordCount -
+
+            snapshots.length
+
+        );
+
+
+    const additionalRecordsMessage =
+
+        additionalRecordCount > 0
+
+            ? `
+
+                <p class="history-truncation-message">
+
+                    Showing the 10 most recent assessments.
+
+                    ${additionalRecordCount}
+
+                    older
+
+                    ${additionalRecordCount === 1 ? "record is" : "records are"}
+
+                    retained in browser history.
+
+                </p>
+
+            `
+
+            : "";
+
 
     return `
 
@@ -259,6 +490,9 @@ function createHistoryTable(
             </table>
 
         </div>
+
+
+        ${additionalRecordsMessage}
 
     `;
 
@@ -348,6 +582,7 @@ function createHistoryRow(
 
                     </span>
 
+
                     ${escapeHtml(stateTitle)}
 
                 </span>
@@ -362,7 +597,160 @@ function createHistoryRow(
 
 
 /**
- * Normalize the snapshot timestamp.
+ * Update the total history-record indicator.
+ */
+function updateHistoryRecordCount(
+
+    count:number
+
+):void {
+
+    const element = document.getElementById(
+
+        "historyRecordCount"
+
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.textContent =
+
+        count === 1
+
+            ? "1 record"
+
+            : `${count} records`;
+
+}
+
+
+/**
+ * Enable or disable the Clear History button.
+ */
+function updateClearButtonState(
+
+    historyExists:boolean
+
+):void {
+
+    const button = document.getElementById(
+
+        "clearHistoryButton"
+
+    ) as HTMLButtonElement | null;
+
+
+    if(!button){
+
+        return;
+
+    }
+
+
+    button.disabled =
+
+        !historyExists;
+
+}
+
+
+/**
+ * Display the empty-history state.
+ */
+function renderEmptyHistory(
+
+    container:HTMLElement
+
+):void {
+
+    container.innerHTML = `
+
+        <div class="history-empty-state">
+
+            <span class="empty-state-icon">
+                …
+            </span>
+
+            <p>
+                No submitted assessments are available.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Update the history operation message.
+ */
+function showHistoryMessage(
+
+    message:string,
+
+    type:
+
+        | "default"
+
+        | "success"
+
+        | "error"
+
+):void {
+
+    const element = document.getElementById(
+
+        "historyMessage"
+
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.textContent = message;
+
+
+    element.classList.remove(
+
+        "history-message-default",
+
+        "history-message-success",
+
+        "history-message-error"
+
+    );
+
+
+    if(message.length === 0){
+
+        return;
+
+    }
+
+
+    element.classList.add(
+
+        `history-message-${type}`
+
+    );
+
+}
+
+
+/**
+ * Normalize a snapshot timestamp.
  */
 function normalizeTimestamp(
 
@@ -372,7 +760,11 @@ function normalizeTimestamp(
 
     if(timestamp instanceof Date){
 
-        return timestamp;
+        return new Date(
+
+            timestamp
+
+        );
 
     }
 
@@ -407,6 +799,8 @@ function formatDate(
         [],
 
         {
+
+            year:"numeric",
 
             month:"short",
 
@@ -448,34 +842,6 @@ function formatTime(
         }
 
     );
-
-}
-
-
-/**
- * Render the empty-history state.
- */
-function renderEmptyHistory(
-
-    container:HTMLElement
-
-):void {
-
-    container.innerHTML = `
-
-        <div class="history-empty-state">
-
-            <span class="empty-state-icon">
-                …
-            </span>
-
-            <p>
-                No submitted assessments are available.
-            </p>
-
-        </div>
-
-    `;
 
 }
 

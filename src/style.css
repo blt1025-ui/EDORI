@@ -1040,3 +1040,112 @@ h1,h2,h3{margin-top:0}
     }
 
 }
+
+/* =========================
+   Assessment History Controls
+========================= */
+
+.history-panel-header {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:16px;
+}
+
+.history-header-actions {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.history-record-count {
+    display:inline-flex;
+    align-items:center;
+    min-height:34px;
+    padding:6px 10px;
+    background:#f1f5f9;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    color:#475569;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+.history-clear-button {
+    min-height:36px;
+    padding:8px 12px;
+}
+
+.history-clear-button:disabled {
+    cursor:not-allowed;
+    opacity:.5;
+}
+
+.history-message {
+    min-height:0;
+    margin-bottom:12px;
+    border-radius:7px;
+    font-size:13px;
+    line-height:1.4;
+}
+
+.history-message:empty {
+    display:none;
+}
+
+.history-message-default,
+.history-message-success,
+.history-message-error {
+    padding:10px 12px;
+}
+
+.history-message-default {
+    background:#f1f5f9;
+    color:#475569;
+}
+
+.history-message-success {
+    background:#f0fdf4;
+    color:#166534;
+}
+
+.history-message-error {
+    background:#fef2f2;
+    color:#991b1b;
+}
+
+.history-truncation-message {
+    margin:12px 0 0;
+    color:#64748b;
+    font-size:12px;
+    line-height:1.5;
+}
+
+@media(max-width:700px) {
+
+    .history-panel-header {
+        flex-direction:column;
+    }
+
+    .history-header-actions {
+        width:100%;
+        justify-content:space-between;
+    }
+
+}
+
+@media(max-width:450px) {
+
+    .history-header-actions {
+        align-items:stretch;
+        flex-direction:column;
+    }
+
+    .history-clear-button {
+        width:100%;
+    }
+
+}
