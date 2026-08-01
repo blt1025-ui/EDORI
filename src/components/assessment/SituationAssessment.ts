@@ -28,6 +28,16 @@
 
 import {
 
+    calculateEsiTotal,
+
+    calculateUnassignedEsiCount
+
+}
+
+from "../../services/ValidationService";
+
+import {
+
     APP_EVENTS
 
 }
@@ -103,13 +113,6 @@ import type {
 from "../../types/HistoricalExpectation";
 
 
-import type {
-
-    SituationAssessment as SituationAssessmentType
-
-}
-
-from "../../types/SituationAssessment";
 
 
 /**
@@ -1335,25 +1338,11 @@ function clearExpectedValueDisplays():void {
  */
 function updateEsiTotalSummary():void {
 
-    const esiTotal =
+    const esiTotal = calculateEsiTotal(
 
-        draftInput.esi1
+    draftInput
 
-        +
-
-        draftInput.esi2
-
-        +
-
-        draftInput.esi3
-
-        +
-
-        draftInput.esi4
-
-        +
-
-        draftInput.esi5;
+);
 
 
     const element = document.getElementById(
@@ -1430,7 +1419,7 @@ function updateEsiTotalSummary():void {
 
     element.textContent =
 
-        `ESI Total: ${esiTotal} — ${draftInput.totalEDVolume - esiTotal} patients do not have an entered ESI category`;
+    `ESI Total: ${esiTotal} — ${calculateUnassignedEsiCount(draftInput)} patients do not have an entered ESI category`
 
 }
 

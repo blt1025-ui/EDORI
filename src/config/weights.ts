@@ -1,52 +1,37 @@
 /**
- * EDORI domain weights
+ * EDORI scoring-domain weights.
  *
- * Staffing is intentionally excluded from the
- * EDORI calculation.
+ * Staffing is intentionally excluded from
+ * the EDORI scoring model.
  *
- * All active weights must total 1.00.
+ * Active domains:
+ *
+ * - ED demand
+ * - Boarding
+ * - Hospital capacity
+ * - Patient acuity
+ * - Near-term forecast
  */
 
 export const WEIGHTS = {
 
-    /**
-     * Current ED volume compared with the
-     * expected volume for the weekday and hour.
-     */
     demand:0.20,
 
-
-    /**
-     * Current boarding compared with expected
-     * boarding for the weekday and hour.
-     */
     boarding:0.25,
 
-
-    /**
-     * Medical-bed occupancy within the hospital.
-     */
     hospital:0.20,
 
-
-    /**
-     * Weighted ESI acuity distribution.
-     */
     acuity:0.15,
 
-
-    /**
-     * Expected near-term operational conditions.
-     */
     forecast:0.20
 
 } as const;
 
 
 /**
- * Development safeguard.
+ * Sum of all active EDORI weights.
  */
-const TOTAL_WEIGHT =
+export const TOTAL_WEIGHT =
 
     WEIGHTS.demand
 
@@ -67,20 +52,17 @@ const TOTAL_WEIGHT =
     WEIGHTS.forecast;
 
 
-if(
+/**
+ * Determine whether the configured weights
+ * total exactly 1.00 within floating-point
+ * tolerance.
+ */
+export function areWeightsValid():boolean {
 
-    Math.abs(
+    return Math.abs(
 
         TOTAL_WEIGHT - 1
 
-    ) > 0.0001
-
-){
-
-    console.warn(
-
-        `EDORI weights total ${TOTAL_WEIGHT}, but should total 1.00.`
-
-    );
+    ) < 0.000001;
 
 }

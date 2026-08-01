@@ -1,141 +1,420 @@
 /**
  * ForecastService
  *
- * Calculates expected near-term ED operational pressure.
+ * Pure near-term operational-flow calculation.
  *
- * Current version:
- * Simple one-hour forecast model.
+ * The Version 1.0 forecast domain estimates
+ * whether expected arrivals are likely to exceed
+ * expected departures during the current hourly
+ * historical period.
  *
- * Future versions:
- * - Machine learning prediction
- * - Seasonal adjustment
- * - Admission prediction
- * - EHR integration
+ * This service does not:
+ *
+ * - Read current application state
+ * - Save results
+ * - Emit events
+ * - Access localStorage
+ * - Predict future EDORI scores
  */
 
+import type {
 
-import type { SituationAssessment }
+    SituationAssessment
+
+}
+
 from "../types/SituationAssessment";
 
 
-
 /**
- * Forecast result returned to EDORI engine.
+ * A positive net flow of 10 patients or more
+ * produces the maximum forecast score.
+ *
+ * This constant should be reviewed during
+ * clinical calibration.
  */
+const NET_FLOW_AT_MAXIMUM_SCORE = 10;
+
+
 export interface ForecastResult {
 
-
     /**
-     * Projected ED census after expected arrivals
-     * and departures.
+     * Expected arrivals minus expected departures.
      */
-    projectedVolume: number;
-
+    netExpectedFlow:number;
 
 
     /**
-     * Difference between projected volume
-     * and expected historical volume.
+     * Forecast strain from 0 through 100.
      */
-    volumeDifference: number;
-
+    forecastScore:number;
 
 
     /**
-     * Forecast strain score 0-100.
+     * Readable direction of expected flow.
      */
-    forecastScore: number;
+    direction:
+
+        | "Increasing"
+
+        | "Stable"
+
+        | "Improving";
+
+
+    /**
+     * Human-readable forecast explanation.
+     */
+    description:string;
 
 }
 
 
-
 /**
- * Calculates the projected operational state.
+ * Calculate the near-term forecast domain.
  */
 export function calculateForecast(
 
-    assessment: SituationAssessment
+    assessment:SituationAssessment
 
-): ForecastResult {
+):ForecastResult {
 
+    const expectedArrivals =
 
+        normalizeHistoricalValue(
 
-    /*
-     * Calculate projected census
-     */
+            assessment.expectedArrivals
 
-    const projectedVolume =
-
-        assessment.totalEDVolume
-
-        +
-
-        assessment.expectedArrivals
-
-        -
-
-        assessment.expectedDepartures;
+        );
 
 
+    const expectedDepartures =
 
-    /*
-     * Compare projected volume
-     * against historical expectation.
-     */
+        normalizeHistoricalValue(
 
-    const volumeDifference =
+            assessment.expectedDepartures
 
-        projectedVolume
+        );
+
+
+    const netExpectedFlow = roundValue(
+
+        expectedArrivals
 
         -
 
-        assessment.expectedVolume;
+        expectedDepartures
+
+    );
 
 
+    const forecastScore =
 
-    /*
-     * Convert difference into a 0-100 score.
-     *
-     * Assumption:
-     * +25 patients above expected represents
-     * extreme forecast pressure.
-     */
+        calculateForecastScore(
 
-    let forecastScore =
+            netExpectedFlow
 
-        (volumeDifference / 25) * 100;
+        );
 
 
+    const direction = getForecastDirection(
 
-    /*
-     * Keep score between 0 and 100.
-     */
+        netExpectedFlow
 
-    forecastScore = Math.max(
+    );
 
-        0,
 
-        Math.min(
+    return {
 
-            100,
+        netExpectedFlow,
 
-            forecastScore
+        forecastScore,
+
+        direction,
+
+        description:
+            createForecastDescription(
+
+                expectedArrivals,
+
+                expectedDepartures,
+
+                netExpectedFlow,
+
+                direction
+
+            )
+
+    };
+
+}
+
+
+/**
+ * Convert positive expected net flow to a
+ * 0–100 forecast score.
+ *
+ * Zero or negative net flow contributes no
+ * forecast-strain score.
+ */
+function calculateForecastScore(
+
+    netExpectedFlow:number
+
+):number {
+
+    if(
+
+        !Number.isFinite(
+
+            netExpectedFlow
+
+        )
+
+        ||
+
+        netExpectedFlow <= 0
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return roundScore(
+
+        clampScore(
+
+            netExpectedFlow
+
+            /
+
+            NET_FLOW_AT_MAXIMUM_SCORE
+
+            *
+
+            100
 
         )
 
     );
 
+}
 
 
-    return {
+/**
+ * Determine expected operational direction.
+ */
+function getForecastDirection(
 
-        projectedVolume,
+    netExpectedFlow:number
 
-        volumeDifference,
+):
 
-        forecastScore
+    | "Increasing"
 
-    };
+    | "Stable"
+
+    | "Improving" {
+
+    if(netExpectedFlow > 0){
+
+        return "Increasing";
+
+    }
+
+
+    if(netExpectedFlow < 0){
+
+        return "Improving";
+
+    }
+
+
+    return "Stable";
+
+}
+
+
+/**
+ * Create a readable explanation.
+ */
+function createForecastDescription(
+
+    expectedArrivals:number,
+
+    expectedDepartures:number,
+
+    netExpectedFlow:number,
+
+    direction:
+
+        | "Increasing"
+
+        | "Stable"
+
+        | "Improving"
+
+):string {
+
+    if(direction === "Increasing"){
+
+        return `Expected arrivals (${formatValue(expectedArrivals)}) exceed expected departures (${formatValue(expectedDepartures)}) by ${formatValue(netExpectedFlow)} patients during the current hourly period.`;
+
+    }
+
+
+    if(direction === "Improving"){
+
+        return `Expected departures (${formatValue(expectedDepartures)}) exceed expected arrivals (${formatValue(expectedArrivals)}) by ${formatValue(Math.abs(netExpectedFlow))} patients during the current hourly period.`;
+
+    }
+
+
+    return `Expected arrivals and departures are balanced at ${formatValue(expectedArrivals)} patients during the current hourly period.`;
+
+}
+
+
+/**
+ * Normalize a historical expectation.
+ *
+ * Historical values may contain decimals.
+ */
+function normalizeHistoricalValue(
+
+    value:number
+
+):number {
+
+    if(
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+        ||
+
+        value < 0
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Keep a score between 0 and 100.
+ */
+function clampScore(
+
+    value:number
+
+):number {
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+
+    return Math.min(
+
+        100,
+
+        Math.max(
+
+            0,
+
+            value
+
+        )
+
+    );
+
+}
+
+
+/**
+ * Round a score to one decimal place.
+ */
+function roundScore(
+
+    value:number
+
+):number {
+
+    return Math.round(
+
+        value * 10
+
+    ) / 10;
+
+}
+
+
+/**
+ * Round a flow value to two decimal places.
+ */
+function roundValue(
+
+    value:number
+
+):number {
+
+    return Math.round(
+
+        value * 100
+
+    ) / 100;
+
+}
+
+
+/**
+ * Format a historical value for text.
+ */
+function formatValue(
+
+    value:number
+
+):string {
+
+    if(Number.isInteger(value)){
+
+        return String(
+
+            value
+
+        );
+
+    }
+
+
+    return value
+
+        .toFixed(
+
+            2
+
+        )
+
+        .replace(
+
+            /\.?0+$/,
+
+            ""
+
+        );
 
 }

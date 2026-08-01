@@ -4,21 +4,28 @@
  * Central orchestration layer for one completed
  * EDORI operational assessment.
  *
- * This is the only workflow that should eventually:
+ * Responsibilities:
  *
- * - Capture the assessment timestamp
+ * - Validate current inputs
+ * - Capture one assessment timestamp
  * - Determine weekday and hour
  * - Load historical expectations
+ * - Build the completed assessment
  * - Validate the completed assessment
- * - Commit StateService
- * - Calculate EDORI
- * - Store ResultService
- * - Create a snapshot
- * - Emit resultChanged
- *
- * Dashboard components must not perform these
- * responsibilities independently.
+ * - Calculate EDORI exactly once
+ * - Persist state and result
+ * - Save one eligible snapshot
+ * - Emit RESULT_CHANGED
  */
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
 
 import {
 
@@ -28,14 +35,6 @@ import {
 
 from "../services/EdoriService";
 
-
-import {
-
-    APP_EVENTS
-
-}
-
-from "../config/appEvents";
 
 import {
 
@@ -90,6 +89,8 @@ from "../services/StateService";
 
 import {
 
+    validateAssessmentInput,
+
     validateState
 
 }
@@ -117,6 +118,15 @@ from "../types/EdoriEngineResult";
 
 import type {
 
+    EdoriResult
+
+}
+
+from "../types/EdoriResult";
+
+
+import type {
+
     SituationAssessment
 
 }
@@ -126,9 +136,6 @@ from "../types/SituationAssessment";
 
 /**
  * Complete one authoritative EDORI assessment.
- *
- * This function should be called only when the
- * user explicitly selects Calculate EDORI.
  */
 export function runEdoriAssessment(
 
@@ -139,11 +146,22 @@ export function runEdoriAssessment(
 ):EdoriEngineResult {
 
     /*
-     * Validate the calculation timestamp before
-     * using it for historical lookup.
+     * Validate the supplied timestamp.
      */
 
-    if(Number.isNaN(calculationTime.getTime())){
+    if(
+
+        !(calculationTime instanceof Date)
+
+        ||
+
+        Number.isNaN(
+
+            calculationTime.getTime()
+
+        )
+
+    ){
 
         return createFailure([
 
@@ -155,24 +173,24 @@ export function runEdoriAssessment(
 
 
     /*
-     * Validate the current operational inputs
-     * before historical data are loaded.
+     * Validate all user-entered current values
+     * through ValidationService.
      */
 
-    const inputErrors =
+    const inputValidation =
 
-        validateCurrentInputs(
+        validateAssessmentInput(
 
             input
 
         );
 
 
-    if(inputErrors.length > 0){
+    if(!inputValidation.valid){
 
         return createFailure(
 
-            inputErrors
+            inputValidation.errors
 
         );
 
@@ -180,8 +198,7 @@ export function runEdoriAssessment(
 
 
     /*
-     * Determine the automatic weekday and hourly
-     * bucket from the submission time.
+     * Determine the automatic historical period.
      */
 
     const period = getAssessmentPeriod(
@@ -192,25 +209,20 @@ export function runEdoriAssessment(
 
 
     /*
-     * Do not calculate EDORI without a historical
-     * expectation for the selected weekday/hour.
-     *
-     * Using zero defaults would create an
-     * operationally misleading score.
+     * Do not calculate against zero fallback values.
      */
 
-    const historicalDataAvailable =
+    if(
 
-        hasHistoricalExpectation(
+        !hasHistoricalExpectation(
 
             period.day,
 
             period.hour
 
-        );
+        )
 
-
-    if(!historicalDataAvailable){
+    ){
 
         return createFailure([
 
@@ -233,11 +245,6 @@ export function runEdoriAssessment(
 
         );
 
-
-    /*
-     * Build the complete authoritative
-     * SituationAssessment.
-     */
 
     const assessment:SituationAssessment = {
 
@@ -290,22 +297,22 @@ export function runEdoriAssessment(
 
 
     /*
-     * Apply the existing centralized assessment
-     * validation rules.
+     * Validate the completed assessment, including
+     * metadata and historical expectations.
      */
 
-    const validation = validateState(
+    const stateValidation = validateState(
 
         assessment
 
     );
 
 
-    if(!validation.valid){
+    if(!stateValidation.valid){
 
         return createFailure(
 
-            validation.errors
+            stateValidation.errors
 
         );
 
@@ -313,10 +320,7 @@ export function runEdoriAssessment(
 
 
     /*
-     * Calculate EDORI exactly once.
-     *
-     * EdoriService must remain a pure calculation
-     * service with no persistence or event effects.
+     * Calculate exactly once before persistence.
      */
 
     const result = calculateEdori(
@@ -327,19 +331,18 @@ export function runEdoriAssessment(
 
 
     /*
-     * Persist the authoritative assessment.
+     * Persist the committed assessment.
      */
 
     setState(
-    assessment
-);
+
+        assessment
+
+    );
 
 
     /*
-     * Persist the authoritative result.
-     *
-     * setLatestResult also clears a previous
-     * historical-data invalidation state.
+     * Persist the current authoritative result.
      */
 
     setLatestResult(
@@ -350,7 +353,7 @@ export function runEdoriAssessment(
 
 
     /*
-     * Build one historical snapshot.
+     * Create one eligible historical snapshot.
      */
 
     const snapshot = {
@@ -396,26 +399,26 @@ export function runEdoriAssessment(
 
 
     /*
-     * Publish one event after all state,
-     * result, and snapshot work is complete.
+     * Publish only after the complete workflow
+     * succeeds.
      */
 
     emit(
 
-    APP_EVENTS.RESULT_CHANGED
+        APP_EVENTS.RESULT_CHANGED
 
-);
+    );
 
 
     return {
 
         success:true,
 
-        assessment:{
+        assessment:cloneAssessment(
 
-            ...assessment
+            assessment
 
-        },
+        ),
 
         result:cloneResult(
 
@@ -426,234 +429,6 @@ export function runEdoriAssessment(
         snapshotSaved
 
     };
-
-}
-
-
-/**
- * Validate current user-entered values before
- * creating the completed assessment.
- */
-function validateCurrentInputs(
-
-    input:EdoriAssessmentInput
-
-):string[] {
-
-    const errors:string[] = [];
-
-
-    validateNonNegativeInteger(
-
-        input.totalEDVolume,
-
-        "Total ED volume",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.boardedPatients,
-
-        "Boarding patients",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.occupiedMedicalBeds,
-
-        "Occupied medical beds",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.esi1,
-
-        "ESI 1",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.esi2,
-
-        "ESI 2",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.esi3,
-
-        "ESI 3",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.esi4,
-
-        "ESI 4",
-
-        errors
-
-    );
-
-
-    validateNonNegativeInteger(
-
-        input.esi5,
-
-        "ESI 5",
-
-        errors
-
-    );
-
-
-    if(input.occupiedMedicalBeds > 273){
-
-        errors.push(
-
-            "Occupied medical beds cannot exceed 273."
-
-        );
-
-    }
-
-
-    if(
-
-        input.boardedPatients
-
-        >
-
-        input.totalEDVolume
-
-    ){
-
-        errors.push(
-
-            "Boarding patients cannot exceed total ED volume."
-
-        );
-
-    }
-
-
-    const esiTotal =
-
-        input.esi1
-
-        +
-
-        input.esi2
-
-        +
-
-        input.esi3
-
-        +
-
-        input.esi4
-
-        +
-
-        input.esi5;
-
-
-    /*
-     * We currently warn only by validation error
-     * when the ESI total exceeds the ED census.
-     *
-     * The ESI total is allowed to be lower because
-     * some current patients may not yet have an
-     * assigned ESI value.
-     */
-
-    if(esiTotal > input.totalEDVolume){
-
-        errors.push(
-
-            `The ESI total (${esiTotal}) cannot exceed total ED volume (${input.totalEDVolume}).`
-
-        );
-
-    }
-
-
-    return errors;
-
-}
-
-
-/**
- * Validate one nonnegative whole-number input.
- */
-function validateNonNegativeInteger(
-
-    value:number,
-
-    label:string,
-
-    errors:string[]
-
-):void {
-
-    if(!Number.isFinite(value)){
-
-        errors.push(
-
-            `${label} must be a valid number.`
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(!Number.isInteger(value)){
-
-        errors.push(
-
-            `${label} must be a whole number.`
-
-        );
-
-    }
-
-
-    if(value < 0){
-
-        errors.push(
-
-            `${label} cannot be negative.`
-
-        );
-
-    }
 
 }
 
@@ -671,11 +446,15 @@ function createFailure(
 
         success:false,
 
-        errors:[
+        errors:Array.from(
 
-            ...errors
+            new Set(
 
-        ]
+                errors
+
+            )
+
+        )
 
     };
 
@@ -683,13 +462,31 @@ function createFailure(
 
 
 /**
- * Create a defensive EDORI result copy.
+ * Return a defensive assessment copy.
+ */
+function cloneAssessment(
+
+    assessment:SituationAssessment
+
+):SituationAssessment {
+
+    return {
+
+        ...assessment
+
+    };
+
+}
+
+
+/**
+ * Return a defensive result copy.
  */
 function cloneResult(
 
-    result:ReturnType<typeof calculateEdori>
+    result:EdoriResult
 
-):ReturnType<typeof calculateEdori> {
+):EdoriResult {
 
     return {
 

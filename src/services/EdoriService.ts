@@ -1,60 +1,127 @@
 /**
  * EdoriService
  *
- * Core EDORI calculation engine.
+ * Pure EDORI calculation service.
  *
- * Converts operational conditions into
- * a 0–100 operational readiness score.
+ * Input:
+ * A complete validated SituationAssessment.
  *
- * Active scoring domains:
+ * Output:
+ * One EdoriResult.
  *
- * - ED demand
- * - Boarding
- * - Hospital capacity
- * - Patient acuity
- * - Forecast
+ * This service does not:
  *
- * Nursing and provider staffing are not
- * included in the EDORI calculation.
- *
- * This service:
- *
- * - Performs calculations only
- * - Does not save snapshots
- * - Does not emit events
- * - Does not update application state
+ * - Read application state
+ * - Modify application state
+ * - Save browser data
+ * - Save snapshots
+ * - Emit events
+ * - Update the dashboard
  */
 
-import type { SituationAssessment }
-from "../types/SituationAssessment";
+import {
 
+    HOSPITAL
 
-import type { EdoriResult }
-from "../types/EdoriResult";
+}
 
-
-import type { Driver }
-from "../types/Driver";
-
-
-import { HOSPITAL }
 from "../config/constants";
 
 
-import { WEIGHTS }
+import {
+
+    areWeightsValid,
+
+    WEIGHTS
+
+}
+
 from "../config/weights";
 
 
-import { getThreshold }
+import {
+
+    getThreshold
+
+}
+
 from "../config/thresholds";
 
 
-import { calculateForecast }
+import {
+
+    calculateForecast
+
+}
+
 from "./ForecastService";
 
 
+import type {
+
+    Driver
+
+}
+
+from "../types/Driver";
+
+
+import type {
+
+    EdoriResult
+
+}
+
+from "../types/EdoriResult";
+
+
+import type {
+
+    SituationAssessment
+
+}
+
+from "../types/SituationAssessment";
+
+
 /**
- * Calculate the authoritative EDORI result.
+ * Maximum positive variance used to normalize
+ * demand and boarding scores.
+ *
+ * These values can be recalibrated later during
+ * operational scenario testing.
+ */
+const DEMAND_VARIANCE_AT_MAXIMUM_SCORE = 25;
+
+const BOARDING_VARIANCE_AT_MAXIMUM_SCORE = 25;
+
+
+/**
+ * Hospital occupancy below this level does not
+ * generate a primary driver.
+ */
+const HOSPITAL_DRIVER_THRESHOLD = 85;
+
+
+/**
+ * Acuity scores below this level do not generate
+ * a primary driver.
+ */
+const ACUITY_DRIVER_THRESHOLD = 60;
+
+
+/**
+ * Forecast scores at or below this level do not
+ * generate a primary driver.
+ */
+const FORECAST_DRIVER_THRESHOLD = 50;
+
+
+/**
+ * Calculate one authoritative EDORI result.
+ *
+ * The caller is responsible for validating the
+ * assessment before invoking this function.
  */
 export function calculateEdori(
 
@@ -62,52 +129,52 @@ export function calculateEdori(
 
 ):EdoriResult {
 
-    /*
-     * Calculate the active scoring domains.
-     */
-
-    const demandScore = calculateDemand(
-
-        assessment
-
-    );
+    assertValidWeights();
 
 
-    const boardingScore = calculateBoarding(
+    const demandScore = calculateDemandScore(
 
         assessment
 
     );
 
 
-    const hospitalScore = calculateHospitalCapacity(
+    const boardingScore = calculateBoardingScore(
 
         assessment
 
     );
 
 
-    const acuityScore = calculateAcuity(
+    const hospitalScore = calculateHospitalScore(
 
         assessment
 
     );
 
 
-    const forecast = calculateForecast(
+    const acuityScore = calculateAcuityScore(
 
         assessment
 
     );
 
 
-    /*
-     * Weighted EDORI score.
-     *
-     * Staffing is intentionally excluded.
-     */
+    const forecastResult = calculateForecast(
 
-    const rawScore =
+        assessment
+
+    );
+
+
+    const forecastScore = clampScore(
+
+        forecastResult.forecastScore
+
+    );
+
+
+    const weightedScore =
 
         demandScore * WEIGHTS.demand
 
@@ -125,14 +192,14 @@ export function calculateEdori(
 
         +
 
-        forecast.forecastScore * WEIGHTS.forecast;
+        forecastScore * WEIGHTS.forecast;
 
 
     const score = Math.round(
 
         clampScore(
 
-            rawScore
+            weightedScore
 
         )
 
@@ -146,23 +213,37 @@ export function calculateEdori(
     );
 
 
-    const operationalState =
+    const operationalState = {
 
-        threshold.operationalState;
+        ...threshold.operationalState
+
+    };
 
 
     const drivers = generateDrivers(
 
         assessment,
 
-        forecast.forecastScore
+        {
+
+            demandScore,
+
+            boardingScore,
+
+            hospitalScore,
+
+            acuityScore,
+
+            forecastScore
+
+        }
 
     );
 
 
     const recommendations =
 
-        generateRecommendations(
+        generateScoreRecommendations(
 
             score
 
@@ -178,16 +259,40 @@ export function calculateEdori(
 
         operationalState,
 
-        demandScore,
+        demandScore:
+            roundDomainScore(
 
-        boardingScore,
+                demandScore
 
-        hospitalScore,
+            ),
 
-        acuityScore,
+        boardingScore:
+            roundDomainScore(
+
+                boardingScore
+
+            ),
+
+        hospitalScore:
+            roundDomainScore(
+
+                hospitalScore
+
+            ),
+
+        acuityScore:
+            roundDomainScore(
+
+                acuityScore
+
+            ),
 
         forecastScore:
-            forecast.forecastScore,
+            roundDomainScore(
+
+                forecastScore
+
+            ),
 
         drivers,
 
@@ -202,43 +307,43 @@ export function calculateEdori(
 
 
 /**
- * ED Demand
+ * Calculate current ED demand relative to
+ * historical expected ED volume.
  *
- * Measures current ED volume above the
- * historical expectation for the same
- * weekday and hour.
+ * Conditions at or below expected volume
+ * contribute no demand-strain score.
  */
-function calculateDemand(
+function calculateDemandScore(
 
     assessment:SituationAssessment
 
 ):number {
 
-    if(
-
-        assessment.expectedVolume <= 0
-
-    ){
+    if(assessment.expectedVolume <= 0){
 
         return 0;
 
     }
 
 
-    const difference =
+    const positiveVariance = Math.max(
+
+        0,
 
         assessment.totalEDVolume
 
         -
 
-        assessment.expectedVolume;
+        assessment.expectedVolume
+
+    );
 
 
-    return normalize(
+    return normalizePositiveVariance(
 
-        difference,
+        positiveVariance,
 
-        25
+        DEMAND_VARIANCE_AT_MAXIMUM_SCORE
 
     );
 
@@ -246,42 +351,36 @@ function calculateDemand(
 
 
 /**
- * Boarding
+ * Calculate boarding strain relative to the
+ * historical boarding expectation.
  *
- * Measures current boarding above the
- * historical expectation.
+ * Boarding at or below the expected baseline
+ * contributes no excess-boarding score.
  */
-function calculateBoarding(
+function calculateBoardingScore(
 
     assessment:SituationAssessment
 
 ):number {
 
-    if(
+    const positiveVariance = Math.max(
 
-        assessment.expectedBoarders < 0
-
-    ){
-
-        return 0;
-
-    }
-
-
-    const difference =
+        0,
 
         assessment.boardedPatients
 
         -
 
-        assessment.expectedBoarders;
+        assessment.expectedBoarders
+
+    );
 
 
-    return normalize(
+    return normalizePositiveVariance(
 
-        difference,
+        positiveVariance,
 
-        25
+        BOARDING_VARIANCE_AT_MAXIMUM_SCORE
 
     );
 
@@ -289,40 +388,41 @@ function calculateBoarding(
 
 
 /**
- * Hospital Capacity
+ * Calculate medical-bed occupancy.
  *
- * Uses occupied medical beds divided by the
- * configured medical-bed denominator.
+ * The configured denominator is expected to
+ * represent usable medical beds rather than
+ * total licensed hospital beds.
  */
-function calculateHospitalCapacity(
+function calculateHospitalScore(
 
     assessment:SituationAssessment
 
 ):number {
 
-    if(
-
-        HOSPITAL.MEDICAL_BEDS <= 0
-
-    ){
+    if(HOSPITAL.MEDICAL_BEDS <= 0){
 
         return 0;
 
     }
 
 
-    const occupancy =
+    const occupancyPercentage =
 
         assessment.occupiedMedicalBeds
 
         /
 
-        HOSPITAL.MEDICAL_BEDS;
+        HOSPITAL.MEDICAL_BEDS
+
+        *
+
+        100;
 
 
     return clampScore(
 
-        occupancy * 100
+        occupancyPercentage
 
     );
 
@@ -330,29 +430,33 @@ function calculateHospitalCapacity(
 
 
 /**
- * Patient Acuity
+ * Calculate the current patient-acuity score.
  *
- * Uses a weighted ESI distribution divided
- * by total ED volume.
+ * ESI weighting:
+ *
+ * ESI 1 = 5
+ * ESI 2 = 4
+ * ESI 3 = 3
+ * ESI 4 = 2
+ * ESI 5 = 1
+ *
+ * The weighted acuity burden is divided by
+ * total ED volume and converted to 0–100.
  */
-function calculateAcuity(
+function calculateAcuityScore(
 
     assessment:SituationAssessment
 
 ):number {
 
-    if(
-
-        assessment.totalEDVolume <= 0
-
-    ){
+    if(assessment.totalEDVolume <= 0){
 
         return 0;
 
     }
 
 
-    const weightedPatients =
+    const weightedAcuityBurden =
 
         assessment.esi1 * 5
 
@@ -373,18 +477,30 @@ function calculateAcuity(
         assessment.esi5;
 
 
-    const acuityRatio =
+    const averageAcuityWeight =
 
-        weightedPatients
+        weightedAcuityBurden
 
         /
 
         assessment.totalEDVolume;
 
 
+    /*
+     * Maximum possible average weight is 5.
+     *
+     * Multiplying by 20 converts:
+     *
+     * 1.0 → 20
+     * 2.0 → 40
+     * 3.0 → 60
+     * 4.0 → 80
+     * 5.0 → 100
+     */
+
     return clampScore(
 
-        acuityRatio * 20
+        averageAcuityWeight * 20
 
     );
 
@@ -392,32 +508,39 @@ function calculateAcuity(
 
 
 /**
- * Convert a positive variance into a
- * normalized 0–100 score.
+ * Normalize a positive variance to 0–100.
  */
-function normalize(
+function normalizePositiveVariance(
 
-    value:number,
+    variance:number,
 
-    maximum:number
+    varianceAtMaximumScore:number
 
 ):number {
 
     if(
 
-        !Number.isFinite(value)
+        !Number.isFinite(
+
+            variance
+
+        )
 
         ||
 
-        !Number.isFinite(maximum)
+        !Number.isFinite(
+
+            varianceAtMaximumScore
+
+        )
 
         ||
 
-        value <= 0
+        variance <= 0
 
         ||
 
-        maximum <= 0
+        varianceAtMaximumScore <= 0
 
     ){
 
@@ -428,17 +551,15 @@ function normalize(
 
     return clampScore(
 
-        (
+        variance
 
-            value
+        /
 
-            /
+        varianceAtMaximumScore
 
-            maximum
+        *
 
-        )
-
-        * 100
+        100
 
     );
 
@@ -446,77 +567,60 @@ function normalize(
 
 
 /**
- * Keep a value within 0–100.
- */
-function clampScore(
-
-    score:number
-
-):number {
-
-    if(!Number.isFinite(score)){
-
-        return 0;
-
-    }
-
-
-    return Math.min(
-
-        100,
-
-        Math.max(
-
-            0,
-
-            score
-
-        )
-
-    );
-
-}
-
-
-/**
- * Generate operational drivers.
- *
- * Staffing is intentionally excluded.
+ * Create primary operational drivers.
  */
 function generateDrivers(
 
     assessment:SituationAssessment,
 
-    forecastScore:number
+    scores:{
+
+        demandScore:number;
+
+        boardingScore:number;
+
+        hospitalScore:number;
+
+        acuityScore:number;
+
+        forecastScore:number;
+
+    }
 
 ):Driver[] {
 
     const drivers:Driver[] = [];
 
 
-    addBoardingDriver(
-
-        drivers,
-
-        assessment
-
-    );
-
-
     addDemandDriver(
 
         drivers,
 
-        assessment
+        assessment,
+
+        scores.demandScore
 
     );
 
 
-    addHospitalCapacityDriver(
+    addBoardingDriver(
 
         drivers,
 
-        assessment
+        assessment,
+
+        scores.boardingScore
+
+    );
+
+
+    addHospitalDriver(
+
+        drivers,
+
+        assessment,
+
+        scores.hospitalScore
 
     );
 
@@ -525,7 +629,9 @@ function generateDrivers(
 
         drivers,
 
-        assessment
+        assessment,
+
+        scores.acuityScore
 
     );
 
@@ -534,34 +640,119 @@ function generateDrivers(
 
         drivers,
 
-        forecastScore
+        scores.forecastScore
 
     );
 
 
-    return drivers.sort(
+    return drivers
 
-        (
+        .sort(
 
-            first,
+            (
 
-            second
+                first,
 
-        ) => second.severity - first.severity
+                second
 
-    );
+            ) =>
+
+                second.severity
+
+                -
+
+                first.severity
+
+        )
+
+        .map(
+
+            driver => ({
+
+                ...driver
+
+            })
+
+        );
 
 }
 
 
 /**
- * Add boarding as a driver.
+ * Add an ED-volume driver.
+ */
+function addDemandDriver(
+
+    drivers:Driver[],
+
+    assessment:SituationAssessment,
+
+    severity:number
+
+):void {
+
+    if(
+
+        assessment.totalEDVolume
+
+        <=
+
+        assessment.expectedVolume
+
+    ){
+
+        return;
+
+    }
+
+
+    const variance = roundDisplayNumber(
+
+        assessment.totalEDVolume
+
+        -
+
+        assessment.expectedVolume
+
+    );
+
+
+    drivers.push({
+
+        title:
+            "ED Volume",
+
+        description:
+            `Total ED volume is ${variance} patients above the historical expectation.`,
+
+        severity:
+            roundDomainScore(
+
+                severity
+
+            ),
+
+        currentValue:
+            assessment.totalEDVolume,
+
+        expectedValue:
+            assessment.expectedVolume
+
+    });
+
+}
+
+
+/**
+ * Add an excess-boarding driver.
  */
 function addBoardingDriver(
 
     drivers:Driver[],
 
-    assessment:SituationAssessment
+    assessment:SituationAssessment,
+
+    severity:number
 
 ):void {
 
@@ -580,13 +771,15 @@ function addBoardingDriver(
     }
 
 
-    const difference =
+    const variance = roundDisplayNumber(
 
         assessment.boardedPatients
 
         -
 
-        assessment.expectedBoarders;
+        assessment.expectedBoarders
+
+    );
 
 
     drivers.push({
@@ -595,12 +788,12 @@ function addBoardingDriver(
             "Boarding",
 
         description:
-            `Boarding exceeds the historical expectation by ${difference} patients.`,
+            `Boarding is ${variance} patients above the historical expectation.`,
 
         severity:
-            calculateBoarding(
+            roundDomainScore(
 
-                assessment
+                severity
 
             ),
 
@@ -616,91 +809,19 @@ function addBoardingDriver(
 
 
 /**
- * Add ED volume as a driver.
+ * Add a hospital-capacity driver.
  */
-function addDemandDriver(
+function addHospitalDriver(
 
     drivers:Driver[],
 
-    assessment:SituationAssessment
+    assessment:SituationAssessment,
+
+    severity:number
 
 ):void {
 
-    if(
-
-        assessment.expectedVolume <= 0
-
-        ||
-
-        assessment.totalEDVolume
-
-        <=
-
-        assessment.expectedVolume
-
-    ){
-
-        return;
-
-    }
-
-
-    const difference =
-
-        assessment.totalEDVolume
-
-        -
-
-        assessment.expectedVolume;
-
-
-    drivers.push({
-
-        title:
-            "ED Volume",
-
-        description:
-            `Emergency department volume exceeds the historical expectation by ${difference} patients.`,
-
-        severity:
-            calculateDemand(
-
-                assessment
-
-            ),
-
-        currentValue:
-            assessment.totalEDVolume,
-
-        expectedValue:
-            assessment.expectedVolume
-
-    });
-
-}
-
-
-/**
- * Add hospital occupancy as a driver.
- */
-function addHospitalCapacityDriver(
-
-    drivers:Driver[],
-
-    assessment:SituationAssessment
-
-):void {
-
-    const hospitalScore =
-
-        calculateHospitalCapacity(
-
-            assessment
-
-        );
-
-
-    if(hospitalScore < 85){
+    if(severity < HOSPITAL_DRIVER_THRESHOLD){
 
         return;
 
@@ -713,10 +834,14 @@ function addHospitalCapacityDriver(
             "Hospital Capacity",
 
         description:
-            `Medical-bed occupancy is ${Math.round(hospitalScore)}%.`,
+            `Medical-bed occupancy is ${Math.round(severity)}%.`,
 
         severity:
-            hospitalScore,
+            roundDomainScore(
+
+                severity
+
+            ),
 
         currentValue:
             assessment.occupiedMedicalBeds,
@@ -724,7 +849,15 @@ function addHospitalCapacityDriver(
         expectedValue:
             Math.round(
 
-                HOSPITAL.MEDICAL_BEDS * 0.85
+                HOSPITAL.MEDICAL_BEDS
+
+                *
+
+                HOSPITAL_DRIVER_THRESHOLD
+
+                /
+
+                100
 
             )
 
@@ -734,31 +867,26 @@ function addHospitalCapacityDriver(
 
 
 /**
- * Add patient acuity as a driver.
+ * Add a patient-acuity driver.
  */
 function addAcuityDriver(
 
     drivers:Driver[],
 
-    assessment:SituationAssessment
+    assessment:SituationAssessment,
+
+    severity:number
 
 ):void {
 
-    const acuityScore = calculateAcuity(
-
-        assessment
-
-    );
-
-
-    if(acuityScore < 60){
+    if(severity < ACUITY_DRIVER_THRESHOLD){
 
         return;
 
     }
 
 
-    const highAcuityPatients =
+    const highAcuityCount =
 
         assessment.esi1
 
@@ -773,18 +901,26 @@ function addAcuityDriver(
             "Patient Acuity",
 
         description:
-            "The current ESI distribution indicates elevated clinical complexity.",
+            `${highAcuityCount} current ED patients are categorized as ESI 1 or ESI 2.`,
 
         severity:
-            acuityScore,
+            roundDomainScore(
+
+                severity
+
+            ),
 
         currentValue:
-            highAcuityPatients,
+            highAcuityCount,
 
         expectedValue:
-            Math.round(
+            roundDisplayNumber(
 
-                assessment.totalEDVolume * 0.20
+                assessment.totalEDVolume
+
+                *
+
+                0.20
 
             )
 
@@ -794,17 +930,20 @@ function addAcuityDriver(
 
 
 /**
- * Add forecast strain as a driver.
+ * Add a forecast driver.
+ */
+/**
+ * Add a near-term forecast driver.
  */
 function addForecastDriver(
 
     drivers:Driver[],
 
-    forecastScore:number
+    severity:number
 
 ):void {
 
-    if(forecastScore <= 50){
+    if(severity <= FORECAST_DRIVER_THRESHOLD){
 
         return;
 
@@ -814,23 +953,27 @@ function addForecastDriver(
     drivers.push({
 
         title:
-            "Forecast",
+            "Near-Term Flow",
 
         description:
-            "Projected arrivals and departures indicate increasing operational strain.",
+            "Expected arrivals exceed expected departures, indicating likely near-term growth in ED census.",
 
         severity:
-            clampScore(
+            roundDomainScore(
 
-                forecastScore
+                severity
 
             ),
 
         currentValue:
-            forecastScore,
+            roundDomainScore(
+
+                severity
+
+            ),
 
         expectedValue:
-            50
+            FORECAST_DRIVER_THRESHOLD
 
     });
 
@@ -838,9 +981,12 @@ function addForecastDriver(
 
 
 /**
- * Generate basic score-level recommendations.
+ * Create broad score-level recommendations.
+ *
+ * Driver-specific recommendations remain the
+ * responsibility of RecommendationService.
  */
-function generateRecommendations(
+function generateScoreRecommendations(
 
     score:number
 
@@ -850,13 +996,13 @@ function generateRecommendations(
 
         return [
 
-            "Activate hospital-wide surge response.",
+            "Activate the highest-level hospital surge response.",
 
             "Escalate inpatient throughput barriers to executive leadership.",
 
             "Prepare immediate additional treatment and boarding capacity.",
 
-            "Reassess EDORI conditions frequently."
+            "Reassess EDORI conditions at frequent intervals."
 
         ];
 
@@ -873,7 +1019,7 @@ function generateRecommendations(
 
             "Notify operational leadership.",
 
-            "Increase assessment frequency."
+            "Increase EDORI assessment frequency."
 
         ];
 
@@ -888,7 +1034,7 @@ function generateRecommendations(
 
             "Evaluate additional ED and inpatient capacity options.",
 
-            "Monitor projected arrivals and departures."
+            "Monitor expected arrivals and departures closely."
 
         ];
 
@@ -899,11 +1045,11 @@ function generateRecommendations(
 
         return [
 
-            "Monitor ED flow closely.",
+            "Increase operational monitoring.",
 
             "Review discharge and admission barriers.",
 
-            "Prepare for possible operational escalation."
+            "Prepare for possible escalation."
 
         ];
 
@@ -916,7 +1062,7 @@ function generateRecommendations(
 
             "Increase operational awareness.",
 
-            "Monitor volume, boarding, acuity, and hospital occupancy."
+            "Monitor ED volume, boarding, acuity, and hospital occupancy."
 
         ];
 
@@ -925,10 +1071,108 @@ function generateRecommendations(
 
     return [
 
-        "Continue normal operations.",
+        "Continue routine operations.",
 
-        "Maintain routine operational monitoring."
+        "Maintain standard operational monitoring."
 
     ];
+
+}
+
+
+/**
+ * Confirm domain weights total 1.00.
+ */
+function assertValidWeights():void {
+
+    if(areWeightsValid()){
+
+        return;
+
+    }
+
+
+    throw new Error(
+
+        "EDORI domain weights must total 1.00."
+
+    );
+
+}
+
+
+/**
+ * Keep a score between 0 and 100.
+ */
+function clampScore(
+
+    value:number
+
+):number {
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+
+    return Math.min(
+
+        100,
+
+        Math.max(
+
+            0,
+
+            value
+
+        )
+
+    );
+
+}
+
+
+/**
+ * Round a domain score for storage and display.
+ */
+function roundDomainScore(
+
+    value:number
+
+):number {
+
+    return Math.round(
+
+        clampScore(
+
+            value
+
+        )
+
+        *
+
+        10
+
+    ) / 10;
+
+}
+
+
+/**
+ * Round values used in driver descriptions.
+ */
+function roundDisplayNumber(
+
+    value:number
+
+):number {
+
+    return Math.round(
+
+        value * 10
+
+    ) / 10;
 
 }
