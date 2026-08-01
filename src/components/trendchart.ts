@@ -12,6 +12,15 @@
  * - Refreshes only when a completed result is published.
  */
 
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
 import {
 
     Chart,
@@ -135,11 +144,11 @@ export function initializeTrendChart():void {
 
     subscribe(
 
-        "resultChanged",
+    APP_EVENTS.RESULT_CHANGED,
 
-        updateTrend
+    updateTrend
 
-    );
+);
 
 }
 

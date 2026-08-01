@@ -13,6 +13,15 @@
 
 import {
 
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
+import {
+
     subscribe
 
 }
@@ -103,11 +112,11 @@ export function initializeAssessmentHistory():void {
 
     subscribe(
 
-        "resultChanged",
+    APP_EVENTS.RESULT_CHANGED,
 
-        updateHistory
+    updateHistory
 
-    );
+);
 
 }
 

@@ -15,6 +15,15 @@
 
 import {
 
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
+import {
+
     parseHistoricalCsvFile
 
 }
@@ -645,9 +654,9 @@ function importValidatedDataset():void {
 
         emit(
 
-            "historicalDataChanged"
+    APP_EVENTS.HISTORICAL_DATA_CHANGED
 
-        );
+);
 
 
         /*
@@ -657,9 +666,9 @@ function importValidatedDataset():void {
 
         emit(
 
-            "resultChanged"
+    APP_EVENTS.RESULT_CHANGED
 
-        );
+);
 
     }
     catch(error){
@@ -800,16 +809,16 @@ function restoreBuiltInDataset():void {
 
         emit(
 
-            "historicalDataChanged"
+    APP_EVENTS.HISTORICAL_DATA_CHANGED
 
-        );
+);
 
 
         emit(
 
-            "resultChanged"
+    APP_EVENTS.RESULT_CHANGED
 
-        );
+);
 
     }
     catch(error){

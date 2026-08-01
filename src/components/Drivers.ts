@@ -11,6 +11,15 @@
 
 import {
 
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
+import {
+
     subscribe
 
 }
@@ -95,11 +104,11 @@ export function initializeDrivers():void {
 
     subscribe(
 
-        "resultChanged",
+    APP_EVENTS.RESULT_CHANGED,
 
-        updateDrivers
+    updateDrivers
 
-    );
+);
 
 }
 

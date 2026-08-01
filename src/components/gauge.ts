@@ -7,6 +7,15 @@
  * It reads the stored result from ResultService.
  */
 
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
 import {
 
     subscribe
@@ -111,11 +120,11 @@ export function initializeGauge():void {
 
     subscribe(
 
-        "resultChanged",
+    APP_EVENTS.RESULT_CHANGED,
 
-        updateGauge
+    updateGauge
 
-    );
+);
 
 }
 

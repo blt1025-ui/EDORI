@@ -23,6 +23,14 @@
 
 import {
 
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+import {
+
     AssessmentHistory,
 
     initializeAssessmentHistory
@@ -313,11 +321,11 @@ export function initializeDashboard():void {
 
     subscribe(
 
-        "resultChanged",
+    APP_EVENTS.RESULT_CHANGED,
 
-        updateDashboard
+    updateDashboard
 
-    );
+);
 
 }
 

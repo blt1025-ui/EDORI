@@ -25,6 +25,15 @@
  * Those responsibilities belong to EdoriEngine.
  */
 
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../../config/appEvents";
+
 import {
 
     runEdoriAssessment
@@ -1131,9 +1140,9 @@ function subscribeToHistoricalDataChanges():void {
 
     subscribe(
 
-        "historicalDataChanged",
+    APP_EVENTS.HISTORICAL_DATA_CHANGED,
 
-        () => {
+    () => {
 
             resetHistoricalDisplay();
 

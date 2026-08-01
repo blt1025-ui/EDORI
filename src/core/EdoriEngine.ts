@@ -31,6 +31,14 @@ from "../services/EdoriService";
 
 import {
 
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+import {
+
     emit
 
 }
@@ -396,9 +404,9 @@ export function runEdoriAssessment(
 
     emit(
 
-        "resultChanged"
+    APP_EVENTS.RESULT_CHANGED
 
-    );
+);
 
 
     return {
