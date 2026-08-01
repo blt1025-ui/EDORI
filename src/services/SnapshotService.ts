@@ -20,6 +20,14 @@
  *
  * This service does not calculate EDORI.
  */
+import type {
+
+    OperationalStateTitle
+
+}
+
+from "../types/OperationalStateTitle";
+
 
 import {
 
@@ -761,6 +769,9 @@ function normalizeSnapshot(
 /**
  * Validate and copy an operational state.
  */
+/**
+ * Validate and copy an operational state.
+ */
 function normalizeOperationalState(
 
     value:unknown
@@ -797,11 +808,11 @@ function normalizeOperationalState(
 
     if(
 
-        typeof candidate.title !== "string"
+        !isOperationalStateTitle(
 
-        ||
+            candidate.title
 
-        candidate.title.trim().length === 0
+        )
 
         ||
 
@@ -837,7 +848,7 @@ function normalizeOperationalState(
     return {
 
         title:
-            candidate.title.trim(),
+            candidate.title,
 
         icon:
             candidate.icon.trim(),
@@ -994,6 +1005,54 @@ function normalizeMaximum(
             )
 
         )
+
+    );
+
+}
+
+/**
+ * Determine whether a value is a supported
+ * operational-state title.
+ */
+function isOperationalStateTitle(
+
+    value:unknown
+
+):value is OperationalStateTitle {
+
+    if(typeof value !== "string"){
+
+        return false;
+
+    }
+
+
+    const titles:OperationalStateTitle[] = [
+
+        "Normal Operations",
+
+        "Elevated Activity",
+
+        "Busy",
+
+        "Surge",
+
+        "Severe Surge",
+
+        "Elevated Awareness",
+
+        "Capacity Strain",
+
+        "High Surge",
+
+        "Critical Operations"
+
+    ];
+
+
+    return titles.includes(
+
+        value as OperationalStateTitle
 
     );
 

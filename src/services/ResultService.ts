@@ -21,6 +21,14 @@
 
 import type {
 
+    OperationalStateTitle
+
+}
+
+from "../types/OperationalStateTitle";
+
+import type {
+
     OperationalState
 
 }
@@ -1019,6 +1027,9 @@ function normalizeScore(
 /**
  * Validate and normalize an operational state.
  */
+/**
+ * Validate and normalize an operational state.
+ */
 function normalizeOperationalState(
 
     value:unknown
@@ -1055,11 +1066,11 @@ function normalizeOperationalState(
 
     if(
 
-        typeof candidate.title !== "string"
+        !isOperationalStateTitle(
 
-        ||
+            candidate.title
 
-        candidate.title.trim().length === 0
+        )
 
         ||
 
@@ -1095,7 +1106,7 @@ function normalizeOperationalState(
     return {
 
         title:
-            candidate.title.trim(),
+            candidate.title,
 
         icon:
             candidate.icon.trim(),
@@ -1109,7 +1120,6 @@ function normalizeOperationalState(
     };
 
 }
-
 
 /**
  * Validate and normalize all drivers.
@@ -1494,5 +1504,53 @@ function cloneResult(
         )
 
     };
+
+}
+
+/**
+ * Determine whether a value is a supported
+ * operational-state title.
+ */
+function isOperationalStateTitle(
+
+    value:unknown
+
+):value is OperationalStateTitle {
+
+    if(typeof value !== "string"){
+
+        return false;
+
+    }
+
+
+    const titles:OperationalStateTitle[] = [
+
+        "Normal Operations",
+
+        "Elevated Activity",
+
+        "Busy",
+
+        "Surge",
+
+        "Severe Surge",
+
+        "Elevated Awareness",
+
+        "Capacity Strain",
+
+        "High Surge",
+
+        "Critical Operations"
+
+    ];
+
+
+    return titles.includes(
+
+        value as OperationalStateTitle
+
+    );
 
 }

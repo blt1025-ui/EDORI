@@ -3,22 +3,15 @@
  *
  * Main EDORI operational dashboard.
  *
- * Data flow:
+ * Responsibilities:
  *
- * Situation Assessment
- *        ↓
- * State Service
- *        ↓
- * Validation
- *        ↓
- * EDORI Calculation Engine
- *        ↓
- * Result Service
- *        ↓
- * Dashboard Displays
+ * - Render dashboard components
+ * - Initialize dashboard behavior
+ * - Display the latest authoritative result
+ * - Build the trigger-adjusted operational state
+ * - Display assessment freshness
  *
- * Historical data changes invalidate the latest
- * EDORI result and require recalculation.
+ * This component does not calculate EDORI.
  */
 
 import {
@@ -28,6 +21,7 @@ import {
 }
 
 from "../config/appEvents";
+
 
 import {
 
@@ -75,6 +69,17 @@ from "./HistoricalDataManager";
 
 import {
 
+    OperationalOverview,
+
+    initializeOperationalOverview
+
+}
+
+from "./OperationalOverview";
+
+
+import {
+
     Recommendations,
 
     initializeRecommendations
@@ -82,17 +87,6 @@ import {
 }
 
 from "./Recommendations";
-
-
-import {
-
-    SituationAssessment,
-
-    initializeSituationAssessment
-
-}
-
-from "./assessment/SituationAssessment";
 
 
 import {
@@ -119,6 +113,17 @@ from "./TrendChart";
 
 import {
 
+    SituationAssessment,
+
+    initializeSituationAssessment
+
+}
+
+from "./assessment/SituationAssessment";
+
+
+import {
+
     subscribe
 
 }
@@ -128,11 +133,11 @@ from "../services/EventService";
 
 import {
 
-    getState
+    createOperationalAssessment
 
 }
 
-from "../services/StateService";
+from "../services/OperationalAssessmentService";
 
 
 import {
@@ -146,13 +151,33 @@ import {
 from "../services/ResultService";
 
 
-import type {
+import {
 
-    EdoriResult
+    getSnapshots
 
 }
 
-from "../types/EdoriResult";
+from "../services/SnapshotService";
+
+
+import {
+
+    getState,
+
+    hasCommittedAssessment
+
+}
+
+from "../services/StateService";
+
+
+import type {
+
+    OperationalState
+
+}
+
+from "../config/operationalStates";
 
 
 import type {
@@ -165,7 +190,7 @@ from "../types/SituationAssessment";
 
 
 /**
- * Render the main EDORI dashboard.
+ * Render the complete EDORI dashboard.
  */
 export function Dashboard():string {
 
@@ -177,64 +202,35 @@ export function Dashboard():string {
 
                 <div
                     id="statusBanner"
-                    class="status-banner status-awaiting"
+                    class="
+                        status-banner
+                        status-awaiting-assessment
+                    "
+                    aria-live="polite"
                 >
 
-                    <div class="status-header">
-
-                        <div id="statusIcon">
-
-                            ⚪
-
-                        </div>
-
-
-                        <div>
-
-                            <div id="statusTitle">
-
-                                Awaiting Assessment
-
-                            </div>
-
-
-                            <div class="status-score">
-
-                                EDORI Score: --
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="status-recommendation">
-
-                        Complete the situation assessment and select Calculate EDORI.
-
-                    </div>
+                    ${createAwaitingAssessmentBanner()}
 
                 </div>
 
 
-                <h2>
+                <div class="dashboard-title-group">
 
-                    Emergency Department Dashboard
+                    <h2>
+                        Emergency Department Dashboard
+                    </h2>
 
-                </h2>
+                    <p>
+                        Operational Readiness Overview
+                    </p>
 
-
-                <p>
-
-                    Operational Readiness Overview
-
-                </p>
+                </div>
 
 
                 <div
                     id="assessmentFreshness"
                     class="assessment-freshness"
+                    aria-live="polite"
                 >
 
                     Assessment not yet calculated.
@@ -260,6 +256,8 @@ export function Dashboard():string {
 
                     ${Gauge()}
 
+                    ${OperationalOverview()}
+
                     ${Drivers()}
 
                     ${Recommendations()}
@@ -282,7 +280,7 @@ export function Dashboard():string {
 
 
 /**
- * Initialize the dashboard and all child components.
+ * Initialize all dashboard components.
  */
 export function initializeDashboard():void {
 
@@ -291,6 +289,8 @@ export function initializeDashboard():void {
     initializeSummaryCards();
 
     initializeGauge();
+
+    initializeOperationalOverview();
 
     initializeDrivers();
 
@@ -303,42 +303,52 @@ export function initializeDashboard():void {
     initializeHistoricalDataManager();
 
 
-    /*
-     * Restore the most recent valid result or
-     * invalidation state when the page opens.
-     */
-
     updateDashboard();
 
 
-    /*
-     * resultChanged is emitted after:
-     *
-     * - a new EDORI calculation;
-     * - a historical dataset import;
-     * - restoration of the built-in dataset.
-     */
+    subscribe(
+
+        APP_EVENTS.RESULT_CHANGED,
+
+        updateDashboard
+
+    );
+
 
     subscribe(
 
-    APP_EVENTS.RESULT_CHANGED,
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
 
-    updateDashboard
+        updateDashboard
 
-);
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORY_CHANGED,
+
+        updateDashboard
+
+    );
 
 }
 
 
 /**
- * Update the dashboard from ResultService.
+ * Update the dashboard banner and freshness
+ * information from authoritative services.
  */
 function updateDashboard():void {
 
-    const state = getState();
+    const assessment = getState();
 
 
-    const result = getLatestResult();
+    updateAssessmentFreshness(
+
+        assessment
+
+    );
 
 
     const invalidationReason =
@@ -346,36 +356,11 @@ function updateDashboard():void {
         getResultInvalidationReason();
 
 
-    /*
-     * Historical-data changes invalidate the latest
-     * score until the assessment is recalculated.
-     */
+    if(invalidationReason){
 
-    if(!result){
+        updateRecalculationRequiredBanner(
 
-        if(invalidationReason){
-
-            showRecalculationRequired(
-
-                invalidationReason
-
-            );
-
-
-            updateRecalculationFreshness();
-
-
-            return;
-
-        }
-
-
-        showAwaitingAssessment();
-
-
-        updateAssessmentFreshness(
-
-            state
+            invalidationReason
 
         );
 
@@ -385,28 +370,112 @@ function updateDashboard():void {
     }
 
 
-    updateStatusBanner(
-
-        result
-
-    );
+    const result = getLatestResult();
 
 
-    updateAssessmentFreshness(
+    if(
 
-        state
+        !result
 
-    );
+        ||
+
+        !hasCommittedAssessment()
+
+    ){
+
+        updateAwaitingAssessmentBanner();
+
+
+        return;
+
+    }
+
+
+    try {
+
+        const operationalAssessment =
+
+            createOperationalAssessment({
+
+                assessment,
+
+                result,
+
+                snapshots:
+                    getSnapshots(),
+
+                evaluatedAt:
+                    new Date()
+
+            });
+
+
+        updateStatusBanner(
+
+            operationalAssessment
+                .scoreResult
+                .score,
+
+            operationalAssessment
+                .finalOperationalState,
+
+            operationalAssessment
+                .baseOperationalState
+                .title,
+
+            operationalAssessment
+                .activeTriggers
+                .length
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to build the dashboard operational assessment:",
+
+            error
+
+        );
+
+
+        /*
+         * Fall back to the score-derived state so
+         * the dashboard remains usable.
+         */
+
+        updateStatusBanner(
+
+            result.score,
+
+            result.operationalState,
+
+            result.operationalState.title,
+
+            0
+
+        );
+
+    }
 
 }
 
 
 /**
- * Display the latest operational state.
+ * Display the current trigger-adjusted
+ * operational status banner.
  */
 function updateStatusBanner(
 
-    result:EdoriResult
+    score:number,
+
+    operationalState:OperationalState,
+
+    baseStateTitle:string,
+
+    activeTriggerCount:number
 
 ):void {
 
@@ -424,16 +493,48 @@ function updateStatusBanner(
     }
 
 
-    const operationalState =
+    const safeScore = Math.min(
 
-        result.operationalState;
+        100,
+
+        Math.max(
+
+            0,
+
+            Math.round(
+
+                score
+
+            )
+
+        )
+
+    );
 
 
-    const stateClass = createStateClass(
+    const stateClass = createStateClassName(
 
         operationalState.title
 
     );
+
+
+    const stateWasEscalated =
+
+        operationalState.title
+
+        !==
+
+        baseStateTitle;
+
+
+    const triggerText =
+
+        activeTriggerCount === 1
+
+            ? "1 active operational trigger"
+
+            : `${activeTriggerCount} active operational triggers`;
 
 
     banner.className =
@@ -441,34 +542,41 @@ function updateStatusBanner(
         `status-banner ${stateClass}`;
 
 
-    banner.style.borderLeftColor =
+    banner.style.setProperty(
 
-        operationalState.color;
+        "--status-color",
+
+        operationalState.color
+
+    );
 
 
     banner.innerHTML = `
 
         <div class="status-header">
 
-            <div id="statusIcon">
+            <div
+                id="statusIcon"
+                class="status-icon"
+                aria-hidden="true"
+            >
 
                 ${escapeHtml(
-
                     operationalState.icon
-
                 )}
 
             </div>
 
 
-            <div>
+            <div class="status-title-group">
 
-                <div id="statusTitle">
+                <div
+                    id="statusTitle"
+                    class="status-title"
+                >
 
                     ${escapeHtml(
-
                         operationalState.title
-
                     )}
 
                 </div>
@@ -476,11 +584,13 @@ function updateStatusBanner(
 
                 <div class="status-score">
 
-                    EDORI Score: ${Math.round(
+                    EDORI Score:
 
-                        result.score
+                    <strong>
 
-                    )}
+                        ${safeScore}
+
+                    </strong>
 
                 </div>
 
@@ -492,84 +602,53 @@ function updateStatusBanner(
         <div class="status-recommendation">
 
             ${escapeHtml(
-
                 operationalState.recommendation
-
             )}
 
         </div>
 
-    `;
 
-}
+        <div class="status-context">
 
+            <span>
 
-/**
- * Display the initial state before an assessment
- * has been calculated.
- */
-function showAwaitingAssessment():void {
+                Score-derived state:
 
-    const banner = document.getElementById(
+                <strong>
 
-        "statusBanner"
+                    ${escapeHtml(
+                        baseStateTitle
+                    )}
 
-    );
+                </strong>
 
-
-    if(!banner){
-
-        return;
-
-    }
+            </span>
 
 
-    banner.className =
+            <span>
 
-        "status-banner status-awaiting";
+                ${escapeHtml(
+                    triggerText
+                )}
 
-
-    banner.style.removeProperty(
-
-        "border-left-color"
-
-    );
+            </span>
 
 
-    banner.innerHTML = `
+            ${stateWasEscalated
 
-        <div class="status-header">
+                ? `
 
-            <div id="statusIcon">
+                    <span class="status-escalation-note">
 
-                ⚪
+                        Operational triggers elevated the final state.
 
-            </div>
+                    </span>
 
+                `
 
-            <div>
+                : ""
 
-                <div id="statusTitle">
-
-                    Awaiting Assessment
-
-                </div>
-
-
-                <div class="status-score">
-
-                    EDORI Score: --
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="status-recommendation">
-
-            Complete the situation assessment and select Calculate EDORI.
+            }
 
         </div>
 
@@ -579,10 +658,9 @@ function showAwaitingAssessment():void {
 
 
 /**
- * Display that the previous result is no longer
- * valid because the historical dataset changed.
+ * Display a recalculation-required banner.
  */
-function showRecalculationRequired(
+function updateRecalculationRequiredBanner(
 
     reason:string
 
@@ -609,7 +687,7 @@ function showRecalculationRequired(
 
     banner.style.removeProperty(
 
-        "border-left-color"
+        "--status-color"
 
     );
 
@@ -618,16 +696,23 @@ function showRecalculationRequired(
 
         <div class="status-header">
 
-            <div id="statusIcon">
+            <div
+                id="statusIcon"
+                class="status-icon"
+                aria-hidden="true"
+            >
 
                 ⚠️
 
             </div>
 
 
-            <div>
+            <div class="status-title-group">
 
-                <div id="statusTitle">
+                <div
+                    id="statusTitle"
+                    class="status-title"
+                >
 
                     Recalculation Required
 
@@ -636,7 +721,7 @@ function showRecalculationRequired(
 
                 <div class="status-score">
 
-                    EDORI Score: --
+                    The previous EDORI result is no longer current.
 
                 </div>
 
@@ -649,7 +734,13 @@ function showRecalculationRequired(
 
             ${escapeHtml(reason)}
 
-            Submit the assessment again to calculate EDORI using the active historical dataset.
+            Review the current operational values and select
+
+            <strong>
+                Calculate EDORI
+            </strong>
+
+            to generate an updated result.
 
         </div>
 
@@ -659,45 +750,110 @@ function showRecalculationRequired(
 
 
 /**
- * Create a CSS-safe operational-state class.
+ * Display the initial awaiting-assessment banner.
  */
-function createStateClass(
+function updateAwaitingAssessmentBanner():void {
 
-    title:string
+    const banner = document.getElementById(
 
-):string {
+        "statusBanner"
 
-    return title
+    );
 
-        .trim()
 
-        .toLowerCase()
+    if(!banner){
 
-        .replaceAll(
+        return;
 
-            " ",
+    }
 
-            "-"
 
-        )
+    banner.className =
 
-        .replace(
+        "status-banner status-awaiting-assessment";
 
-            /[^a-z0-9-]/g,
 
-            ""
+    banner.style.removeProperty(
 
-        );
+        "--status-color"
+
+    );
+
+
+    banner.innerHTML =
+
+        createAwaitingAssessmentBanner();
 
 }
 
 
 /**
- * Display the age of the committed assessment.
+ * Create the initial banner markup.
+ */
+function createAwaitingAssessmentBanner():string {
+
+    return `
+
+        <div class="status-header">
+
+            <div
+                id="statusIcon"
+                class="status-icon"
+                aria-hidden="true"
+            >
+
+                ◯
+
+            </div>
+
+
+            <div class="status-title-group">
+
+                <div
+                    id="statusTitle"
+                    class="status-title"
+                >
+
+                    Awaiting Assessment
+
+                </div>
+
+
+                <div class="status-score">
+
+                    No current EDORI result is available.
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="status-recommendation">
+
+            Complete the Situation Assessment and select
+
+            <strong>
+                Calculate EDORI
+            </strong>
+
+            to generate the operational readiness assessment.
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Display the age of the most recently committed
+ * assessment.
  */
 function updateAssessmentFreshness(
 
-    state:SituationAssessmentType
+    assessment:SituationAssessmentType
 
 ):void {
 
@@ -717,6 +873,8 @@ function updateAssessmentFreshness(
 
     element.classList.remove(
 
+        "assessment-current",
+
         "assessment-warning",
 
         "assessment-critical",
@@ -726,7 +884,39 @@ function updateAssessmentFreshness(
     );
 
 
-    if(!state.assessmentTime){
+    const invalidationReason =
+
+        getResultInvalidationReason();
+
+
+    if(invalidationReason){
+
+        element.textContent =
+
+            "The current operational assessment requires recalculation.";
+
+
+        element.classList.add(
+
+            "assessment-recalculation"
+
+        );
+
+
+        return;
+
+    }
+
+
+    if(
+
+        !hasCommittedAssessment()
+
+        ||
+
+        !assessment.assessmentTime
+
+    ){
 
         element.textContent =
 
@@ -740,7 +930,7 @@ function updateAssessmentFreshness(
 
     const assessmentDate = new Date(
 
-        state.assessmentTime
+        assessment.assessmentTime
 
     );
 
@@ -753,76 +943,8 @@ function updateAssessmentFreshness(
 
         element.textContent =
 
-            "Assessment time unavailable.";
+            "Assessment time is unavailable.";
 
-
-        return;
-
-    }
-
-
-    const minutes = Math.max(
-
-        0,
-
-        Math.floor(
-
-            (
-
-                Date.now()
-
-                -
-
-                assessmentDate.getTime()
-
-            )
-
-            /
-
-            60000
-
-        )
-
-    );
-
-
-    element.textContent =
-
-        formatAssessmentAge(
-
-            minutes
-
-        );
-
-
-    /*
-     * Freshness categories:
-     *
-     * Less than 30 minutes:
-     * Current
-     *
-     * 30–59 minutes:
-     * Warning
-     *
-     * 60 minutes or more:
-     * Stale
-     */
-
-    if(minutes >= 60){
-
-        element.classList.add(
-
-            "assessment-critical"
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(minutes >= 30){
 
         element.classList.add(
 
@@ -830,79 +952,127 @@ function updateAssessmentFreshness(
 
         );
 
-    }
-
-}
-
-
-/**
- * Display freshness state after result invalidation.
- */
-function updateRecalculationFreshness():void {
-
-    const element = document.getElementById(
-
-        "assessmentFreshness"
-
-    );
-
-
-    if(!element){
 
         return;
 
     }
 
 
-    element.classList.remove(
+    const elapsedMilliseconds = Math.max(
 
-        "assessment-warning",
+        0,
 
-        "assessment-critical"
+        new Date().getTime()
 
-    );
+        -
 
-
-    element.classList.add(
-
-        "assessment-recalculation"
+        assessmentDate.getTime()
 
     );
 
 
-    element.textContent =
+    const minutes = Math.floor(
 
-        "The previous EDORI result is no longer current.";
+        elapsedMilliseconds
 
-}
+        /
 
+        60000
 
-/**
- * Format the assessment age.
- */
-function formatAssessmentAge(
-
-    minutes:number
-
-):string {
-
-    if(minutes === 0){
-
-        return "Last calculated less than one minute ago";
-
-    }
+    );
 
 
-    if(minutes === 1){
+    element.textContent = createFreshnessMessage(
 
-        return "Last calculated 1 minute ago";
+        minutes,
+
+        assessmentDate
+
+    );
+
+
+    if(minutes < 30){
+
+        element.classList.add(
+
+            "assessment-current"
+
+        );
+
+
+        return;
 
     }
 
 
     if(minutes < 60){
 
-        return `Last calculated ${minutes} minutes ago`;
+        element.classList.add(
+
+            "assessment-warning"
+
+        );
+
+
+        return;
+
+    }
+
+
+    element.classList.add(
+
+        "assessment-critical"
+
+    );
+
+}
+
+
+/**
+ * Create a readable assessment-age message.
+ */
+function createFreshnessMessage(
+
+    minutes:number,
+
+    assessmentDate:Date
+
+):string {
+
+    const timeText = assessmentDate.toLocaleTimeString(
+
+        [],
+
+        {
+
+            hour:
+                "2-digit",
+
+            minute:
+                "2-digit"
+
+        }
+
+    );
+
+
+    if(minutes === 0){
+
+        return `Calculated less than one minute ago at ${timeText}`;
+
+    }
+
+
+    if(minutes === 1){
+
+        return `Calculated 1 minute ago at ${timeText}`;
+
+    }
+
+
+    if(minutes < 60){
+
+        return `Calculated ${minutes} minutes ago at ${timeText}`;
 
     }
 
@@ -919,48 +1089,78 @@ function formatAssessmentAge(
         minutes % 60;
 
 
-    if(hours === 1){
-
-        if(remainingMinutes === 0){
-
-            return "Last calculated 1 hour ago";
-
-        }
-
-
-        if(remainingMinutes === 1){
-
-            return "Last calculated 1 hour and 1 minute ago";
-
-        }
-
-
-        return `Last calculated 1 hour and ${remainingMinutes} minutes ago`;
-
-    }
-
-
     if(remainingMinutes === 0){
 
-        return `Last calculated ${hours} hours ago`;
+        return hours === 1
+
+            ? `Calculated 1 hour ago at ${timeText}`
+
+            : `Calculated ${hours} hours ago at ${timeText}`;
 
     }
 
 
-    if(remainingMinutes === 1){
+    const hourText = hours === 1
 
-        return `Last calculated ${hours} hours and 1 minute ago`;
+        ? "1 hour"
 
-    }
+        : `${hours} hours`;
 
 
-    return `Last calculated ${hours} hours and ${remainingMinutes} minutes ago`;
+    const minuteText = remainingMinutes === 1
+
+        ? "1 minute"
+
+        : `${remainingMinutes} minutes`;
+
+
+    return `Calculated ${hourText} and ${minuteText} ago at ${timeText}`;
 
 }
 
 
 /**
- * Escape text before inserting it into HTML.
+ * Convert a state title into a valid CSS class.
+ */
+function createStateClassName(
+
+    title:string
+
+):string {
+
+    return `status-${title
+
+        .toLowerCase()
+
+        .replaceAll(
+
+            "&",
+
+            "and"
+
+        )
+
+        .replace(
+
+            /[^a-z0-9]+/g,
+
+            "-"
+
+        )
+
+        .replace(
+
+            /^-+|-+$/g,
+
+            ""
+
+        )}`;
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
  */
 function escapeHtml(
 

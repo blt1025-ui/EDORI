@@ -1,12 +1,15 @@
 /**
  * Recommendations
  *
- * Displays prioritized operational actions
- * from the latest submitted EDORI result.
+ * Displays prioritized operational actions from the
+ * authoritative EDORI OperationalAssessment.
  *
- * This component does not calculate EDORI.
- * It reads the authoritative result from
- * ResultService.
+ * This component does not:
+ *
+ * - Calculate EDORI
+ * - Evaluate triggers
+ * - Generate independent recommendations
+ * - Modify application state
  */
 
 import {
@@ -29,7 +32,18 @@ from "../services/EventService";
 
 import {
 
-    getLatestResult
+    createOperationalAssessment
+
+}
+
+from "../services/OperationalAssessmentService";
+
+
+import {
+
+    getLatestResult,
+
+    getResultInvalidationReason
 
 }
 
@@ -38,26 +52,35 @@ from "../services/ResultService";
 
 import {
 
-    generateRecommendations
+    getSnapshots
 
 }
 
-from "../services/RecommendationService";
+from "../services/SnapshotService";
 
 
-interface RecommendationPriority {
+import {
 
-    label:string;
+    getState,
 
-    className:string;
-
-    icon:string;
+    hasCommittedAssessment
 
 }
+
+from "../services/StateService";
+
+
+import type {
+
+    OperationalRecommendation
+
+}
+
+from "../types/OperationalRecommendation";
 
 
 /**
- * Render the Recommended Actions panel.
+ * Render the recommendations panel.
  */
 export function Recommendations():string {
 
@@ -74,27 +97,29 @@ export function Recommendations():string {
                     </h3>
 
                     <p class="panel-description">
-                        Operational actions based on the current assessment
+                        Prioritized actions based on current operational triggers
                     </p>
 
                 </div>
+
+
+                <span
+                    id="recommendationCount"
+                    class="recommendation-count"
+                >
+                    0 actions
+                </span>
 
             </div>
 
 
-            <div id="recommendations-list">
+            <div
+                id="recommendations-list"
+                class="recommendations-list"
+                aria-live="polite"
+            >
 
-                <div class="recommendations-empty-state">
-
-                    <span class="empty-state-icon">
-                        …
-                    </span>
-
-                    <p>
-                        Complete and calculate an assessment to generate recommendations.
-                    </p>
-
-                </div>
+                ${createAwaitingAssessmentState()}
 
             </div>
 
@@ -106,7 +131,7 @@ export function Recommendations():string {
 
 
 /**
- * Initialize recommendation display.
+ * Initialize the recommendations panel.
  */
 export function initializeRecommendations():void {
 
@@ -115,17 +140,36 @@ export function initializeRecommendations():void {
 
     subscribe(
 
-    APP_EVENTS.RESULT_CHANGED,
+        APP_EVENTS.RESULT_CHANGED,
 
-    updateRecommendations
+        updateRecommendations
 
-);
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+
+        updateRecommendations
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORY_CHANGED,
+
+        updateRecommendations
+
+    );
 
 }
 
 
 /**
- * Display recommendations from the latest result.
+ * Refresh recommendations from the current
+ * authoritative operational assessment.
  */
 function updateRecommendations():void {
 
@@ -143,136 +187,386 @@ function updateRecommendations():void {
     }
 
 
+    const invalidationReason =
+
+        getResultInvalidationReason();
+
+
+    if(invalidationReason){
+
+        updateRecommendationCount(
+
+            0
+
+        );
+
+
+        container.innerHTML =
+
+            createRecalculationRequiredState();
+
+
+        return;
+
+    }
+
+
+    if(!hasCommittedAssessment()){
+
+        updateRecommendationCount(
+
+            0
+
+        );
+
+
+        container.innerHTML =
+
+            createAwaitingAssessmentState();
+
+
+        return;
+
+    }
+
+
     const result = getLatestResult();
 
 
     if(!result){
 
-        renderAwaitingAssessment(
+        updateRecommendationCount(
 
-            container
+            0
 
         );
+
+
+        container.innerHTML =
+
+            createAwaitingAssessmentState();
+
 
         return;
 
     }
 
 
-    const recommendations = generateRecommendations(
+    try {
 
-        result.score,
+        const operationalAssessment =
 
-        result.drivers
+            createOperationalAssessment({
 
-    );
+                assessment:
+                    getState(),
+
+                result,
+
+                snapshots:
+                    getSnapshots(),
+
+                evaluatedAt:
+                    new Date()
+
+            });
 
 
-    if(recommendations.length === 0){
+        const recommendations =
 
-        renderNoRecommendations(
+            operationalAssessment.recommendations;
 
-            container
+
+        updateRecommendationCount(
+
+            recommendations.length
 
         );
 
-        return;
 
-    }
+        if(recommendations.length === 0){
+
+            container.innerHTML =
+
+                createRoutineOperationsState();
 
 
-    container.innerHTML = recommendations
+            return;
 
-        .map(
+        }
 
-            (
 
-                recommendation,
+        container.innerHTML = recommendations
 
-                index
+            .slice()
 
-            ) => createRecommendationCard(
+            .sort(
 
-                recommendation,
-
-                index,
-
-                result.score
+                compareRecommendations
 
             )
 
-        )
+            .map(
 
-        .join("");
+                recommendation =>
+
+                    createRecommendationCard(
+
+                        recommendation
+
+                    )
+
+            )
+
+            .join("");
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to update operational recommendations:",
+
+            error
+
+        );
+
+
+        updateRecommendationCount(
+
+            0
+
+        );
+
+
+        container.innerHTML = `
+
+            <div class="recommendations-empty-state error">
+
+                <strong>
+                    Recommendations unavailable
+                </strong>
+
+                <p>
+                    Review the browser console for additional details.
+                </p>
+
+            </div>
+
+        `;
+
+    }
 
 }
 
 
 /**
- * Build one recommendation card.
+ * Create one recommendation card.
  */
 function createRecommendationCard(
 
-    recommendation:string,
-
-    index:number,
-
-    score:number
+    recommendation:OperationalRecommendation
 
 ):string {
 
-    const priority = getRecommendationPriority(
+    const priorityClass =
 
-        score,
+        createPriorityClassName(
 
-        index
+            recommendation.priority
 
-    );
+        );
+
+
+    const responsibleGroupMarkup =
+
+        recommendation.responsibleGroup
+
+            ? `
+
+                <div class="recommendation-metadata-item">
+
+                    <span>
+                        Responsible Group
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(
+                            recommendation.responsibleGroup
+                        )}
+
+                    </strong>
+
+                </div>
+
+            `
+
+            : "";
+
+
+    const reassessmentMarkup =
+
+        recommendation.reassessmentMinutes
+
+            ? `
+
+                <div class="recommendation-metadata-item">
+
+                    <span>
+                        Reassess
+                    </span>
+
+                    <strong>
+
+                        ${recommendation.reassessmentMinutes}
+                        minutes
+
+                    </strong>
+
+                </div>
+
+            `
+
+            : "";
+
+
+    const sourceMarkup =
+
+        recommendation.sourceIds.length > 0
+
+            ? `
+
+                <div class="recommendation-source">
+
+                    Trigger source:
+
+                    ${recommendation.sourceIds
+
+                        .map(
+
+                            sourceId =>
+
+                                escapeHtml(
+
+                                    formatIdentifier(
+
+                                        sourceId
+
+                                    )
+
+                                )
+
+                        )
+
+                        .join(", ")}
+
+                </div>
+
+            `
+
+            : "";
 
 
     return `
 
         <article
-            class="recommendation-card ${priority.className}"
+            class="
+                recommendation-card
+                ${priorityClass}
+            "
         >
 
-            <div class="recommendation-order">
+            <div class="recommendation-card-header">
 
-                ${index + 1}
+                <div>
 
-            </div>
+                    <span class="recommendation-priority">
 
-
-            <div class="recommendation-content">
-
-                <div class="recommendation-heading">
-
-                    <span
-                        class="recommendation-priority-icon"
-                        aria-hidden="true"
-                    >
-
-                        ${priority.icon}
+                        ${escapeHtml(
+                            recommendation.priority
+                        )}
 
                     </span>
 
 
-                    <span class="recommendation-priority-label">
+                    <h4>
 
-                        ${priority.label}
+                        ${escapeHtml(
+                            recommendation.title
+                        )}
 
-                    </span>
+                    </h4>
 
                 </div>
 
 
-                <p class="recommendation-text">
+                <span
+                    class="
+                        recommendation-priority-badge
+                        ${priorityClass}
+                    "
+                >
 
-                    ${escapeHtml(recommendation)}
+                    ${escapeHtml(
+                        recommendation.priority
+                    )}
+
+                </span>
+
+            </div>
+
+
+            <p class="recommendation-description">
+
+                ${escapeHtml(
+                    recommendation.description
+                )}
+
+            </p>
+
+
+            <div class="recommendation-rationale">
+
+                <strong>
+                    Why this action is suggested
+                </strong>
+
+                <p>
+
+                    ${escapeHtml(
+                        recommendation.rationale
+                    )}
 
                 </p>
 
             </div>
+
+
+            ${responsibleGroupMarkup
+
+                ||
+
+                reassessmentMarkup
+
+                    ? `
+
+                        <div class="recommendation-metadata">
+
+                            ${responsibleGroupMarkup}
+
+                            ${reassessmentMarkup}
+
+                        </div>
+
+                    `
+
+                    : ""
+
+            }
+
+
+            ${sourceMarkup}
 
         </article>
 
@@ -282,138 +576,150 @@ function createRecommendationCard(
 
 
 /**
- * Assign priority based on score and action order.
+ * Order recommendations from highest to lowest
+ * operational priority.
  */
-function getRecommendationPriority(
+function compareRecommendations(
 
-    score:number,
+    first:OperationalRecommendation,
 
-    index:number
+    second:OperationalRecommendation
 
-):RecommendationPriority {
+):number {
 
-    if(score >= 85){
+    const priorityDifference =
 
-        if(index === 0){
+        getPriorityRank(
 
-            return {
+            second.priority
 
-                label:"Immediate action",
+        )
 
-                className:"recommendation-immediate",
+        -
 
-                icon:"!"
+        getPriorityRank(
 
-            };
+            first.priority
 
-        }
+        );
 
 
-        return {
+    if(priorityDifference !== 0){
 
-            label:"High priority",
-
-            className:"recommendation-high",
-
-            icon:"●"
-
-        };
+        return priorityDifference;
 
     }
 
 
-    if(score >= 70){
+    const firstReassessment =
 
-        if(index === 0){
+        first.reassessmentMinutes
 
-            return {
-
-                label:"High priority",
-
-                className:"recommendation-high",
-
-                icon:"!"
-
-            };
-
-        }
+        ?? Number.MAX_SAFE_INTEGER;
 
 
-        return {
+    const secondReassessment =
 
-            label:"Priority action",
+        second.reassessmentMinutes
 
-            className:"recommendation-priority",
-
-            icon:"●"
-
-        };
-
-    }
+        ?? Number.MAX_SAFE_INTEGER;
 
 
-    if(score >= 40){
+    return firstReassessment
 
-        if(index === 0){
+        -
 
-            return {
+        secondReassessment;
 
-                label:"Priority action",
-
-                className:"recommendation-priority",
-
-                icon:"●"
-
-            };
-
-        }
+}
 
 
-        return {
+/**
+ * Rank recommendation priorities.
+ */
+function getPriorityRank(
 
-            label:"Recommended action",
+    priority:OperationalRecommendation["priority"]
 
-            className:"recommendation-routine",
+):number {
 
-            icon:"●"
+    const ranks:Record<
 
-        };
+        OperationalRecommendation["priority"],
 
-    }
+        number
 
+    > = {
 
-    return {
+        Routine:
+            1,
 
-        label:"Routine action",
+        Moderate:
+            2,
 
-        className:"recommendation-routine",
+        High:
+            3,
 
-        icon:"✓"
+        Immediate:
+            4
 
     };
 
+
+    return ranks[priority];
+
 }
 
 
 /**
- * Display the pre-calculation state.
+ * Update the action count.
  */
-function renderAwaitingAssessment(
+function updateRecommendationCount(
 
-    container:HTMLElement
+    count:number
 
 ):void {
 
-    container.innerHTML = `
+    const element = document.getElementById(
+
+        "recommendationCount"
+
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.textContent =
+
+        count === 1
+
+            ? "1 action"
+
+            : `${count} actions`;
+
+}
+
+
+/**
+ * Create the initial state.
+ */
+function createAwaitingAssessmentState():string {
+
+    return `
 
         <div class="recommendations-empty-state">
 
-            <span class="empty-state-icon">
-                …
-            </span>
+            <strong>
+                Awaiting assessment
+            </strong>
 
             <p>
-                Complete and calculate an assessment to generate recommendations.
+                Calculate EDORI to generate operational recommendations.
             </p>
 
         </div>
@@ -424,29 +730,20 @@ function renderAwaitingAssessment(
 
 
 /**
- * Display when no additional action is needed.
+ * Create the recalculation-required state.
  */
-function renderNoRecommendations(
+function createRecalculationRequiredState():string {
 
-    container:HTMLElement
+    return `
 
-):void {
+        <div class="recommendations-empty-state warning">
 
-    container.innerHTML = `
-
-        <div
-            class="
-                recommendations-empty-state
-                recommendations-empty-success
-            "
-        >
-
-            <span class="empty-state-icon">
-                ✓
-            </span>
+            <strong>
+                Recalculation required
+            </strong>
 
             <p>
-                No additional operational actions are recommended.
+                Submit the current operational assessment to update recommendations.
             </p>
 
         </div>
@@ -457,7 +754,92 @@ function renderNoRecommendations(
 
 
 /**
- * Escape values inserted into HTML.
+ * Create the state shown when no triggers require
+ * additional operational action.
+ */
+function createRoutineOperationsState():string {
+
+    return `
+
+        <div class="recommendations-empty-state routine">
+
+            <strong>
+                Continue routine operations
+            </strong>
+
+            <p>
+                No trigger-based operational actions are currently required.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Convert priority text into a CSS class.
+ */
+function createPriorityClassName(
+
+    priority:OperationalRecommendation["priority"]
+
+):string {
+
+    return `priority-${priority
+
+        .toLowerCase()
+
+        .replace(
+
+            /[^a-z0-9]+/g,
+
+            "-"
+
+        )}`;
+
+}
+
+
+/**
+ * Convert an identifier into readable text.
+ */
+function formatIdentifier(
+
+    identifier:string
+
+):string {
+
+    return identifier
+
+        .split("-")
+
+        .filter(
+
+            word => word.length > 0
+
+        )
+
+        .map(
+
+            word =>
+
+                word.charAt(0).toUpperCase()
+
+                +
+
+                word.slice(1)
+
+        )
+
+        .join(" ");
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
  */
 function escapeHtml(
 

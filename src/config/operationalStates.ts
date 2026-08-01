@@ -5,9 +5,17 @@
  * associated with EDORI score ranges.
  */
 
+import type {
+
+    OperationalStateTitle
+
+}
+
+from "../types/OperationalStateTitle";
+
 export interface OperationalState {
 
-    title:string;
+   title:OperationalStateTitle;
 
     icon:string;
 
