@@ -19,6 +19,14 @@
 
 import {
 
+    getOperationalIntervention
+
+}
+
+from "../config/interventions";
+
+import {
+
     evaluateOperationalTriggers
 
 }
@@ -771,6 +779,9 @@ function determineFinalOperationalState(
 /**
  * Create initial trigger-based recommendations.
  */
+/**
+ * Create configured trigger-based recommendations.
+ */
 function createInitialRecommendations(
 
     activeTriggers:OperationalAssessment["activeTriggers"]
@@ -788,13 +799,126 @@ function createInitialRecommendations(
 
     activeTriggers.forEach(
 
-        result => {
+        triggerResult => {
 
-            result.trigger.interventionIds.forEach(
+            triggerResult.trigger.interventionIds.forEach(
 
                 interventionId => {
 
-                    if(recommendations.has(interventionId)){
+                    const intervention =
+
+                        getOperationalIntervention(
+
+                            interventionId
+
+                        );
+
+
+                    if(!intervention){
+
+                        console.warn(
+
+                            `No enabled operational intervention was found for "${interventionId}".`
+
+                        );
+
+
+                        return;
+
+                    }
+
+
+                    const existingRecommendation =
+
+                        recommendations.get(
+
+                            interventionId
+
+                        );
+
+
+                    const triggerPriority =
+
+                        mapTriggerPriority(
+
+                            triggerResult.trigger.priority
+
+                        );
+
+
+                    const finalPriority =
+
+                        getHigherRecommendationPriority(
+
+                            intervention.defaultPriority,
+
+                            triggerPriority
+
+                        );
+
+
+                    const reassessmentMinutes =
+
+                        selectShortestReassessmentInterval(
+
+                            existingRecommendation
+                                ?.reassessmentMinutes
+
+                            ?? intervention.reassessmentMinutes,
+
+                            triggerResult
+                                .trigger
+                                .reassessmentMinutes
+
+                        );
+
+
+                    if(existingRecommendation){
+
+                        recommendations.set(
+
+                            interventionId,
+
+                            {
+
+                                ...existingRecommendation,
+
+                                priority:
+                                    getHigherRecommendationPriority(
+
+                                        existingRecommendation.priority,
+
+                                        finalPriority
+
+                                    ),
+
+                                sourceIds:Array.from(
+
+                                    new Set([
+
+                                        ...existingRecommendation.sourceIds,
+
+                                        triggerResult.trigger.id
+
+                                    ])
+
+                                ),
+
+                                rationale:
+                                    createCombinedRationale(
+
+                                        existingRecommendation.rationale,
+
+                                        triggerResult.activationReason
+
+                                    ),
+
+                                reassessmentMinutes
+
+                            }
+
+                        );
+
 
                         return;
 
@@ -808,39 +932,30 @@ function createInitialRecommendations(
                         {
 
                             id:
-                                interventionId,
+                                intervention.id,
 
                             title:
-                                formatInterventionTitle(
-
-                                    interventionId
-
-                                ),
+                                intervention.title,
 
                             description:
-                                `Consider ${formatInterventionTitle(interventionId).toLowerCase()} based on the active ${result.trigger.title} trigger.`,
+                                intervention.description,
 
                             priority:
-                                mapTriggerPriority(
-
-                                    result.trigger.priority
-
-                                ),
+                                finalPriority,
 
                             rationale:
-                                result.activationReason,
+                                triggerResult.activationReason,
 
                             sourceIds:[
 
-                                result.trigger.id
+                                triggerResult.trigger.id
 
                             ],
 
                             responsibleGroup:
-                                null,
+                                intervention.responsibleGroup,
 
-                            reassessmentMinutes:
-                                result.trigger.reassessmentMinutes
+                            reassessmentMinutes
 
                         }
 
@@ -859,7 +974,13 @@ function createInitialRecommendations(
 
         recommendations.values()
 
-    );
+    )
+
+        .sort(
+
+            compareOperationalRecommendations
+
+        );
 
 }
 
@@ -1199,31 +1320,7 @@ function mapTriggerPriority(
  * Convert an intervention identifier into a
  * readable title.
  */
-function formatInterventionTitle(
 
-    interventionId:string
-
-):string {
-
-    return interventionId
-
-        .split("-")
-
-        .map(
-
-            word =>
-
-                word.charAt(0).toUpperCase()
-
-                +
-
-                word.slice(1)
-
-        )
-
-        .join(" ");
-
-}
 
 
 /**
@@ -1277,5 +1374,201 @@ function clampScore(
         10
 
     ) / 10;
+
+}
+
+/**
+ * Return the higher of two recommendation
+ * priorities.
+ */
+function getHigherRecommendationPriority(
+
+    first:OperationalRecommendation["priority"],
+
+    second:OperationalRecommendation["priority"]
+
+):OperationalRecommendation["priority"] {
+
+    return getRecommendationPriorityRank(
+
+        first
+
+    )
+
+    >=
+
+    getRecommendationPriorityRank(
+
+        second
+
+    )
+
+        ? first
+
+        : second;
+
+}
+
+
+/**
+ * Rank recommendation priorities.
+ */
+function getRecommendationPriorityRank(
+
+    priority:OperationalRecommendation["priority"]
+
+):number {
+
+    const ranks:Record<
+
+        OperationalRecommendation["priority"],
+
+        number
+
+    > = {
+
+        Routine:
+            1,
+
+        Moderate:
+            2,
+
+        High:
+            3,
+
+        Immediate:
+            4
+
+    };
+
+
+    return ranks[priority];
+
+}
+
+
+/**
+ * Use the shortest available reassessment interval.
+ */
+function selectShortestReassessmentInterval(
+
+    first:number | null,
+
+    second:number | null
+
+):number | null {
+
+    if(first === null){
+
+        return second;
+
+    }
+
+
+    if(second === null){
+
+        return first;
+
+    }
+
+
+    return Math.min(
+
+        first,
+
+        second
+
+    );
+
+}
+
+
+/**
+ * Combine trigger rationale without repeating
+ * identical text.
+ */
+function createCombinedRationale(
+
+    existingRationale:string,
+
+    additionalRationale:string
+
+):string {
+
+    if(
+
+        existingRationale
+
+        ===
+
+        additionalRationale
+
+    ){
+
+        return existingRationale;
+
+    }
+
+
+    return `${existingRationale} ${additionalRationale}`;
+
+}
+
+
+/**
+ * Sort recommendations by priority and then
+ * reassessment urgency.
+ */
+function compareOperationalRecommendations(
+
+    first:OperationalRecommendation,
+
+    second:OperationalRecommendation
+
+):number {
+
+    const priorityDifference =
+
+        getRecommendationPriorityRank(
+
+            second.priority
+
+        )
+
+        -
+
+        getRecommendationPriorityRank(
+
+            first.priority
+
+        );
+
+
+    if(priorityDifference !== 0){
+
+        return priorityDifference;
+
+    }
+
+
+    const firstInterval =
+
+        first.reassessmentMinutes
+
+        ?? Number.MAX_SAFE_INTEGER;
+
+
+    const secondInterval =
+
+        second.reassessmentMinutes
+
+        ?? Number.MAX_SAFE_INTEGER;
+
+
+    return firstInterval
+
+        -
+
+        secondInterval;
 
 }
