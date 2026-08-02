@@ -1,17 +1,15 @@
 /**
  * AssessmentHistory
  *
- * Displays recently submitted EDORI assessments.
+ * Displays persistent EDORI assessment history
+ * using the Alpha–Echo operational-level model.
  *
- * SnapshotService is the single source of truth.
+ * This component does not:
  *
- * This component:
- *
- * - Does not calculate EDORI
- * - Does not create snapshots
- * - Reads persistent history from SnapshotService
- * - Supports clearing history with confirmation
- * - Refreshes after result or history changes
+ * - Calculate EDORI
+ * - Evaluate operational triggers
+ * - Save or alter snapshots
+ * - Reconstruct past trigger-adjusted levels
  */
 
 import {
@@ -21,6 +19,15 @@ import {
 }
 
 from "../config/appEvents";
+
+
+import {
+
+    getOperationalState
+
+}
+
+from "../config/operationalStates";
 
 
 import {
@@ -36,9 +43,7 @@ import {
 
     clearSnapshots,
 
-    getSnapshots,
-
-    getSnapshotCount
+    getSnapshots
 
 }
 
@@ -54,19 +59,22 @@ import type {
 from "../types/EdoriSnapshot";
 
 
-const MAX_VISIBLE_ASSESSMENTS = 10;
+/**
+ * Maximum number of rows displayed at once.
+ */
+const MAXIMUM_DISPLAYED_ROWS = 50;
 
 
 /**
- * Render the assessment-history panel.
+ * Render the Assessment History panel.
  */
 export function AssessmentHistory():string {
 
     return `
 
-        <section class="history-container">
+        <section class="assessment-history-container">
 
-            <div class="panel-header history-panel-header">
+            <div class="panel-header">
 
                 <div>
 
@@ -75,25 +83,25 @@ export function AssessmentHistory():string {
                     </h3>
 
                     <p class="panel-description">
-                        Most recently submitted operational assessments
+                        Saved EDORI assessments and Alpha–Echo levels
                     </p>
 
                 </div>
 
 
-                <div class="history-header-actions">
+                <div class="assessment-history-header-actions">
 
                     <span
-                        id="historyRecordCount"
-                        class="history-record-count"
+                        id="assessmentHistoryCount"
+                        class="assessment-history-count"
                     >
-                        0 records
+                        0 assessments
                     </span>
 
 
                     <button
-                        id="clearHistoryButton"
-                        class="danger-secondary-button history-clear-button"
+                        id="clearAssessmentHistoryButton"
+                        class="assessment-history-clear-button"
                         type="button"
                         disabled
                     >
@@ -106,29 +114,12 @@ export function AssessmentHistory():string {
 
 
             <div
-                id="historyMessage"
-                class="history-message"
+                id="assessmentHistoryContent"
+                class="assessment-history-content"
                 aria-live="polite"
             >
-            </div>
 
-
-            <div
-                id="history-table"
-                class="history-content"
-            >
-
-                <div class="history-empty-state">
-
-                    <span class="empty-state-icon">
-                        …
-                    </span>
-
-                    <p>
-                        No submitted assessments are available.
-                    </p>
-
-                </div>
+                ${createEmptyHistoryState()}
 
             </div>
 
@@ -140,20 +131,34 @@ export function AssessmentHistory():string {
 
 
 /**
- * Initialize the history panel.
+ * Initialize assessment-history behavior.
  */
 export function initializeAssessmentHistory():void {
 
-    initializeClearHistoryButton();
+    const clearButton = document.getElementById(
 
-    updateHistory();
+        "clearAssessmentHistoryButton"
+
+    );
+
+
+    clearButton?.addEventListener(
+
+        "click",
+
+        handleClearHistory
+
+    );
+
+
+    updateAssessmentHistory();
 
 
     subscribe(
 
         APP_EVENTS.RESULT_CHANGED,
 
-        updateHistory
+        updateAssessmentHistory
 
     );
 
@@ -162,7 +167,16 @@ export function initializeAssessmentHistory():void {
 
         APP_EVENTS.HISTORY_CHANGED,
 
-        updateHistory
+        updateAssessmentHistory
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+
+        updateAssessmentHistory
 
     );
 
@@ -170,142 +184,13 @@ export function initializeAssessmentHistory():void {
 
 
 /**
- * Initialize the clear-history action.
+ * Refresh history from SnapshotService.
  */
-function initializeClearHistoryButton():void {
-
-    const button = document.getElementById(
-
-        "clearHistoryButton"
-
-    ) as HTMLButtonElement | null;
-
-
-    if(!button){
-
-        console.warn(
-
-            "AssessmentHistory could not find clearHistoryButton."
-
-        );
-
-        return;
-
-    }
-
-
-    button.addEventListener(
-
-        "click",
-
-        clearHistoryWithConfirmation
-
-    );
-
-}
-
-
-/**
- * Confirm and clear persistent EDORI history.
- */
-function clearHistoryWithConfirmation():void {
-
-    const recordCount = getSnapshotCount();
-
-
-    if(recordCount === 0){
-
-        showHistoryMessage(
-
-            "There is no assessment history to clear.",
-
-            "default"
-
-        );
-
-        return;
-
-    }
-
-
-    const confirmationMessage =
-
-        recordCount === 1
-
-            ? "Permanently remove the stored EDORI assessment history? This will remove 1 record from the trend chart and history table."
-
-            : `Permanently remove the stored EDORI assessment history? This will remove ${recordCount} records from the trend chart and history table.`;
-
-
-    const confirmed = window.confirm(
-
-        confirmationMessage
-
-    );
-
-
-    if(!confirmed){
-
-        showHistoryMessage(
-
-            "Assessment history was not changed.",
-
-            "default"
-
-        );
-
-        return;
-
-    }
-
-
-    try {
-
-        clearSnapshots();
-
-
-        showHistoryMessage(
-
-            "Assessment history was cleared successfully.",
-
-            "success"
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to clear EDORI assessment history:",
-
-            error
-
-        );
-
-
-        showHistoryMessage(
-
-            "Assessment history could not be cleared.",
-
-            "error"
-
-        );
-
-    }
-
-}
-
-
-/**
- * Refresh the history table from persistent
- * snapshots.
- */
-function updateHistory():void {
+function updateAssessmentHistory():void {
 
     const container = document.getElementById(
 
-        "history-table"
+        "assessmentHistoryContent"
 
     );
 
@@ -317,26 +202,245 @@ function updateHistory():void {
     }
 
 
-    const allSnapshots = getSnapshots();
+    try {
+
+        const snapshots =
+
+            getValidChronologicalSnapshots();
 
 
-    updateHistoryRecordCount(
+        updateHistoryCount(
 
-        allSnapshots.length
+            snapshots.length
 
-    );
-
-
-    updateClearButtonState(
-
-        allSnapshots.length > 0
-
-    );
+        );
 
 
-    const visibleSnapshots = allSnapshots
+        updateClearButton(
 
-        .slice()
+            snapshots.length > 0
+
+        );
+
+
+        if(snapshots.length === 0){
+
+            container.innerHTML =
+
+                createEmptyHistoryState();
+
+
+            return;
+
+        }
+
+
+        const rows = createHistoryRows(
+
+            snapshots
+
+        );
+
+
+        container.innerHTML = `
+
+            <div class="assessment-history-table-wrapper">
+
+                <table class="assessment-history-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th scope="col">
+                                Time
+                            </th>
+
+                            <th scope="col">
+                                Level
+                            </th>
+
+                            <th scope="col">
+                                Score
+                            </th>
+
+                            <th scope="col">
+                                Change
+                            </th>
+
+                            <th scope="col">
+                                ED Volume
+                            </th>
+
+                            <th scope="col">
+                                Boarding
+                            </th>
+
+                            <th scope="col">
+                                Medical Beds
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${rows
+
+                            .slice(
+
+                                -MAXIMUM_DISPLAYED_ROWS
+
+                            )
+
+                            .reverse()
+
+                            .map(
+
+                                row =>
+
+                                    createHistoryRowMarkup(
+
+                                        row
+
+                                    )
+
+                            )
+
+                            .join("")}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            ${snapshots.length > MAXIMUM_DISPLAYED_ROWS
+
+                ? `
+
+                    <div class="assessment-history-limit-note">
+
+                        Showing the most recent
+                        ${MAXIMUM_DISPLAYED_ROWS}
+                        of
+                        ${snapshots.length}
+                        saved assessments.
+
+                    </div>
+
+                `
+
+                : ""
+
+            }
+
+        `;
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to update assessment history:",
+
+            error
+
+        );
+
+
+        updateHistoryCount(
+
+            0
+
+        );
+
+
+        updateClearButton(
+
+            false
+
+        );
+
+
+        container.innerHTML = `
+
+            <div class="assessment-history-empty error">
+
+                <strong>
+                    Assessment history unavailable
+                </strong>
+
+                <p>
+                    Review the browser console for additional details.
+                </p>
+
+            </div>
+
+        `;
+
+    }
+
+}
+
+
+/**
+ * Return valid snapshots in chronological order.
+ */
+function getValidChronologicalSnapshots():
+
+EdoriSnapshot[] {
+
+    return getSnapshots()
+
+        .filter(
+
+            snapshot =>
+
+                Number.isFinite(
+
+                    snapshot.score
+
+                )
+
+                &&
+
+                !Number.isNaN(
+
+                    new Date(
+
+                        snapshot.timestamp
+
+                    ).getTime()
+
+                )
+
+        )
+
+        .map(
+
+            snapshot => ({
+
+                ...snapshot,
+
+                operationalState:{
+
+                    ...snapshot.operationalState
+
+                },
+
+                timestamp:new Date(
+
+                    snapshot.timestamp
+
+                )
+
+            })
+
+        )
 
         .sort(
 
@@ -348,41 +452,74 @@ function updateHistory():void {
 
             ) =>
 
-                second.timestamp.getTime()
+                new Date(
+
+                    first.timestamp
+
+                ).getTime()
 
                 -
 
-                first.timestamp.getTime()
+                new Date(
 
-        )
+                    second.timestamp
 
-        .slice(
-
-            0,
-
-            MAX_VISIBLE_ASSESSMENTS
+                ).getTime()
 
         );
 
-
-    if(visibleSnapshots.length === 0){
-
-        renderEmptyHistory(
-
-            container
-
-        );
-
-        return;
-
-    }
+}
 
 
-    container.innerHTML = createHistoryTable(
+/**
+ * Create history rows with score-change data.
+ */
+function createHistoryRows(
 
-        visibleSnapshots,
+    snapshots:EdoriSnapshot[]
 
-        allSnapshots.length
+):Array<{
+
+    snapshot:EdoriSnapshot;
+
+    scoreChange:number | null;
+
+}> {
+
+    return snapshots.map(
+
+        (
+
+            snapshot,
+
+            index
+
+        ) => {
+
+            const previousSnapshot = index > 0
+
+                ? snapshots[index - 1]
+
+                : null;
+
+
+            return {
+
+                snapshot,
+
+                scoreChange:previousSnapshot
+
+                    ? snapshot.score
+
+                        -
+
+                        previousSnapshot.score
+
+                    : null
+
+            };
+
+        }
 
     );
 
@@ -390,151 +527,62 @@ function updateHistory():void {
 
 
 /**
- * Create the history table.
+ * Create one history-table row.
  */
-function createHistoryTable(
+function createHistoryRowMarkup(
 
-    snapshots:EdoriSnapshot[],
+    row:{
 
-    totalRecordCount:number
+        snapshot:EdoriSnapshot;
+
+        scoreChange:number | null;
+
+    }
 
 ):string {
 
-    const additionalRecordCount =
+    const state = getOperationalState(
+
+        row.snapshot.score
+
+    );
+
+
+    const safeScore = Math.min(
+
+        100,
 
         Math.max(
 
             0,
 
-            totalRecordCount -
+            Math.round(
 
-            snapshots.length
+                row.snapshot.score
 
-        );
+            )
 
-
-    const additionalRecordsMessage =
-
-        additionalRecordCount > 0
-
-            ? `
-
-                <p class="history-truncation-message">
-
-                    Showing the 10 most recent assessments.
-
-                    ${additionalRecordCount}
-
-                    older
-
-                    ${additionalRecordCount === 1 ? "record is" : "records are"}
-
-                    retained in browser history.
-
-                </p>
-
-            `
-
-            : "";
-
-
-    return `
-
-        <div class="history-table-wrapper">
-
-            <table class="history-table">
-
-                <thead>
-
-                    <tr>
-
-                        <th scope="col">
-                            Date
-                        </th>
-
-                        <th scope="col">
-                            Time
-                        </th>
-
-                        <th scope="col">
-                            Score
-                        </th>
-
-                        <th scope="col">
-                            Operational State
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-
-                <tbody>
-
-                    ${snapshots
-
-                        .map(
-
-                            snapshot => createHistoryRow(
-
-                                snapshot
-
-                            )
-
-                        )
-
-                        .join("")}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-
-        ${additionalRecordsMessage}
-
-    `;
-
-}
-
-
-/**
- * Create one history row.
- */
-function createHistoryRow(
-
-    snapshot:EdoriSnapshot
-
-):string {
-
-    const timestamp = normalizeTimestamp(
-
-        snapshot.timestamp
+        )
 
     );
 
 
-    const operationalState =
+    const scoreChangeClass =
 
-        snapshot.operationalState;
+        createScoreChangeClass(
 
+            row.scoreChange
 
-    const stateTitle = operationalState?.title
-
-        ?? snapshot.status
-
-        ?? "Unknown";
+        );
 
 
-    const stateIcon = operationalState?.icon
+    const scoreChangeText =
 
-        ?? "•";
+        createScoreChangeText(
 
+            row.scoreChange
 
-    const stateColor = operationalState?.color
-
-        ?? "#64748b";
+        );
 
 
     return `
@@ -543,23 +591,69 @@ function createHistoryRow(
 
             <td>
 
-                ${formatDate(timestamp)}
+                <time
+                    datetime="${escapeAttribute(
+                        new Date(
+                            row.snapshot.timestamp
+                        ).toISOString()
+                    )}"
+                >
+
+                    ${escapeHtml(
+                        formatAssessmentDate(
+                            new Date(
+                                row.snapshot.timestamp
+                            )
+                        )
+                    )}
+
+                </time>
 
             </td>
 
 
             <td>
 
-                ${formatTime(timestamp)}
+                <span
+                    class="assessment-history-level"
+                    style="
+                        --history-level-color:
+                        ${escapeAttribute(
+                            state.color
+                        )};
+                    "
+                >
+
+                    <span
+                        class="assessment-history-level-icon"
+                        aria-hidden="true"
+                    >
+
+                        ${escapeHtml(
+                            state.icon
+                        )}
+
+                    </span>
+
+
+                    <strong>
+
+                        ${escapeHtml(
+                            state.title
+                        )}
+
+                    </strong>
+
+                </span>
 
             </td>
 
 
             <td>
 
-                <strong class="history-score">
+                <strong class="assessment-history-score">
 
-                    ${Math.round(snapshot.score)}
+                    ${safeScore}
 
                 </strong>
 
@@ -569,23 +663,44 @@ function createHistoryRow(
             <td>
 
                 <span
-                    class="history-state"
-                    style="--history-state-color:${escapeAttribute(stateColor)};"
+                    class="
+                        assessment-history-change
+                        ${scoreChangeClass}
+                    "
                 >
 
-                    <span
-                        class="history-state-icon"
-                        aria-hidden="true"
-                    >
-
-                        ${escapeHtml(stateIcon)}
-
-                    </span>
-
-
-                    ${escapeHtml(stateTitle)}
+                    ${escapeHtml(
+                        scoreChangeText
+                    )}
 
                 </span>
+
+            </td>
+
+
+            <td>
+
+                ${formatSnapshotValue(
+                    row.snapshot.totalEDVolume
+                )}
+
+            </td>
+
+
+            <td>
+
+                ${formatSnapshotValue(
+                    row.snapshot.boardedPatients
+                )}
+
+            </td>
+
+
+            <td>
+
+                ${formatSnapshotValue(
+                    row.snapshot.occupiedMedicalBeds
+                )}
 
             </td>
 
@@ -597,9 +712,65 @@ function createHistoryRow(
 
 
 /**
- * Update the total history-record indicator.
+ * Clear saved snapshot history after confirmation.
  */
-function updateHistoryRecordCount(
+function handleClearHistory():void {
+
+    const snapshots = getSnapshots();
+
+
+    if(snapshots.length === 0){
+
+        return;
+
+    }
+
+
+    const confirmed = window.confirm(
+
+        "Clear all saved EDORI assessment history? This cannot be undone."
+
+    );
+
+
+    if(!confirmed){
+
+        return;
+
+    }
+
+
+    try {
+
+        clearSnapshots();
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to clear assessment history:",
+
+            error
+
+        );
+
+
+        window.alert(
+
+            "Assessment history could not be cleared."
+
+        );
+
+    }
+
+}
+
+
+/**
+ * Update the saved-assessment count.
+ */
+function updateHistoryCount(
 
     count:number
 
@@ -607,7 +778,7 @@ function updateHistoryRecordCount(
 
     const element = document.getElementById(
 
-        "historyRecordCount"
+        "assessmentHistoryCount"
 
     );
 
@@ -619,29 +790,27 @@ function updateHistoryRecordCount(
     }
 
 
-    element.textContent =
+    element.textContent = count === 1
 
-        count === 1
+        ? "1 assessment"
 
-            ? "1 record"
-
-            : `${count} records`;
+        : `${count} assessments`;
 
 }
 
 
 /**
- * Enable or disable the Clear History button.
+ * Enable or disable the clear-history button.
  */
-function updateClearButtonState(
+function updateClearButton(
 
-    historyExists:boolean
+    enabled:boolean
 
 ):void {
 
     const button = document.getElementById(
 
-        "clearHistoryButton"
+        "clearAssessmentHistoryButton"
 
     ) as HTMLButtonElement | null;
 
@@ -653,195 +822,199 @@ function updateClearButtonState(
     }
 
 
-    button.disabled =
-
-        !historyExists;
+    button.disabled = !enabled;
 
 }
 
 
 /**
- * Display the empty-history state.
+ * Create score-change text.
  */
-function renderEmptyHistory(
+function createScoreChangeText(
 
-    container:HTMLElement
+    scoreChange:number | null
 
-):void {
+):string {
 
-    container.innerHTML = `
+    if(scoreChange === null){
 
-        <div class="history-empty-state">
+        return "Initial";
 
-            <span class="empty-state-icon">
-                …
-            </span>
+    }
+
+
+    const rounded = Math.round(
+
+        scoreChange
+
+    );
+
+
+    if(rounded > 0){
+
+        return `+${rounded}`;
+
+    }
+
+
+    return String(
+
+        rounded
+
+    );
+
+}
+
+
+/**
+ * Create score-change styling.
+ */
+function createScoreChangeClass(
+
+    scoreChange:number | null
+
+):string {
+
+    if(scoreChange === null){
+
+        return "history-change-initial";
+
+    }
+
+
+    if(scoreChange <= -5){
+
+        return "history-change-improving";
+
+    }
+
+
+    if(scoreChange >= 10){
+
+        return "history-change-critical";
+
+    }
+
+
+    if(scoreChange > 0){
+
+        return "history-change-increasing";
+
+    }
+
+
+    return "history-change-stable";
+
+}
+
+
+/**
+ * Format the assessment timestamp.
+ */
+function formatAssessmentDate(
+
+    date:Date
+
+):string {
+
+    return date.toLocaleString(
+
+        [],
+
+        {
+
+            month:
+                "short",
+
+            day:
+                "numeric",
+
+            year:
+                "numeric",
+
+            hour:
+                "numeric",
+
+            minute:
+                "2-digit"
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Format a saved snapshot value.
+ */
+function formatSnapshotValue(
+
+    value:number | undefined
+
+):string {
+
+    if(
+
+        value === undefined
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return "--";
+
+    }
+
+
+    if(Number.isInteger(value)){
+
+        return String(value);
+
+    }
+
+
+    return value
+
+        .toFixed(
+
+            1
+
+        )
+
+        .replace(
+
+            /\.0$/,
+
+            ""
+
+        );
+
+}
+
+
+/**
+ * Create the empty-history state.
+ */
+function createEmptyHistoryState():string {
+
+    return `
+
+        <div class="assessment-history-empty">
+
+            <strong>
+                No saved assessments
+            </strong>
 
             <p>
-                No submitted assessments are available.
+                Completed EDORI calculations will appear here.
             </p>
 
         </div>
 
     `;
-
-}
-
-
-/**
- * Update the history operation message.
- */
-function showHistoryMessage(
-
-    message:string,
-
-    type:
-
-        | "default"
-
-        | "success"
-
-        | "error"
-
-):void {
-
-    const element = document.getElementById(
-
-        "historyMessage"
-
-    );
-
-
-    if(!element){
-
-        return;
-
-    }
-
-
-    element.textContent = message;
-
-
-    element.classList.remove(
-
-        "history-message-default",
-
-        "history-message-success",
-
-        "history-message-error"
-
-    );
-
-
-    if(message.length === 0){
-
-        return;
-
-    }
-
-
-    element.classList.add(
-
-        `history-message-${type}`
-
-    );
-
-}
-
-
-/**
- * Normalize a snapshot timestamp.
- */
-function normalizeTimestamp(
-
-    timestamp:Date
-
-):Date {
-
-    if(timestamp instanceof Date){
-
-        return new Date(
-
-            timestamp
-
-        );
-
-    }
-
-
-    return new Date(
-
-        timestamp
-
-    );
-
-}
-
-
-/**
- * Format the history date.
- */
-function formatDate(
-
-    timestamp:Date
-
-):string {
-
-    if(Number.isNaN(timestamp.getTime())){
-
-        return "Unknown";
-
-    }
-
-
-    return timestamp.toLocaleDateString(
-
-        [],
-
-        {
-
-            year:"numeric",
-
-            month:"short",
-
-            day:"numeric"
-
-        }
-
-    );
-
-}
-
-
-/**
- * Format the history time.
- */
-function formatTime(
-
-    timestamp:Date
-
-):string {
-
-    if(Number.isNaN(timestamp.getTime())){
-
-        return "Unknown";
-
-    }
-
-
-    return timestamp.toLocaleTimeString(
-
-        [],
-
-        {
-
-            hour:"2-digit",
-
-            minute:"2-digit"
-
-        }
-
-    );
 
 }
 
@@ -901,7 +1074,7 @@ function escapeHtml(
 
 
 /**
- * Escape a value used inside an HTML attribute.
+ * Escape text inserted into HTML attributes.
  */
 function escapeAttribute(
 

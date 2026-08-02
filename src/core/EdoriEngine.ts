@@ -18,6 +18,14 @@
  * - Emit RESULT_CHANGED
  */
 
+import type {
+
+    EdoriSnapshot
+
+}
+
+from "../types/EdoriSnapshot";
+
 import {
 
     APP_EVENTS
@@ -356,21 +364,109 @@ export function runEdoriAssessment(
      * Create one eligible historical snapshot.
      */
 
-    const snapshot = {
+    const snapshot:EdoriSnapshot = {
 
-        score:
-            result.score,
+    score:
+        result.score,
 
-        status:
-            result.status,
+    status:
+        result.operationalState.title,
 
-        operationalState:
-            result.operationalState,
+    operationalState:{
 
-        timestamp:
-            calculationTime
+        ...result.operationalState
 
-    };
+    },
+
+    timestamp:new Date(
+
+        result.timestamp
+
+    ),
+
+
+    /*
+     * Current operational inputs
+     */
+
+    totalEDVolume:
+        assessment.totalEDVolume,
+
+    boardedPatients:
+        assessment.boardedPatients,
+
+    occupiedMedicalBeds:
+        assessment.occupiedMedicalBeds,
+
+
+    /*
+     * ESI distribution
+     */
+
+    esi1:
+        assessment.esi1,
+
+    esi2:
+        assessment.esi2,
+
+    esi3:
+        assessment.esi3,
+
+    esi4:
+        assessment.esi4,
+
+    esi5:
+        assessment.esi5,
+
+
+    /*
+     * Historical expectations
+     */
+
+    expectedVolume:
+        assessment.expectedVolume,
+
+    expectedBoarders:
+        assessment.expectedBoarders,
+
+    expectedArrivals:
+        assessment.expectedArrivals,
+
+    expectedDepartures:
+        assessment.expectedDepartures,
+
+
+    /*
+     * EDORI domain scores
+     */
+
+    demandScore:
+        result.demandScore,
+
+    boardingScore:
+        result.boardingScore,
+
+    hospitalScore:
+        result.hospitalScore,
+
+    acuityScore:
+        result.acuityScore,
+
+    forecastScore:
+        result.forecastScore,
+
+
+    /*
+     * Assessment timing
+     */
+
+    day:
+        assessment.day,
+
+    hour:
+        assessment.hour
+
+};
 
 
     let snapshotSaved = false;

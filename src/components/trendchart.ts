@@ -1,41 +1,18 @@
 /**
  * TrendChart
  *
- * Displays persistent EDORI score history.
+ * Displays the saved EDORI score trend using the
+ * Alpha–Echo operational-level model.
  *
- * SnapshotService is the authoritative source,
- * accessed through TrendService.
+ * The chart reads persistent SnapshotService data.
  *
- * This component:
+ * It does not:
  *
- * - Does not calculate EDORI
- * - Does not save snapshots
- * - Does not maintain a separate history array
- * - Refreshes after RESULT_CHANGED
+ * - Calculate EDORI
+ * - Evaluate operational triggers
+ * - Save or alter snapshot history
+ * - Reconstruct past trigger-adjusted levels
  */
-
-import {
-
-    CategoryScale,
-
-    Chart,
-
-    Legend,
-
-    LinearScale,
-
-    LineController,
-
-    LineElement,
-
-    PointElement,
-
-    Tooltip
-
-}
-
-from "chart.js";
-
 
 import {
 
@@ -44,6 +21,15 @@ import {
 }
 
 from "../config/appEvents";
+
+
+import {
+
+    getOperationalState
+
+}
+
+from "../config/operationalStates";
 
 
 import {
@@ -57,47 +43,65 @@ from "../services/EventService";
 
 import {
 
-    getRecentTrendHistory
+    getSnapshots
 
 }
 
-from "../services/TrendService";
+from "../services/SnapshotService";
 
 
 import type {
 
-    TrendPoint
+    EdoriSnapshot
 
 }
 
-from "../services/TrendService";
-
-
-const MAXIMUM_CHART_POINTS = 50;
-
-
-let chart:Chart<
-
-    "line",
-
-    number[],
-
-    string
-
-> | null = null;
-
-
-let chartRegistered = false;
+from "../types/EdoriSnapshot";
 
 
 /**
- * Render the trend panel.
+ * Maximum number of trend points shown.
+ */
+const MAXIMUM_TREND_POINTS = 24;
+
+
+/**
+ * SVG layout constants.
+ */
+const SVG_WIDTH = 760;
+
+const SVG_HEIGHT = 320;
+
+const PLOT_LEFT = 54;
+
+const PLOT_RIGHT = 22;
+
+const PLOT_TOP = 20;
+
+const PLOT_BOTTOM = 48;
+
+
+interface TrendPoint {
+
+    snapshot:EdoriSnapshot;
+
+    x:number;
+
+    y:number;
+
+    score:number;
+
+}
+
+
+/**
+ * Render the EDORI Trend panel.
  */
 export function TrendChart():string {
 
     return `
 
-        <section class="trend-container">
+        <section class="trend-chart-container">
 
             <div class="panel-header">
 
@@ -108,32 +112,65 @@ export function TrendChart():string {
                     </h3>
 
                     <p class="panel-description">
-                        Submitted EDORI assessments over time
+                        Saved operational-readiness scores over time
                     </p>
 
                 </div>
 
+
+                <span
+                    id="trendPointCount"
+                    class="trend-point-count"
+                >
+                    0 points
+                </span>
+
             </div>
 
 
-            <div class="trend-chart-wrapper">
+            <div class="trend-level-legend">
 
-                <canvas
-                    id="edoriTrendChart"
-                    aria-label="EDORI score trend chart"
-                    role="img"
-                >
-                </canvas>
+                ${createLevelLegendItem(
+                    "Alpha",
+                    "0–20",
+                    "#16A34A"
+                )}
+
+                ${createLevelLegendItem(
+                    "Bravo",
+                    "21–40",
+                    "#EAB308"
+                )}
+
+                ${createLevelLegendItem(
+                    "Charlie",
+                    "41–60",
+                    "#F97316"
+                )}
+
+                ${createLevelLegendItem(
+                    "Delta",
+                    "61–80",
+                    "#DC2626"
+                )}
+
+                ${createLevelLegendItem(
+                    "Echo",
+                    "81–100",
+                    "#111827"
+                )}
 
             </div>
 
 
             <div
-                id="trend-summary"
-                class="trend-summary"
+                id="trendChartContent"
+                class="trend-chart-content"
                 aria-live="polite"
             >
-                No EDORI assessments recorded.
+
+                ${createEmptyTrendState()}
+
             </div>
 
         </section>
@@ -148,30 +185,32 @@ export function TrendChart():string {
  */
 export function initializeTrendChart():void {
 
-    registerChartComponents();
-
-    updateTrend();
+    updateTrendChart();
 
 
     subscribe(
 
         APP_EVENTS.RESULT_CHANGED,
 
-        updateTrend
+        updateTrendChart
 
     );
 
-
-    /*
-     * Reserved for future history deletion,
-     * import, or synchronization.
-     */
 
     subscribe(
 
         APP_EVENTS.HISTORY_CHANGED,
 
-        updateTrend
+        updateTrendChart
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+
+        updateTrendChart
 
     );
 
@@ -179,254 +218,1188 @@ export function initializeTrendChart():void {
 
 
 /**
- * Register required Chart.js components once.
+ * Refresh the trend chart from saved snapshots.
  */
-function registerChartComponents():void {
+function updateTrendChart():void {
 
-    if(chartRegistered){
+    const container = document.getElementById(
+
+        "trendChartContent"
+
+    );
+
+
+    if(!container){
 
         return;
 
     }
 
 
-    Chart.register(
+    try {
 
-        LineController,
+        const snapshots =
 
-        LineElement,
-
-        PointElement,
-
-        LinearScale,
-
-        CategoryScale,
-
-        Tooltip,
-
-        Legend
-
-    );
+            getValidChronologicalSnapshots();
 
 
-    chartRegistered = true;
+        updateTrendPointCount(
+
+            snapshots.length
+
+        );
+
+
+        if(snapshots.length === 0){
+
+            container.innerHTML =
+
+                createEmptyTrendState();
+
+
+            return;
+
+        }
+
+
+        const visibleSnapshots = snapshots.slice(
+
+            -MAXIMUM_TREND_POINTS
+
+        );
+
+
+        container.innerHTML =
+
+            createTrendChartMarkup(
+
+                visibleSnapshots,
+
+                snapshots.length
+
+            );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to update the EDORI trend chart:",
+
+            error
+
+        );
+
+
+        updateTrendPointCount(
+
+            0
+
+        );
+
+
+        container.innerHTML = `
+
+            <div class="trend-chart-empty error">
+
+                <strong>
+                    Trend unavailable
+                </strong>
+
+                <p>
+                    Review the browser console for additional details.
+                </p>
+
+            </div>
+
+        `;
+
+    }
 
 }
 
 
 /**
- * Refresh the chart from persistent snapshots.
+ * Return valid snapshots in chronological order.
  */
-function updateTrend():void {
+function getValidChronologicalSnapshots():
 
-    const canvas = document.getElementById(
+EdoriSnapshot[] {
 
-        "edoriTrendChart"
+    return getSnapshots()
 
-    ) as HTMLCanvasElement | null;
+        .filter(
+
+            snapshot =>
+
+                Number.isFinite(
+
+                    snapshot.score
+
+                )
+
+                &&
+
+                !Number.isNaN(
+
+                    new Date(
+
+                        snapshot.timestamp
+
+                    ).getTime()
+
+                )
+
+        )
+
+        .map(
+
+            snapshot => ({
+
+                ...snapshot,
+
+                operationalState:{
+
+                    ...snapshot.operationalState
+
+                },
+
+                timestamp:new Date(
+
+                    snapshot.timestamp
+
+                )
+
+            })
+
+        )
+
+        .sort(
+
+            (
+
+                first,
+
+                second
+
+            ) =>
+
+                new Date(
+
+                    first.timestamp
+
+                ).getTime()
+
+                -
+
+                new Date(
+
+                    second.timestamp
+
+                ).getTime()
+
+        );
+
+}
 
 
-    if(!canvas){
+/**
+ * Create the completed chart.
+ */
+function createTrendChartMarkup(
 
-        return;
+    snapshots:EdoriSnapshot[],
 
-    }
+    totalSnapshotCount:number
 
+):string {
 
-    const history = getRecentTrendHistory(
+    const points = createTrendPoints(
 
-        MAXIMUM_CHART_POINTS
+        snapshots
 
     );
 
 
-    destroyChart();
+    const polylinePoints = points
 
+        .map(
 
-    if(history.length === 0){
+            point =>
 
-        clearCanvas(
+                `${roundCoordinate(point.x)},${roundCoordinate(point.y)}`
 
-            canvas
+        )
 
-        );
+        .join(" ");
 
 
-        updateTrendSummary(
+    const latestPoint = points[
 
-            history
+        points.length - 1
 
-        );
+    ];
 
 
-        return;
+    const previousPoint = points.length > 1
 
-    }
+        ? points[points.length - 2]
 
+        : null;
 
-    chart = new Chart(
 
-        canvas,
+    const latestState = getOperationalState(
 
-        {
+        latestPoint.score
 
-            type:"line",
+    );
 
-            data:{
 
-                labels:history.map(
+    const latestChange = previousPoint
 
-                    point => formatChartTimestamp(
+        ? latestPoint.score
 
-                        point.timestamp
+            -
 
-                    )
+            previousPoint.score
 
-                ),
+        : null;
 
-                datasets:[
 
-                    {
+    return `
 
-                        label:"EDORI Score",
+        <div class="trend-chart-current-summary">
 
-                        data:history.map(
+            <div>
 
-                            point => Math.round(
+                <span>
+                    Latest Score
+                </span>
 
-                                point.score
+                <strong>
+                    ${Math.round(latestPoint.score)}
+                </strong>
 
-                            )
+            </div>
 
-                        ),
 
-                        borderWidth:3,
+            <div>
 
-                        pointRadius:4,
+                <span>
+                    Current Level
+                </span>
 
-                        pointHoverRadius:6,
+                <strong>
 
-                        tension:0.25,
+                    ${escapeHtml(
+                        `${latestState.icon} ${latestState.title}`
+                    )}
 
-                        fill:false
+                </strong>
 
-                    }
+            </div>
 
-                ]
 
-            },
+            <div>
 
-            options:{
+                <span>
+                    Latest Change
+                </span>
 
-                responsive:true,
+                <strong
+                    class="${createScoreChangeClass(
+                        latestChange
+                    )}"
+                >
 
-                maintainAspectRatio:false,
+                    ${createScoreChangeText(
+                        latestChange
+                    )}
 
-                animation:{
+                </strong>
 
-                    duration:250
+            </div>
 
-                },
+        </div>
 
-                interaction:{
 
-                    intersect:false,
+        <div class="trend-chart-scroll">
 
-                    mode:"index"
+            <svg
+                class="trend-chart-svg"
+                viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}"
+                role="img"
+                aria-labelledby="
+                    trendChartTitle
+                    trendChartDescription
+                "
+            >
 
-                },
+                <title id="trendChartTitle">
+                    EDORI score trend
+                </title>
 
-                scales:{
 
-                    x:{
+                <desc id="trendChartDescription">
+                    Saved EDORI scores displayed across Alpha, Bravo, Charlie, Delta, and Echo operational levels.
+                </desc>
 
-                        title:{
 
-                            display:true,
+                ${createOperationalBands()}
 
-                            text:"Assessment Time"
+                ${createHorizontalGridLines()}
 
-                        },
+                ${createVerticalAxisLabels()}
 
-                        ticks:{
+                ${createLevelLabels()}
 
-                            maxRotation:45,
+                ${createTimeLabels(points)}
 
-                            minRotation:0,
+                ${points.length > 1
 
-                            autoSkip:true,
+                    ? `
 
-                            maxTicksLimit:12
+                        <polyline
+                            class="trend-score-line"
+                            points="${polylinePoints}"
+                            fill="none"
+                        />
 
-                        }
+                    `
 
-                    },
-
-                    y:{
-
-                        min:0,
-
-                        max:100,
-
-                        title:{
-
-                            display:true,
-
-                            text:"EDORI Score"
-
-                        },
-
-                        ticks:{
-
-                            stepSize:20
-
-                        }
-
-                    }
-
-                },
-
-                plugins:{
-
-                    legend:{
-
-                        display:true,
-
-                        position:"bottom"
-
-                    },
-
-                    tooltip:{
-
-                        callbacks:{
-
-                            label:(context) => {
-
-                                const value =
-
-                                    context.parsed.y;
-
-
-                                return `EDORI Score: ${value}`;
-
-                            }
-
-                        }
-
-                    }
+                    : ""
 
                 }
 
+                ${points
+
+                    .map(
+
+                        point =>
+
+                            createTrendPointMarkup(
+
+                                point
+
+                            )
+
+                    )
+
+                    .join("")}
+
+            </svg>
+
+        </div>
+
+
+        <div class="trend-chart-footnote">
+
+            ${totalSnapshotCount > MAXIMUM_TREND_POINTS
+
+                ? `Showing the most recent ${MAXIMUM_TREND_POINTS} of ${totalSnapshotCount} saved assessments.`
+
+                : `${totalSnapshotCount} saved assessment${totalSnapshotCount === 1 ? "" : "s"} displayed.`
+
             }
+
+            Historical points use the score-derived Alpha–Echo level stored by the EDORI score.
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Convert snapshots into chart coordinates.
+ */
+function createTrendPoints(
+
+    snapshots:EdoriSnapshot[]
+
+):TrendPoint[] {
+
+    const plotWidth =
+
+        SVG_WIDTH
+
+        -
+
+        PLOT_LEFT
+
+        -
+
+        PLOT_RIGHT;
+
+
+    const plotHeight =
+
+        SVG_HEIGHT
+
+        -
+
+        PLOT_TOP
+
+        -
+
+        PLOT_BOTTOM;
+
+
+    return snapshots.map(
+
+        (
+
+            snapshot,
+
+            index
+
+        ) => {
+
+            const score = clampScore(
+
+                snapshot.score
+
+            );
+
+
+            const x = snapshots.length === 1
+
+                ? PLOT_LEFT
+
+                    +
+
+                    plotWidth / 2
+
+                : PLOT_LEFT
+
+                    +
+
+                    (
+
+                        index
+
+                        /
+
+                        (
+
+                            snapshots.length - 1
+
+                        )
+
+                    )
+
+                    *
+
+                    plotWidth;
+
+
+            const y = PLOT_TOP
+
+                +
+
+                (
+
+                    1
+
+                    -
+
+                    score / 100
+
+                )
+
+                *
+
+                plotHeight;
+
+
+            return {
+
+                snapshot,
+
+                x,
+
+                y,
+
+                score
+
+            };
 
         }
 
     );
 
+}
 
-    updateTrendSummary(
 
-        history
+/**
+ * Draw colored Alpha–Echo background bands.
+ */
+function createOperationalBands():string {
+
+    const plotHeight =
+
+        SVG_HEIGHT
+
+        -
+
+        PLOT_TOP
+
+        -
+
+        PLOT_BOTTOM;
+
+
+    const bandHeight =
+
+        plotHeight / 5;
+
+
+    const bands = [
+
+        {
+
+            title:"Echo",
+
+            fill:"#111827",
+
+            opacity:.09,
+
+            index:0
+
+        },
+
+        {
+
+            title:"Delta",
+
+            fill:"#DC2626",
+
+            opacity:.10,
+
+            index:1
+
+        },
+
+        {
+
+            title:"Charlie",
+
+            fill:"#F97316",
+
+            opacity:.11,
+
+            index:2
+
+        },
+
+        {
+
+            title:"Bravo",
+
+            fill:"#EAB308",
+
+            opacity:.12,
+
+            index:3
+
+        },
+
+        {
+
+            title:"Alpha",
+
+            fill:"#16A34A",
+
+            opacity:.10,
+
+            index:4
+
+        }
+
+    ];
+
+
+    return bands
+
+        .map(
+
+            band => `
+
+                <rect
+                    class="trend-level-band"
+                    x="${PLOT_LEFT}"
+                    y="${roundCoordinate(
+                        PLOT_TOP
+
+                        +
+
+                        band.index * bandHeight
+                    )}"
+                    width="${SVG_WIDTH - PLOT_LEFT - PLOT_RIGHT}"
+                    height="${roundCoordinate(bandHeight)}"
+                    fill="${band.fill}"
+                    fill-opacity="${band.opacity}"
+                >
+
+                    <title>
+                        ${band.title} operational range
+                    </title>
+
+                </rect>
+
+            `
+
+        )
+
+        .join("");
+
+}
+
+
+/**
+ * Draw score grid lines at 0, 20, 40, 60,
+ * 80, and 100.
+ */
+function createHorizontalGridLines():string {
+
+    const values = [
+
+        0,
+
+        20,
+
+        40,
+
+        60,
+
+        80,
+
+        100
+
+    ];
+
+
+    return values
+
+        .map(
+
+            value => {
+
+                const y = scoreToY(
+
+                    value
+
+                );
+
+
+                return `
+
+                    <line
+                        class="trend-grid-line"
+                        x1="${PLOT_LEFT}"
+                        y1="${roundCoordinate(y)}"
+                        x2="${SVG_WIDTH - PLOT_RIGHT}"
+                        y2="${roundCoordinate(y)}"
+                    />
+
+                `;
+
+            }
+
+        )
+
+        .join("");
+
+}
+
+
+/**
+ * Draw numerical vertical-axis labels.
+ */
+function createVerticalAxisLabels():string {
+
+    const values = [
+
+        0,
+
+        20,
+
+        40,
+
+        60,
+
+        80,
+
+        100
+
+    ];
+
+
+    return values
+
+        .map(
+
+            value => `
+
+                <text
+                    class="trend-axis-label"
+                    x="${PLOT_LEFT - 12}"
+                    y="${roundCoordinate(
+                        scoreToY(value) + 4
+                    )}"
+                    text-anchor="end"
+                >
+
+                    ${value}
+
+                </text>
+
+            `
+
+        )
+
+        .join("");
+
+}
+
+
+/**
+ * Draw Alpha–Echo labels within each band.
+ */
+function createLevelLabels():string {
+
+    const labels = [
+
+        {
+
+            title:"Echo",
+
+            score:90
+
+        },
+
+        {
+
+            title:"Delta",
+
+            score:70
+
+        },
+
+        {
+
+            title:"Charlie",
+
+            score:50
+
+        },
+
+        {
+
+            title:"Bravo",
+
+            score:30
+
+        },
+
+        {
+
+            title:"Alpha",
+
+            score:10
+
+        }
+
+    ];
+
+
+    return labels
+
+        .map(
+
+            item => `
+
+                <text
+                    class="trend-level-label"
+                    x="${SVG_WIDTH - PLOT_RIGHT - 8}"
+                    y="${roundCoordinate(
+                        scoreToY(item.score) + 4
+                    )}"
+                    text-anchor="end"
+                >
+
+                    ${item.title}
+
+                </text>
+
+            `
+
+        )
+
+        .join("");
+
+}
+
+
+/**
+ * Draw a limited number of time-axis labels.
+ */
+function createTimeLabels(
+
+    points:TrendPoint[]
+
+):string {
+
+    if(points.length === 0){
+
+        return "";
+
+    }
+
+
+    const labelIndexes = new Set<number>([
+
+        0,
+
+        points.length - 1
+
+    ]);
+
+
+    if(points.length >= 3){
+
+        labelIndexes.add(
+
+            Math.floor(
+
+                (
+
+                    points.length - 1
+
+                )
+
+                / 2
+
+            )
+
+        );
+
+    }
+
+
+    if(points.length >= 8){
+
+        labelIndexes.add(
+
+            Math.floor(
+
+                (
+
+                    points.length - 1
+
+                )
+
+                / 4
+
+            )
+
+        );
+
+
+        labelIndexes.add(
+
+            Math.floor(
+
+                (
+
+                    points.length - 1
+
+                )
+
+                *
+
+                3
+
+                /
+
+                4
+
+            )
+
+        );
+
+    }
+
+
+    return Array.from(
+
+        labelIndexes
+
+    )
+
+        .sort(
+
+            (
+
+                first,
+
+                second
+
+            ) => first - second
+
+        )
+
+        .map(
+
+            index => {
+
+                const point =
+
+                    points[index];
+
+
+                return `
+
+                    <text
+                        class="trend-time-label"
+                        x="${roundCoordinate(point.x)}"
+                        y="${SVG_HEIGHT - 17}"
+                        text-anchor="${getTimeLabelAnchor(
+                            index,
+                            points.length
+                        )}"
+                    >
+
+                        ${escapeHtml(
+                            formatShortDateTime(
+                                new Date(
+                                    point.snapshot.timestamp
+                                )
+                            )
+                        )}
+
+                    </text>
+
+                `;
+
+            }
+
+        )
+
+        .join("");
+
+}
+
+
+/**
+ * Create one score point.
+ */
+function createTrendPointMarkup(
+
+    point:TrendPoint
+
+):string {
+
+    const state = getOperationalState(
+
+        point.score
+
+    );
+
+
+    return `
+
+        <circle
+            class="trend-score-point"
+            cx="${roundCoordinate(point.x)}"
+            cy="${roundCoordinate(point.y)}"
+            r="6"
+            fill="${escapeAttribute(state.color)}"
+            stroke="#ffffff"
+            stroke-width="3"
+            tabindex="0"
+            aria-label="${escapeAttribute(
+                `${formatLongDateTime(
+                    new Date(
+                        point.snapshot.timestamp
+                    )
+                )}: EDORI ${Math.round(point.score)}, level ${state.title}`
+            )}"
+        >
+
+            <title>
+
+                ${escapeHtml(
+                    formatLongDateTime(
+                        new Date(
+                            point.snapshot.timestamp
+                        )
+                    )
+                )}
+
+                — EDORI ${Math.round(point.score)}
+
+                — ${escapeHtml(state.title)}
+
+            </title>
+
+        </circle>
+
+    `;
+
+}
+
+
+/**
+ * Create one legend item.
+ */
+function createLevelLegendItem(
+
+    level:string,
+
+    range:string,
+
+    color:string
+
+):string {
+
+    return `
+
+        <div class="trend-level-legend-item">
+
+            <span
+                class="trend-level-legend-swatch"
+                style="background:${escapeAttribute(color)};"
+                aria-hidden="true"
+            >
+            </span>
+
+            <strong>
+                ${escapeHtml(level)}
+            </strong>
+
+            <span>
+                ${escapeHtml(range)}
+            </span>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Convert a score to a Y coordinate.
+ */
+function scoreToY(
+
+    score:number
+
+):number {
+
+    const plotHeight =
+
+        SVG_HEIGHT
+
+        -
+
+        PLOT_TOP
+
+        -
+
+        PLOT_BOTTOM;
+
+
+    return PLOT_TOP
+
+        +
+
+        (
+
+            1
+
+            -
+
+            clampScore(score)
+
+            /
+
+            100
+
+        )
+
+        *
+
+        plotHeight;
+
+}
+
+
+/**
+ * Determine time-label anchoring.
+ */
+function getTimeLabelAnchor(
+
+    index:number,
+
+    pointCount:number
+
+):"start" | "middle" | "end" {
+
+    if(index === 0){
+
+        return "start";
+
+    }
+
+
+    if(index === pointCount - 1){
+
+        return "end";
+
+    }
+
+
+    return "middle";
+
+}
+
+
+/**
+ * Create score-change text.
+ */
+function createScoreChangeText(
+
+    scoreChange:number | null
+
+):string {
+
+    if(scoreChange === null){
+
+        return "Initial entry";
+
+    }
+
+
+    const rounded = Math.round(
+
+        scoreChange
+
+    );
+
+
+    if(rounded > 0){
+
+        return `+${rounded}`;
+
+    }
+
+
+    return String(
+
+        rounded
 
     );
 
@@ -434,36 +1407,59 @@ function updateTrend():void {
 
 
 /**
- * Destroy the existing Chart.js instance.
+ * Create score-change CSS class.
  */
-function destroyChart():void {
+function createScoreChangeClass(
 
-    if(!chart){
+    scoreChange:number | null
 
-        return;
+):string {
+
+    if(scoreChange === null){
+
+        return "trend-change-initial";
 
     }
 
 
-    chart.destroy();
+    if(scoreChange <= -5){
 
-    chart = null;
+        return "trend-change-improving";
+
+    }
+
+
+    if(scoreChange >= 10){
+
+        return "trend-change-critical";
+
+    }
+
+
+    if(scoreChange > 0){
+
+        return "trend-change-increasing";
+
+    }
+
+
+    return "trend-change-stable";
 
 }
 
 
 /**
- * Update the text summary beneath the chart.
+ * Update the point count.
  */
-function updateTrendSummary(
+function updateTrendPointCount(
 
-    history:TrendPoint[]
+    count:number
 
 ):void {
 
     const element = document.getElementById(
 
-        "trend-summary"
+        "trendPointCount"
 
     );
 
@@ -475,196 +1471,224 @@ function updateTrendSummary(
     }
 
 
-    if(history.length === 0){
+    element.textContent = count === 1
 
-        element.textContent =
+        ? "1 point"
 
-            "No EDORI assessments recorded.";
-
-
-        return;
-
-    }
-
-
-    const current = history[
-
-        history.length - 1
-
-    ];
-
-
-    if(history.length === 1){
-
-        element.textContent =
-
-            `Current Score: ${Math.round(current.score)} | One submitted assessment`;
-
-
-        return;
-
-    }
-
-
-    const previous = history[
-
-        history.length - 2
-
-    ];
-
-
-    const difference = Math.round(
-
-        current.score -
-
-        previous.score
-
-    );
-
-
-    element.textContent =
-
-        `Current Score: ${Math.round(current.score)} | Trend: ${getTrendDirection(difference)} (${formatDifference(difference)}) | ${history.length} assessments shown`;
+        : `${count} points`;
 
 }
 
 
 /**
- * Determine the operational trend direction.
+ * Create the empty chart state.
  */
-function getTrendDirection(
+function createEmptyTrendState():string {
 
-    difference:number
+    return `
 
-):string {
+        <div class="trend-chart-empty">
 
-    if(difference > 0){
+            <strong>
+                No trend data
+            </strong>
 
-        return "Increasing";
+            <p>
+                Saved EDORI assessments will appear after calculation.
+            </p>
 
-    }
+        </div>
 
-
-    if(difference < 0){
-
-        return "Improving";
-
-    }
-
-
-    return "Stable";
+    `;
 
 }
 
 
 /**
- * Format the change between the latest scores.
+ * Format a compact chart date.
  */
-function formatDifference(
+function formatShortDateTime(
 
-    difference:number
+    date:Date
 
 ):string {
 
-    if(difference > 0){
-
-        return `+${difference}`;
-
-    }
-
-
-    return String(
-
-        difference
-
-    );
-
-}
-
-
-/**
- * Format a timestamp for the chart x-axis.
- */
-function formatChartTimestamp(
-
-    timestamp:Date
-
-):string {
-
-    if(Number.isNaN(timestamp.getTime())){
-
-        return "Unknown";
-
-    }
-
-
-    const dateText = timestamp.toLocaleDateString(
+    return date.toLocaleString(
 
         [],
 
         {
 
-            month:"short",
+            month:
+                "short",
 
-            day:"numeric"
+            day:
+                "numeric",
 
-        }
-
-    );
-
-
-    const timeText = timestamp.toLocaleTimeString(
-
-        [],
-
-        {
-
-            hour:"2-digit",
-
-            minute:"2-digit"
+            hour:
+                "numeric"
 
         }
 
     );
-
-
-    return `${dateText} ${timeText}`;
 
 }
 
 
 /**
- * Clear residual chart pixels when no history exists.
+ * Format a detailed point date.
  */
-function clearCanvas(
+function formatLongDateTime(
 
-    canvas:HTMLCanvasElement
+    date:Date
 
-):void {
+):string {
 
-    const context = canvas.getContext(
+    return date.toLocaleString(
 
-        "2d"
+        [],
+
+        {
+
+            month:
+                "short",
+
+            day:
+                "numeric",
+
+            year:
+                "numeric",
+
+            hour:
+                "numeric",
+
+            minute:
+                "2-digit"
+
+        }
 
     );
 
+}
 
-    if(!context){
 
-        return;
+/**
+ * Clamp score between 0 and 100.
+ */
+function clampScore(
+
+    value:number
+
+):number {
+
+    if(!Number.isFinite(value)){
+
+        return 0;
 
     }
 
 
-    context.clearRect(
+    return Math.min(
 
-        0,
+        100,
 
-        0,
+        Math.max(
 
-        canvas.width,
+            0,
 
-        canvas.height
+            value
+
+        )
+
+    );
+
+}
+
+
+/**
+ * Round an SVG coordinate.
+ */
+function roundCoordinate(
+
+    value:number
+
+):number {
+
+    return Math.round(
+
+        value * 10
+
+    ) / 10;
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
+ */
+function escapeHtml(
+
+    value:string
+
+):string {
+
+    return value
+
+        .replaceAll(
+
+            "&",
+
+            "&amp;"
+
+        )
+
+        .replaceAll(
+
+            "<",
+
+            "&lt;"
+
+        )
+
+        .replaceAll(
+
+            ">",
+
+            "&gt;"
+
+        )
+
+        .replaceAll(
+
+            "\"",
+
+            "&quot;"
+
+        )
+
+        .replaceAll(
+
+            "'",
+
+            "&#039;"
+
+        );
+
+}
+
+
+/**
+ * Escape text inserted into HTML attributes.
+ */
+function escapeAttribute(
+
+    value:string
+
+):string {
+
+    return escapeHtml(
+
+        value
 
     );
 

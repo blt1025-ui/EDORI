@@ -1,33 +1,20 @@
 /**
  * SnapshotService
  *
- * Persistent storage for EDORI assessment history.
- *
- * SnapshotService is the single source of truth for:
- *
- * - Trend charts
- * - Assessment history
- * - Historical score review
+ * Stores and restores persistent EDORI assessment
+ * history.
  *
  * Responsibilities:
  *
- * - Validate restored snapshots
- * - Save snapshots in chronological order
- * - Prevent duplicate snapshots
- * - Limit browser storage growth
- * - Clear persistent history
- * - Notify history-driven components
- *
- * This service does not calculate EDORI.
+ * - Validate incoming snapshots
+ * - Preserve expanded assessment fields
+ * - Prevent accidental duplicate snapshots
+ * - Persist history in localStorage
+ * - Restore valid history on application startup
+ * - Return defensive copies
+ * - Clear history
+ * - Notify subscribed components when history changes
  */
-import type {
-
-    OperationalStateTitle
-
-}
-
-from "../types/OperationalStateTitle";
-
 
 import {
 
@@ -58,6 +45,15 @@ from "../config/operationalStates";
 
 import type {
 
+    OperationalStateTitle
+
+}
+
+from "../types/OperationalStateTitle";
+
+
+import type {
+
     EdoriSnapshot
 
 }
@@ -65,7 +61,10 @@ import type {
 from "../types/EdoriSnapshot";
 
 
-const STORAGE_KEY =
+/**
+ * Browser-storage key.
+ */
+const SNAPSHOT_STORAGE_KEY =
 
     "edori_snapshots";
 
@@ -73,109 +72,55 @@ const STORAGE_KEY =
 /**
  * Maximum number of snapshots retained locally.
  *
- * At one assessment per hour, 500 records provide
- * approximately three weeks of continuous history.
+ * This prevents localStorage from growing without
+ * limit during development and extended use.
  */
-const MAXIMUM_SNAPSHOTS = 500;
+const MAXIMUM_SNAPSHOT_COUNT = 500;
 
 
 /**
- * Minimum time between identical-score snapshots.
+ * Snapshots created within this time window with
+ * the same score and assessment values are treated
+ * as duplicates.
  */
-const DUPLICATE_TIME_WINDOW_MS =
+const DUPLICATE_TIME_WINDOW_MILLISECONDS =
 
-    15 * 60 * 1000;
+    5_000;
 
 
 /**
- * Save a new validated EDORI snapshot.
+ * In-memory authoritative history.
  */
-export function saveSnapshot(
+let snapshots:EdoriSnapshot[] =
 
-    snapshot:EdoriSnapshot
-
-):void {
-
-    const normalizedSnapshot =
-
-        normalizeSnapshot(
-
-            snapshot
-
-        );
+    restoreSnapshots();
 
 
-    if(!normalizedSnapshot){
+/**
+ * Return a defensive copy of all snapshots in
+ * chronological order.
+ */
+export function getSnapshots():EdoriSnapshot[] {
 
-        throw new Error(
+    return snapshots
 
-            "The EDORI snapshot is invalid and could not be saved."
-
-        );
-
-    }
-
-
-    const history = getSnapshots();
-
-
-    history.push(
-
-        normalizedSnapshot
-
-    );
-
-
-    const normalizedHistory = history
+        .slice()
 
         .sort(
 
-            compareSnapshots
-
-        )
-
-        .slice(
-
-            -MAXIMUM_SNAPSHOTS
-
-        );
-
-
-    persistSnapshots(
-
-        normalizedHistory
-
-    );
-
-}
-
-
-/**
- * Return all valid snapshots in chronological order.
- *
- * Defensive copies are returned so dashboard
- * components cannot mutate stored history.
- */
-export function getSnapshots():
-
-EdoriSnapshot[] {
-
-    const storedSnapshots =
-
-        loadStoredSnapshots();
-
-
-    return storedSnapshots
-
-        .sort(
-
-            compareSnapshots
+            compareSnapshotsChronologically
 
         )
 
         .map(
 
-            cloneSnapshot
+            snapshot =>
+
+                cloneSnapshot(
+
+                    snapshot
+
+                )
 
         );
 
@@ -183,208 +128,142 @@ EdoriSnapshot[] {
 
 
 /**
- * Return the most recent snapshots.
- */
-export function getRecentSnapshots(
-
-    maximumSnapshots:number = 50
-
-):EdoriSnapshot[] {
-
-    const safeMaximum = normalizeMaximum(
-
-        maximumSnapshots
-
-    );
-
-
-    if(safeMaximum === 0){
-
-        return [];
-
-    }
-
-
-    return getSnapshots().slice(
-
-        -safeMaximum
-
-    );
-
-}
-
-
-/**
- * Return the newest stored snapshot.
+ * Return the newest saved snapshot.
  */
 export function getLatestSnapshot():
 
 EdoriSnapshot | null {
 
-    const history = getSnapshots();
-
-
-    if(history.length === 0){
+    if(snapshots.length === 0){
 
         return null;
 
     }
 
 
-    return cloneSnapshot(
+    const latestSnapshot = snapshots
 
-        history[
+        .slice()
 
-            history.length - 1
+        .sort(
 
-        ]
+            compareSnapshotsChronologically
 
-    );
+        )[
+
+            snapshots.length - 1
+
+        ];
+
+
+    return latestSnapshot
+
+        ? cloneSnapshot(
+
+            latestSnapshot
+
+        )
+
+        : null;
 
 }
 
 
 /**
- * Return the current number of stored snapshots.
- */
-export function getSnapshotCount():number {
-
-    return getSnapshots().length;
-
-}
-
-
-/**
- * Determine whether a new snapshot should be saved.
+ * Save one completed EDORI snapshot.
  *
- * A snapshot is saved when:
- *
- * - no prior history exists;
- * - the EDORI score changed;
- * - the operational state changed;
- * - at least 15 minutes passed since the previous
- *   snapshot.
+ * Returns true when the snapshot was saved.
+ * Returns false when it was invalid or duplicated.
  */
-export function shouldCreateSnapshot(
+export function saveSnapshot(
 
-    snapshot:EdoriSnapshot
+    candidate:EdoriSnapshot
 
 ):boolean {
 
-    const candidate = normalizeSnapshot(
+    const normalizedSnapshot = normalizeSnapshot(
 
-        snapshot
+        candidate
 
     );
 
 
-    if(!candidate){
+    if(!normalizedSnapshot){
+
+        console.warn(
+
+            "SnapshotService rejected an invalid EDORI snapshot.",
+
+            candidate
+
+        );
+
 
         return false;
 
     }
 
 
-    const previous = getLatestSnapshot();
+    if(
 
+        isDuplicateSnapshot(
 
-    if(!previous){
+            normalizedSnapshot
 
-        return true;
+        )
 
-    }
-
-
-    const scoreChanged =
-
-        previous.score
-
-        !==
-
-        candidate.score;
-
-
-    const statusChanged =
-
-        previous.status
-
-        !==
-
-        candidate.status;
-
-
-    const operationalStateChanged =
-
-        previous.operationalState.title
-
-        !==
-
-        candidate.operationalState.title;
-
-
-    const elapsedMilliseconds =
-
-        candidate.timestamp.getTime()
-
-        -
-
-        previous.timestamp.getTime();
-
-
-    const minimumTimePassed =
-
-        elapsedMilliseconds
-
-        >=
-
-        DUPLICATE_TIME_WINDOW_MS;
-
-
-    /*
-     * If the candidate timestamp is earlier than the
-     * latest stored snapshot, do not create a new
-     * automatic snapshot.
-     */
-
-    if(elapsedMilliseconds < 0){
+    ){
 
         return false;
 
     }
 
 
-    return scoreChanged
+    snapshots.push(
 
-        ||
+        cloneSnapshot(
 
-        statusChanged
+            normalizedSnapshot
 
-        ||
+        )
 
-        operationalStateChanged
+    );
 
-        ||
 
-        minimumTimePassed;
+    snapshots.sort(
+
+        compareSnapshotsChronologically
+
+    );
+
+
+    trimSnapshotHistory();
+
+
+    persistSnapshots();
+
+
+    publishHistoryChanged();
+
+
+    return true;
 
 }
 
 
 /**
- * Remove all persistent EDORI history.
+ * Compatibility alias for code that uses
+ * addSnapshot().
  */
-export function clearSnapshots():void {
+export function addSnapshot(
 
-    localStorage.removeItem(
+    candidate:EdoriSnapshot
 
-        STORAGE_KEY
+):boolean {
 
-    );
+    return saveSnapshot(
 
-
-    emit(
-
-        APP_EVENTS.HISTORY_CHANGED
+        candidate
 
     );
 
@@ -392,22 +271,97 @@ export function clearSnapshots():void {
 
 
 /**
- * Replace all snapshot history.
+ * Compatibility alias for code that uses
+ * recordSnapshot().
+ */
+export function recordSnapshot(
+
+    candidate:EdoriSnapshot
+
+):boolean {
+
+    return saveSnapshot(
+
+        candidate
+
+    );
+
+}
+
+
+/**
+ * Determine whether an incoming snapshot should be
+ * stored.
  *
- * This will support future history import,
- * synchronization, and test fixtures.
+ * This function does not mutate history.
+ */
+export function shouldSaveSnapshot(
+
+    candidate:EdoriSnapshot
+
+):boolean {
+
+    const normalizedSnapshot = normalizeSnapshot(
+
+        candidate
+
+    );
+
+
+    if(!normalizedSnapshot){
+
+        return false;
+
+    }
+
+
+    return !isDuplicateSnapshot(
+
+        normalizedSnapshot
+
+    );
+
+}
+
+/**
+ * Compatibility alias used by EdoriEngine.
+ */
+export function shouldCreateSnapshot(
+
+    candidate:EdoriSnapshot
+
+):boolean {
+
+    return shouldSaveSnapshot(
+
+        candidate
+
+    );
+
+}
+
+/**
+ * Replace the complete snapshot history.
+ *
+ * Useful for import, restoration, and testing.
  */
 export function replaceSnapshots(
 
-    snapshots:EdoriSnapshot[]
+    candidates:EdoriSnapshot[]
 
 ):void {
 
-    const validSnapshots = snapshots
+    const normalizedSnapshots = candidates
 
         .map(
 
-            normalizeSnapshot
+            candidate =>
+
+                normalizeSnapshot(
+
+                    candidate
+
+                )
 
         )
 
@@ -425,90 +379,144 @@ export function replaceSnapshots(
 
         .sort(
 
-            compareSnapshots
-
-        )
-
-        .slice(
-
-            -MAXIMUM_SNAPSHOTS
+            compareSnapshotsChronologically
 
         );
 
 
-    if(validSnapshots.length !== snapshots.length){
+    snapshots = removeDuplicateSnapshots(
 
-        throw new Error(
+        normalizedSnapshots
 
-            "One or more EDORI snapshots were invalid."
+    );
+
+
+    trimSnapshotHistory();
+
+
+    persistSnapshots();
+
+
+    publishHistoryChanged();
+
+}
+
+
+/**
+ * Clear all persistent assessment history.
+ */
+export function clearSnapshots():void {
+
+    snapshots = [];
+
+
+    try {
+
+        localStorage.removeItem(
+
+            SNAPSHOT_STORAGE_KEY
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "SnapshotService could not remove saved history.",
+
+            error
 
         );
 
     }
 
 
-    persistSnapshots(
-
-        validSnapshots
-
-    );
-
-
-    emit(
-
-        APP_EVENTS.HISTORY_CHANGED
-
-    );
+    publishHistoryChanged();
 
 }
 
 
 /**
- * Load snapshots safely from browser storage.
+ * Return the number of stored snapshots.
  */
-function loadStoredSnapshots():
+export function getSnapshotCount():number {
 
-EdoriSnapshot[] {
+    return snapshots.length;
+
+}
+
+
+/**
+ * Restore persistent snapshots from localStorage.
+ */
+function restoreSnapshots():EdoriSnapshot[] {
+
+    let storedValue:string | null = null;
+
 
     try {
 
-        const stored = localStorage.getItem(
+        storedValue = localStorage.getItem(
 
-            STORAGE_KEY
+            SNAPSHOT_STORAGE_KEY
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "SnapshotService could not read saved history.",
+
+            error
 
         );
 
 
-        if(!stored){
+        return [];
+
+    }
+
+
+    if(!storedValue){
+
+        return [];
+
+    }
+
+
+    try {
+
+        const parsed:unknown = JSON.parse(
+
+            storedValue
+
+        );
+
+
+        if(!Array.isArray(parsed)){
+
+            removeCorruptedStorage();
+
 
             return [];
 
         }
 
 
-        const parsed = JSON.parse(
-
-            stored
-
-        ) as unknown;
-
-
-        if(!Array.isArray(parsed)){
-
-            throw new Error(
-
-                "Stored EDORI history is not an array."
-
-            );
-
-        }
-
-
-        const normalizedSnapshots = parsed
+        const restoredSnapshots = parsed
 
             .map(
 
-                normalizeSnapshot
+                candidate =>
+
+                    normalizeSnapshot(
+
+                        candidate
+
+                    )
 
             )
 
@@ -522,65 +530,43 @@ EdoriSnapshot[] {
 
                     snapshot !== null
 
-            );
-
-
-        /*
-         * Reject the complete stored history when
-         * any record is invalid. A partial history
-         * could produce misleading trend analysis.
-         */
-
-        if(
-
-            normalizedSnapshots.length
-
-            !==
-
-            parsed.length
-
-        ){
-
-            throw new Error(
-
-                "Stored EDORI history contains invalid records."
-
-            );
-
-        }
-
-
-        return normalizedSnapshots
+            )
 
             .sort(
 
-                compareSnapshots
-
-            )
-
-            .slice(
-
-                -MAXIMUM_SNAPSHOTS
+                compareSnapshotsChronologically
 
             );
+
+
+        const uniqueSnapshots =
+
+            removeDuplicateSnapshots(
+
+                restoredSnapshots
+
+            );
+
+
+        return uniqueSnapshots.slice(
+
+            -MAXIMUM_SNAPSHOT_COUNT
+
+        );
 
     }
     catch(error){
 
-        console.error(
+        console.warn(
 
-            "Unable to restore EDORI snapshot history:",
+            "SnapshotService discarded corrupted saved history.",
 
             error
 
         );
 
 
-        localStorage.removeItem(
-
-            STORAGE_KEY
-
-        );
+        removeCorruptedStorage();
 
 
         return [];
@@ -591,23 +577,32 @@ EdoriSnapshot[] {
 
 
 /**
- * Persist a validated snapshot collection.
+ * Persist the complete expanded snapshot objects.
  */
-function persistSnapshots(
-
-    snapshots:EdoriSnapshot[]
-
-):void {
+function persistSnapshots():void {
 
     try {
 
+        const serializedSnapshots = snapshots.map(
+
+            snapshot =>
+
+                serializeSnapshot(
+
+                    snapshot
+
+                )
+
+        );
+
+
         localStorage.setItem(
 
-            STORAGE_KEY,
+            SNAPSHOT_STORAGE_KEY,
 
             JSON.stringify(
 
-                snapshots
+                serializedSnapshots
 
             )
 
@@ -618,16 +613,9 @@ function persistSnapshots(
 
         console.error(
 
-            "Unable to save EDORI snapshot history:",
+            "SnapshotService could not persist assessment history.",
 
             error
-
-        );
-
-
-        throw new Error(
-
-            "EDORI history could not be saved to browser storage."
 
         );
 
@@ -637,7 +625,125 @@ function persistSnapshots(
 
 
 /**
- * Convert an unknown object into a valid snapshot.
+ * Convert one snapshot into a JSON-safe object.
+ *
+ * All expanded fields are intentionally retained.
+ */
+function serializeSnapshot(
+
+    snapshot:EdoriSnapshot
+
+):Record<string, unknown> {
+
+    return {
+
+        score:
+            snapshot.score,
+
+        status:
+            snapshot.status,
+
+        operationalState:{
+
+            title:
+                snapshot.operationalState.title,
+
+            icon:
+                snapshot.operationalState.icon,
+
+            color:
+                snapshot.operationalState.color,
+
+            recommendation:
+                snapshot.operationalState
+                    .recommendation
+
+        },
+
+        timestamp:
+            new Date(
+
+                snapshot.timestamp
+
+            ).toISOString(),
+
+        id:
+            snapshot.id,
+
+        totalEDVolume:
+            snapshot.totalEDVolume,
+
+        boardedPatients:
+            snapshot.boardedPatients,
+
+        occupiedMedicalBeds:
+            snapshot.occupiedMedicalBeds,
+
+        esi1:
+            snapshot.esi1,
+
+        esi2:
+            snapshot.esi2,
+
+        esi3:
+            snapshot.esi3,
+
+        esi4:
+            snapshot.esi4,
+
+        esi5:
+            snapshot.esi5,
+
+        expectedVolume:
+            snapshot.expectedVolume,
+
+        expectedBoarders:
+            snapshot.expectedBoarders,
+
+        expectedArrivals:
+            snapshot.expectedArrivals,
+
+        expectedDepartures:
+            snapshot.expectedDepartures,
+
+        demandScore:
+            snapshot.demandScore,
+
+        boardingScore:
+            snapshot.boardingScore,
+
+        hospitalScore:
+            snapshot.hospitalScore,
+
+        acuityScore:
+            snapshot.acuityScore,
+
+        forecastScore:
+            snapshot.forecastScore,
+
+        day:
+            snapshot.day,
+
+        hour:
+            snapshot.hour
+
+    };
+
+}
+
+
+/**
+ * Validate and normalize an unknown snapshot.
+ *
+ * The four legacy fields remain required:
+ *
+ * - score
+ * - status
+ * - operationalState
+ * - timestamp
+ *
+ * Expanded assessment fields remain optional for
+ * compatibility with older history records.
  */
 function normalizeSnapshot(
 
@@ -670,49 +776,61 @@ function normalizeSnapshot(
 
         timestamp?:unknown;
 
+        id?:unknown;
+
+        totalEDVolume?:unknown;
+
+        boardedPatients?:unknown;
+
+        occupiedMedicalBeds?:unknown;
+
+        esi1?:unknown;
+
+        esi2?:unknown;
+
+        esi3?:unknown;
+
+        esi4?:unknown;
+
+        esi5?:unknown;
+
+        expectedVolume?:unknown;
+
+        expectedBoarders?:unknown;
+
+        expectedArrivals?:unknown;
+
+        expectedDepartures?:unknown;
+
+        demandScore?:unknown;
+
+        boardingScore?:unknown;
+
+        hospitalScore?:unknown;
+
+        acuityScore?:unknown;
+
+        forecastScore?:unknown;
+
+        day?:unknown;
+
+        hour?:unknown;
+
     };
 
 
-    if(
+    const score = normalizeRequiredNumber(
 
-        typeof candidate.score !== "number"
+        candidate.score
 
-        ||
-
-        !Number.isFinite(
-
-            candidate.score
-
-        )
-
-        ||
-
-        candidate.score < 0
-
-        ||
-
-        candidate.score > 100
-
-    ){
-
-        return null;
-
-    }
+    );
 
 
-    if(
+    const timestamp = normalizeDate(
 
-        typeof candidate.status !== "string"
+        candidate.timestamp
 
-        ||
-
-        candidate.status.trim().length === 0
-
-    ){
-
-        return null;
-
-    }
+    );
 
 
     const operationalState =
@@ -724,42 +842,192 @@ function normalizeSnapshot(
         );
 
 
-    if(!operationalState){
+    if(
+
+        score === null
+
+        ||
+
+        timestamp === null
+
+        ||
+
+        operationalState === null
+
+    ){
 
         return null;
 
     }
 
 
-    const timestamp = normalizeTimestamp(
+    const status =
 
-        candidate.timestamp
+        typeof candidate.status === "string"
 
-    );
+        &&
 
+        candidate.status.trim().length > 0
 
-    if(!timestamp){
+            ? candidate.status.trim()
 
-        return null;
-
-    }
+            : operationalState.title;
 
 
     return {
 
         score:
-            Math.round(
+            clampScore(
 
-                candidate.score
+                score
 
             ),
 
-        status:
-            candidate.status.trim(),
+        status,
 
         operationalState,
 
-        timestamp
+        timestamp,
+
+        id:
+            normalizeOptionalString(
+
+                candidate.id
+
+            ),
+
+        totalEDVolume:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.totalEDVolume
+
+            ),
+
+        boardedPatients:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.boardedPatients
+
+            ),
+
+        occupiedMedicalBeds:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.occupiedMedicalBeds
+
+            ),
+
+        esi1:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.esi1
+
+            ),
+
+        esi2:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.esi2
+
+            ),
+
+        esi3:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.esi3
+
+            ),
+
+        esi4:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.esi4
+
+            ),
+
+        esi5:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.esi5
+
+            ),
+
+        expectedVolume:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.expectedVolume
+
+            ),
+
+        expectedBoarders:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.expectedBoarders
+
+            ),
+
+        expectedArrivals:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.expectedArrivals
+
+            ),
+
+        expectedDepartures:
+            normalizeOptionalNonNegativeNumber(
+
+                candidate.expectedDepartures
+
+            ),
+
+        demandScore:
+            normalizeOptionalScore(
+
+                candidate.demandScore
+
+            ),
+
+        boardingScore:
+            normalizeOptionalScore(
+
+                candidate.boardingScore
+
+            ),
+
+        hospitalScore:
+            normalizeOptionalScore(
+
+                candidate.hospitalScore
+
+            ),
+
+        acuityScore:
+            normalizeOptionalScore(
+
+                candidate.acuityScore
+
+            ),
+
+        forecastScore:
+            normalizeOptionalScore(
+
+                candidate.forecastScore
+
+            ),
+
+        day:
+            normalizeOptionalString(
+
+                candidate.day
+
+            ),
+
+        hour:
+            normalizeOptionalHour(
+
+                candidate.hour
+
+            )
 
     };
 
@@ -767,10 +1035,7 @@ function normalizeSnapshot(
 
 
 /**
- * Validate and copy an operational state.
- */
-/**
- * Validate and copy an operational state.
+ * Validate and normalize an operational state.
  */
 function normalizeOperationalState(
 
@@ -865,83 +1130,50 @@ function normalizeOperationalState(
 
 
 /**
- * Convert an unknown timestamp into a valid Date.
+ * Determine whether a value is a supported
+ * Alpha–Echo operational title.
  */
-function normalizeTimestamp(
+function isOperationalStateTitle(
 
     value:unknown
 
-):Date | null {
+):value is OperationalStateTitle {
 
-    const timestamp = value instanceof Date
+    if(typeof value !== "string"){
 
-        ? new Date(
-
-            value.getTime()
-
-        )
-
-        : typeof value === "string"
-
-            ||
-
-            typeof value === "number"
-
-                ? new Date(
-
-                    value
-
-                )
-
-                : null;
-
-
-    if(
-
-        !timestamp
-
-        ||
-
-        Number.isNaN(
-
-            timestamp.getTime()
-
-        )
-
-    ){
-
-        return null;
+        return false;
 
     }
 
 
-    return timestamp;
+    const titles:OperationalStateTitle[] = [
+
+        "Alpha",
+
+        "Bravo",
+
+        "Charlie",
+
+        "Delta",
+
+        "Echo"
+
+    ];
+
+
+    return titles.includes(
+
+        value as OperationalStateTitle
+
+    );
 
 }
 
 
 /**
- * Sort snapshots from oldest to newest.
- */
-function compareSnapshots(
-
-    first:EdoriSnapshot,
-
-    second:EdoriSnapshot
-
-):number {
-
-    return first.timestamp.getTime()
-
-        -
-
-        second.timestamp.getTime();
-
-}
-
-
-/**
- * Return a defensive snapshot copy.
+ * Create a defensive copy of one snapshot.
+ *
+ * Every expanded field is retained.
  */
 function cloneSnapshot(
 
@@ -967,7 +1199,67 @@ function cloneSnapshot(
 
             snapshot.timestamp
 
-        )
+        ),
+
+        id:
+            snapshot.id,
+
+        totalEDVolume:
+            snapshot.totalEDVolume,
+
+        boardedPatients:
+            snapshot.boardedPatients,
+
+        occupiedMedicalBeds:
+            snapshot.occupiedMedicalBeds,
+
+        esi1:
+            snapshot.esi1,
+
+        esi2:
+            snapshot.esi2,
+
+        esi3:
+            snapshot.esi3,
+
+        esi4:
+            snapshot.esi4,
+
+        esi5:
+            snapshot.esi5,
+
+        expectedVolume:
+            snapshot.expectedVolume,
+
+        expectedBoarders:
+            snapshot.expectedBoarders,
+
+        expectedArrivals:
+            snapshot.expectedArrivals,
+
+        expectedDepartures:
+            snapshot.expectedDepartures,
+
+        demandScore:
+            snapshot.demandScore,
+
+        boardingScore:
+            snapshot.boardingScore,
+
+        hospitalScore:
+            snapshot.hospitalScore,
+
+        acuityScore:
+            snapshot.acuityScore,
+
+        forecastScore:
+            snapshot.forecastScore,
+
+        day:
+            snapshot.day,
+
+        hour:
+            snapshot.hour
 
     };
 
@@ -975,34 +1267,578 @@ function cloneSnapshot(
 
 
 /**
- * Normalize a requested history limit.
+ * Determine whether a snapshot duplicates the most
+ * recently saved assessment.
  */
-function normalizeMaximum(
+function isDuplicateSnapshot(
+
+    candidate:EdoriSnapshot
+
+):boolean {
+
+    const latestSnapshot = snapshots
+
+        .slice()
+
+        .sort(
+
+            compareSnapshotsChronologically
+
+        )[
+
+            snapshots.length - 1
+
+        ];
+
+
+    if(!latestSnapshot){
+
+        return false;
+
+    }
+
+
+    const timeDifference = Math.abs(
+
+        new Date(
+
+            candidate.timestamp
+
+        ).getTime()
+
+        -
+
+        new Date(
+
+            latestSnapshot.timestamp
+
+        ).getTime()
+
+    );
+
+
+    if(
+
+        timeDifference
+
+        >
+
+        DUPLICATE_TIME_WINDOW_MILLISECONDS
+
+    ){
+
+        return false;
+
+    }
+
+
+    return snapshotsContainSameAssessment(
+
+        latestSnapshot,
+
+        candidate
+
+    );
+
+}
+
+
+/**
+ * Compare values that identify one assessment.
+ */
+function snapshotsContainSameAssessment(
+
+    previous:EdoriSnapshot,
+
+    candidate:EdoriSnapshot
+
+):boolean {
+
+    return previous.score === candidate.score
+
+        &&
+
+        previous.status === candidate.status
+
+        &&
+
+        previous.operationalState.title
+
+            ===
+
+            candidate.operationalState.title
+
+        &&
+
+        previous.totalEDVolume
+
+            ===
+
+            candidate.totalEDVolume
+
+        &&
+
+        previous.boardedPatients
+
+            ===
+
+            candidate.boardedPatients
+
+        &&
+
+        previous.occupiedMedicalBeds
+
+            ===
+
+            candidate.occupiedMedicalBeds
+
+        &&
+
+        previous.esi1 === candidate.esi1
+
+        &&
+
+        previous.esi2 === candidate.esi2
+
+        &&
+
+        previous.esi3 === candidate.esi3
+
+        &&
+
+        previous.esi4 === candidate.esi4
+
+        &&
+
+        previous.esi5 === candidate.esi5;
+
+}
+
+
+/**
+ * Remove duplicated restored records.
+ */
+function removeDuplicateSnapshots(
+
+    candidates:EdoriSnapshot[]
+
+):EdoriSnapshot[] {
+
+    const uniqueSnapshots:EdoriSnapshot[] = [];
+
+
+    candidates.forEach(
+
+        candidate => {
+
+            const previousSnapshot =
+
+                uniqueSnapshots[
+
+                    uniqueSnapshots.length - 1
+
+                ];
+
+
+            if(!previousSnapshot){
+
+                uniqueSnapshots.push(
+
+                    cloneSnapshot(
+
+                        candidate
+
+                    )
+
+                );
+
+
+                return;
+
+            }
+
+
+            const timeDifference = Math.abs(
+
+                new Date(
+
+                    candidate.timestamp
+
+                ).getTime()
+
+                -
+
+                new Date(
+
+                    previousSnapshot.timestamp
+
+                ).getTime()
+
+            );
+
+
+            const duplicated =
+
+                timeDifference
+
+                <=
+
+                DUPLICATE_TIME_WINDOW_MILLISECONDS
+
+                &&
+
+                snapshotsContainSameAssessment(
+
+                    previousSnapshot,
+
+                    candidate
+
+                );
+
+
+            if(!duplicated){
+
+                uniqueSnapshots.push(
+
+                    cloneSnapshot(
+
+                        candidate
+
+                    )
+
+                );
+
+            }
+
+        }
+
+    );
+
+
+    return uniqueSnapshots;
+
+}
+
+
+/**
+ * Keep only the newest configured number of
+ * snapshots.
+ */
+function trimSnapshotHistory():void {
+
+    if(
+
+        snapshots.length
+
+        <=
+
+        MAXIMUM_SNAPSHOT_COUNT
+
+    ){
+
+        return;
+
+    }
+
+
+    snapshots = snapshots.slice(
+
+        -MAXIMUM_SNAPSHOT_COUNT
+
+    );
+
+}
+
+
+/**
+ * Sort oldest to newest.
+ */
+function compareSnapshotsChronologically(
+
+    first:EdoriSnapshot,
+
+    second:EdoriSnapshot
+
+):number {
+
+    return new Date(
+
+        first.timestamp
+
+    ).getTime()
+
+    -
+
+    new Date(
+
+        second.timestamp
+
+    ).getTime();
+
+}
+
+
+/**
+ * Normalize a required finite number.
+ */
+function normalizeRequiredNumber(
+
+    value:unknown
+
+):number | null {
+
+    return typeof value === "number"
+
+        &&
+
+        Number.isFinite(value)
+
+            ? value
+
+            : null;
+
+}
+
+
+/**
+ * Normalize an optional nonnegative number.
+ */
+function normalizeOptionalNonNegativeNumber(
+
+    value:unknown
+
+):number | undefined {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return undefined;
+
+    }
+
+
+    return Math.max(
+
+        0,
+
+        value
+
+    );
+
+}
+
+
+/**
+ * Normalize an optional score.
+ */
+function normalizeOptionalScore(
+
+    value:unknown
+
+):number | undefined {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return undefined;
+
+    }
+
+
+    return clampScore(
+
+        value
+
+    );
+
+}
+
+
+/**
+ * Normalize an optional hour.
+ */
+function normalizeOptionalHour(
+
+    value:unknown
+
+):number | undefined {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+    ){
+
+        return undefined;
+
+    }
+
+
+    const roundedHour = Math.round(
+
+        value
+
+    );
+
+
+    if(
+
+        roundedHour < 0
+
+        ||
+
+        roundedHour > 23
+
+    ){
+
+        return undefined;
+
+    }
+
+
+    return roundedHour;
+
+}
+
+
+/**
+ * Normalize an optional nonempty string.
+ */
+function normalizeOptionalString(
+
+    value:unknown
+
+):string | undefined {
+
+    if(typeof value !== "string"){
+
+        return undefined;
+
+    }
+
+
+    const normalized = value.trim();
+
+
+    return normalized.length > 0
+
+        ? normalized
+
+        : undefined;
+
+}
+
+
+/**
+ * Normalize a date.
+ */
+function normalizeDate(
+
+    value:unknown
+
+):Date | null {
+
+    if(
+
+        !isDateInput(
+
+            value
+
+        )
+
+    ){
+
+        return null;
+
+    }
+
+
+    const date = value instanceof Date
+
+        ? new Date(
+
+            value.getTime()
+
+        )
+
+        : new Date(
+
+            value
+
+        );
+
+
+    return Number.isNaN(
+
+        date.getTime()
+
+    )
+
+        ? null
+
+        : date;
+
+}
+
+
+/**
+ * Narrow supported Date-constructor inputs.
+ */
+function isDateInput(
+
+    value:unknown
+
+):value is Date | string | number {
+
+    return value instanceof Date
+
+        ||
+
+        typeof value === "string"
+
+        ||
+
+        typeof value === "number";
+
+}
+
+
+/**
+ * Clamp a numerical EDORI score to 0–100.
+ */
+function clampScore(
 
     value:number
 
 ):number {
 
-    if(!Number.isFinite(value)){
-
-        return 0;
-
-    }
-
-
     return Math.min(
 
-        MAXIMUM_SNAPSHOTS,
+        100,
 
         Math.max(
 
             0,
 
-            Math.floor(
-
-                value
-
-            )
+            value
 
         )
 
@@ -1010,41 +1846,44 @@ function normalizeMaximum(
 
 }
 
+
 /**
- * Determine whether a value is a supported
- * operational-state title.
+ * Remove corrupted localStorage history.
  */
-function isOperationalStateTitle(
+function removeCorruptedStorage():void {
 
-    value:unknown
+    try {
 
-):value is OperationalStateTitle {
+        localStorage.removeItem(
 
-    if(typeof value !== "string"){
+            SNAPSHOT_STORAGE_KEY
 
-        return false;
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "SnapshotService could not remove corrupted history.",
+
+            error
+
+        );
 
     }
 
-
-    const titles:OperationalStateTitle[] = [
-
-    "Alpha",
-
-    "Bravo",
-
-    "Charlie",
-
-    "Delta",
-
-    "Echo"
-
-];
+}
 
 
-    return titles.includes(
+/**
+ * Notify subscribed dashboard components.
+ */
+function publishHistoryChanged():void {
 
-        value as OperationalStateTitle
+    emit(
+
+        APP_EVENTS.HISTORY_CHANGED
 
     );
 

@@ -2955,3 +2955,435 @@ h1,h2,h3{margin-top:0}
     }
 
 }
+
+/* =========================
+   Alpha–Echo Trend Chart
+========================= */
+
+.trend-chart-container {
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 8px 22px rgba(15, 23, 42, .06);
+}
+
+.trend-point-count {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:6px 12px;
+    background:#f1f5f9;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    color:#475569;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+.trend-level-legend {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:14px 0;
+}
+
+.trend-level-legend-item {
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:5px 8px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    color:#64748b;
+    font-size:10px;
+}
+
+.trend-level-legend-item strong {
+    color:#334155;
+}
+
+.trend-level-legend-swatch {
+    width:9px;
+    height:9px;
+    border-radius:50%;
+}
+
+.trend-chart-content {
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+.trend-chart-current-summary {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+}
+
+.trend-chart-current-summary > div {
+    min-width:0;
+    padding:11px 12px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+}
+
+.trend-chart-current-summary span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.trend-chart-current-summary strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:14px;
+    line-height:1.4;
+    overflow-wrap:anywhere;
+}
+
+.trend-chart-scroll {
+    width:100%;
+    overflow-x:auto;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+    background:#ffffff;
+}
+
+.trend-chart-svg {
+    display:block;
+    width:100%;
+    min-width:680px;
+    height:auto;
+}
+
+.trend-grid-line {
+    stroke:#cbd5e1;
+    stroke-width:1;
+    stroke-dasharray:3 5;
+}
+
+.trend-axis-label,
+.trend-time-label {
+    fill:#64748b;
+    font-size:10px;
+    font-family:inherit;
+}
+
+.trend-level-label {
+    fill:#475569;
+    font-size:10px;
+    font-weight:800;
+    font-family:inherit;
+    letter-spacing:.05em;
+}
+
+.trend-score-line {
+    stroke:#2563eb;
+    stroke-width:3;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
+
+.trend-score-point {
+    cursor:pointer;
+    transition:r .15s ease;
+}
+
+.trend-score-point:hover,
+.trend-score-point:focus {
+    r:8;
+    outline:none;
+}
+
+.trend-change-initial,
+.trend-change-stable {
+    color:#475569 !important;
+}
+
+.trend-change-improving {
+    color:#166534 !important;
+}
+
+.trend-change-increasing {
+    color:#9a3412 !important;
+}
+
+.trend-change-critical {
+    color:#991b1b !important;
+}
+
+.trend-chart-footnote {
+    color:#64748b;
+    font-size:10px;
+    line-height:1.5;
+    text-align:center;
+}
+
+.trend-chart-empty {
+    padding:20px;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:10px;
+    color:#475569;
+    text-align:center;
+}
+
+.trend-chart-empty strong {
+    display:block;
+    color:#334155;
+    font-size:15px;
+}
+
+.trend-chart-empty p {
+    margin:6px 0 0;
+    font-size:13px;
+    line-height:1.55;
+}
+
+.trend-chart-empty.error {
+    background:#fef2f2;
+    border-color:#fecaca;
+    color:#991b1b;
+}
+
+@media(max-width:650px) {
+
+    .trend-chart-container {
+        padding:16px;
+    }
+
+    .trend-chart-current-summary {
+        grid-template-columns:1fr;
+    }
+
+}
+
+/* =========================
+   Alpha–Echo Assessment History
+========================= */
+
+.assessment-history-container {
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 8px 22px rgba(15, 23, 42, .06);
+}
+
+.assessment-history-header-actions {
+    display:flex;
+    align-items:center;
+    gap:9px;
+    flex-wrap:wrap;
+}
+
+.assessment-history-count {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:6px 12px;
+    background:#f1f5f9;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    color:#475569;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+.assessment-history-clear-button {
+    min-height:34px;
+    padding:6px 12px;
+    background:#ffffff;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    color:#475569;
+    cursor:pointer;
+    font-size:12px;
+    font-weight:700;
+}
+
+.assessment-history-clear-button:hover:not(:disabled) {
+    background:#fef2f2;
+    border-color:#fecaca;
+    color:#991b1b;
+}
+
+.assessment-history-clear-button:disabled {
+    cursor:not-allowed;
+    opacity:.45;
+}
+
+.assessment-history-content {
+    margin-top:14px;
+}
+
+.assessment-history-table-wrapper {
+    width:100%;
+    overflow-x:auto;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+}
+
+.assessment-history-table {
+    width:100%;
+    min-width:760px;
+    border-collapse:collapse;
+    background:#ffffff;
+}
+
+.assessment-history-table th,
+.assessment-history-table td {
+    padding:11px 12px;
+    border-bottom:1px solid #e2e8f0;
+    text-align:left;
+    vertical-align:middle;
+}
+
+.assessment-history-table th {
+    background:#f8fafc;
+    color:#64748b;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.assessment-history-table td {
+    color:#475569;
+    font-size:12px;
+}
+
+.assessment-history-table tbody tr:last-child td {
+    border-bottom:0;
+}
+
+.assessment-history-table tbody tr:hover {
+    background:#f8fafc;
+}
+
+.assessment-history-table time {
+    color:#334155;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+.assessment-history-level {
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:5px 9px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-left:4px solid var(--history-level-color);
+    border-radius:7px;
+    white-space:nowrap;
+}
+
+.assessment-history-level-icon {
+    font-size:12px;
+    line-height:1;
+}
+
+.assessment-history-level strong {
+    color:#0f172a;
+    font-size:12px;
+}
+
+.assessment-history-score {
+    color:#0f172a;
+    font-size:14px;
+}
+
+.assessment-history-change {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:48px;
+    padding:4px 7px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:800;
+}
+
+.history-change-initial,
+.history-change-stable {
+    background:#f1f5f9;
+    color:#475569;
+}
+
+.history-change-improving {
+    background:#f0fdf4;
+    color:#166534;
+}
+
+.history-change-increasing {
+    background:#fff7ed;
+    color:#9a3412;
+}
+
+.history-change-critical {
+    background:#fef2f2;
+    color:#991b1b;
+}
+
+.assessment-history-limit-note {
+    margin-top:12px;
+    padding:9px 11px;
+    background:#f8fafc;
+    border-radius:8px;
+    color:#64748b;
+    font-size:11px;
+    text-align:center;
+}
+
+.assessment-history-empty {
+    padding:20px;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:10px;
+    color:#475569;
+    text-align:center;
+}
+
+.assessment-history-empty strong {
+    display:block;
+    color:#334155;
+    font-size:15px;
+}
+
+.assessment-history-empty p {
+    margin:6px 0 0;
+    font-size:13px;
+    line-height:1.55;
+}
+
+.assessment-history-empty.error {
+    background:#fef2f2;
+    border-color:#fecaca;
+    color:#991b1b;
+}
+
+@media(max-width:600px) {
+
+    .assessment-history-container {
+        padding:16px;
+    }
+
+    .assessment-history-header-actions {
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+}
