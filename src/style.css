@@ -5257,3 +5257,320 @@ h1,h2,h3{margin-top:0}
     }
 
 }
+
+/* =========================
+   EDORI Operational Outlook
+========================= */
+
+.operational-forecast-container {
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 8px 22px rgba(15, 23, 42, .06);
+}
+
+.operational-forecast-content {
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.operational-forecast-summary {
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:10px;
+}
+
+.operational-forecast-summary > div {
+    min-width:0;
+    padding:11px 12px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:9px;
+}
+
+.operational-forecast-summary span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.operational-forecast-summary strong {
+    display:block;
+    margin-top:5px;
+    color:#0f172a;
+    font-size:16px;
+    line-height:1.4;
+    overflow-wrap:anywhere;
+}
+
+.operational-forecast-grid {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+}
+
+.operational-forecast-card {
+    --forecast-level-color:#64748b;
+
+    min-width:0;
+    padding:16px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-top:6px solid var(--forecast-level-color);
+    border-radius:11px;
+}
+
+.operational-forecast-card-header {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.operational-forecast-card-header span,
+.operational-forecast-level span,
+.operational-forecast-score > span,
+.operational-forecast-metrics span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.operational-forecast-card-header h4 {
+    margin:3px 0 0;
+    color:#0f172a;
+    font-size:18px;
+}
+
+.operational-forecast-level-icon {
+    font-size:24px !important;
+    line-height:1;
+}
+
+.operational-forecast-level {
+    margin-top:16px;
+}
+
+.operational-forecast-level strong {
+    display:block;
+    margin-top:4px;
+    color:var(--forecast-level-color);
+    font-size:24px;
+    line-height:1.2;
+}
+
+.operational-forecast-score {
+    margin-top:15px;
+    padding:13px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:9px;
+}
+
+.operational-forecast-score > strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:30px;
+    line-height:1;
+}
+
+.operational-forecast-score small {
+    display:block;
+    margin-top:7px;
+    font-size:11px;
+    font-weight:800;
+}
+
+.operational-forecast-metrics {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:8px;
+    margin-top:12px;
+}
+
+.operational-forecast-metrics > div {
+    min-width:0;
+    padding:9px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+}
+
+.operational-forecast-metrics strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:12px;
+    line-height:1.4;
+    overflow-wrap:anywhere;
+}
+
+.operational-forecast-assumptions {
+    padding:14px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+}
+
+.operational-forecast-assumptions h4 {
+    margin:0 0 10px;
+    color:#334155;
+    font-size:13px;
+}
+
+.operational-forecast-assumption-grid {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:9px;
+}
+
+.operational-forecast-assumption {
+    min-width:0;
+    padding:10px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+}
+
+.operational-forecast-assumption > span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.operational-forecast-assumption strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:14px;
+}
+
+.operational-forecast-assumption p {
+    margin:6px 0 0;
+    color:#64748b;
+    font-size:10px;
+    line-height:1.5;
+}
+
+.operational-forecast-disclaimer {
+    padding:12px 14px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    border-radius:9px;
+    color:#1e40af;
+}
+
+.operational-forecast-disclaimer strong {
+    display:block;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+}
+
+.operational-forecast-disclaimer p {
+    margin:5px 0 0;
+    font-size:11px;
+    line-height:1.55;
+}
+
+.forecast-direction-improving,
+.forecast-value-improving {
+    color:#166534 !important;
+}
+
+.forecast-direction-stable,
+.forecast-value-stable {
+    color:#475569 !important;
+}
+
+.forecast-direction-worsening,
+.forecast-value-increasing {
+    color:#9a3412 !important;
+}
+
+.forecast-direction-rapidly-worsening {
+    color:#991b1b !important;
+}
+
+.operational-forecast-empty {
+    padding:20px;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:10px;
+    color:#475569;
+    text-align:center;
+}
+
+.operational-forecast-empty strong {
+    display:block;
+    color:#334155;
+    font-size:15px;
+}
+
+.operational-forecast-empty p {
+    margin:6px 0 0;
+    font-size:13px;
+    line-height:1.55;
+}
+
+.operational-forecast-empty.warning {
+    background:#fff7ed;
+    border-color:#fdba74;
+    color:#9a3412;
+}
+
+.operational-forecast-empty.error {
+    background:#fef2f2;
+    border-color:#fecaca;
+    color:#991b1b;
+}
+
+@media(max-width:850px) {
+
+    .operational-forecast-summary {
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .operational-forecast-grid {
+        grid-template-columns:1fr;
+    }
+
+}
+
+@media(max-width:600px) {
+
+    .operational-forecast-container {
+        padding:16px;
+    }
+
+    .operational-forecast-assumption-grid {
+        grid-template-columns:1fr;
+    }
+
+    .operational-forecast-metrics {
+        grid-template-columns:1fr;
+    }
+
+}
+
+@media(max-width:420px) {
+
+    .operational-forecast-summary {
+        grid-template-columns:1fr;
+    }
+
+}

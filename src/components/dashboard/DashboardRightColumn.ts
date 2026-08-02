@@ -10,6 +10,14 @@
 
 import {
 
+    OperationalForecast
+
+}
+
+from "../OperationalForecast";
+
+import {
+
     AssessmentDetails
 
 }
@@ -228,6 +236,22 @@ export function DashboardRightColumn():string {
                     Recommendations()
 
             })}
+
+${CollapsiblePanel({
+
+    id:
+        "operational-forecast-panel",
+
+    title:
+        "Operational Outlook",
+
+    description:
+        "Directional 2-hour and 4-hour ED scenario estimates",
+
+    content:
+        OperationalForecast()
+
+})}
 
 
             ${CollapsiblePanel({

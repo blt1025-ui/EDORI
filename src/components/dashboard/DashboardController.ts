@@ -9,6 +9,14 @@
 
 import {
 
+    initializeOperationalForecast
+
+}
+
+from "../OperationalForecast";
+
+import {
+
     initializeAssessmentDetails
 
 }
@@ -156,6 +164,8 @@ export function initializeDashboardComponents():void {
     initializeDrivers();
 
     initializeRecommendations();
+
+    initializeOperationalForecast();
 
     initializeTrendChart();
 
