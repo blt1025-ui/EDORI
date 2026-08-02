@@ -41,7 +41,7 @@ export interface SituationAssessment {
 
     occupiedMedicalBeds:number;
 
-
+staffedMedicalBeds:number;
     /*
      * Patient acuity distribution
      */

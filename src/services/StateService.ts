@@ -68,6 +68,8 @@ const DEFAULT_STATE:SituationAssessment = {
 
     occupiedMedicalBeds:0,
 
+    staffedMedicalBeds: 273,
+
     esi1:0,
 
     esi2:0,
@@ -622,6 +624,8 @@ function normalizeAssessment(
 
         occupiedMedicalBeds?:unknown;
 
+        staffedMedicalBeds?:unknown;
+
         esi1?:unknown;
 
         esi2?:unknown;
@@ -697,6 +701,16 @@ function normalizeAssessment(
         candidate.occupiedMedicalBeds
 
     );
+
+    const staffedMedicalBeds =
+
+        normalizePositiveNumber(
+
+            candidate.staffedMedicalBeds
+
+        )
+
+        ?? 273;
 
 
     const esi1 = normalizeNonNegativeNumber(
@@ -860,7 +874,15 @@ function normalizeAssessment(
     }
 
 
-    if(occupiedMedicalBeds > 273){
+    if(
+
+        occupiedMedicalBeds
+
+        >
+
+        staffedMedicalBeds
+
+    ){
 
         return null;
 
@@ -915,6 +937,8 @@ function normalizeAssessment(
         boardedPatients,
 
         occupiedMedicalBeds,
+
+        staffedMedicalBeds,
 
         esi1,
 
@@ -1119,6 +1143,46 @@ function normalizeHour(
 
 
 /**
+ * Normalize a positive finite number.
+ *
+ * Used for capacity values that must be greater
+ * than zero.
+ */
+function normalizePositiveNumber(
+
+    value:unknown
+
+):number | null {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+        ||
+
+        value <= 0
+
+    ){
+
+        return null;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
  * Normalize a nonnegative finite number.
  *
  * Current operational assessment values should be
@@ -1187,6 +1251,9 @@ function cloneAssessment(
 
         occupiedMedicalBeds:
             assessment.occupiedMedicalBeds,
+
+        staffedMedicalBeds:
+            assessment.staffedMedicalBeds,
 
         esi1:
             assessment.esi1,

@@ -9,6 +9,32 @@
 
 import {
 
+    initializeDashboardCommandBar
+
+}
+
+from "./DashboardCommandBar";
+
+import {
+
+    initializeHistoryRestoreCenter
+
+}
+
+from "../HistoryRestoreCenter";
+
+
+import {
+
+    initializeDataExportCenter
+
+}
+
+from "../DataExportCenter";
+
+
+import {
+
     initializeExecutiveAssessmentReport
 
 }
@@ -164,6 +190,8 @@ from "./DashboardToolbar";
  */
 export function initializeDashboardComponents():void {
 
+    initializeDashboardCommandBar();
+    
     initializeSituationAssessment();
 
     initializeExecutiveSummary();
@@ -187,6 +215,10 @@ export function initializeDashboardComponents():void {
     initializeShiftHandoffSummary();
 
     initializeExecutiveAssessmentReport();
+
+    initializeDataExportCenter();
+
+    initializeHistoryRestoreCenter();
 
     initializeTrendChart();
 

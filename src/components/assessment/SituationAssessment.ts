@@ -130,6 +130,8 @@ const CURRENT_VALUE_FIELDS:Array<
 
     "occupiedMedicalBeds",
 
+    "staffedMedicalBeds",
+
     "esi1",
 
     "esi2",
@@ -146,8 +148,9 @@ const CURRENT_VALUE_FIELDS:Array<
 /**
  * Assessment fields monitored for completion.
  *
- * These IDs match the current Situation Assessment
- * input element IDs.
+ * Historical expectations are read automatically
+ * when EDORI is calculated and are not editable
+ * required fields.
  */
 const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
 
@@ -156,6 +159,8 @@ const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
     "boardedPatients",
 
     "occupiedMedicalBeds",
+
+    "staffedMedicalBeds",
 
     "esi1",
 
@@ -171,6 +176,15 @@ const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
 
 
 /**
+ * CSS class applied to inputs that have changed
+ * since the most recent successful calculation.
+ */
+const CHANGED_FIELD_CLASS =
+
+    "assessment-input-changed";
+
+
+/**
  * Local draft maintained by this component.
  *
  * The committed StateService assessment is not
@@ -183,6 +197,8 @@ let draftInput:EdoriAssessmentInput = {
     boardedPatients:0,
 
     occupiedMedicalBeds:0,
+
+    staffedMedicalBeds:273,
 
     esi1:0,
 
@@ -219,11 +235,69 @@ export function SituationAssessment():string {
             </div>
 
 
+            <div
+                id="assessmentProgress"
+                class="assessment-progress"
+                aria-live="polite"
+            >
+
+                <div class="assessment-progress-header">
+
+                    <div>
+
+                        <span class="assessment-progress-label">
+                            Assessment Completion
+                        </span>
+
+                        <strong id="assessmentProgressText">
+                            Review required fields
+                        </strong>
+
+                    </div>
+
+
+                    <span id="assessmentProgressPercent">
+                        0%
+                    </span>
+
+                </div>
+
+
+                <div class="assessment-progress-track">
+
+                    <div
+                        id="assessmentProgressFill"
+                        class="assessment-progress-fill"
+                        style="width:0%;"
+                    >
+                    </div>
+
+                </div>
+
+            </div>
+
+
             <div class="assessment-section">
 
-                <h3>
-                    ED Demand
-                </h3>
+                <div class="assessment-section-heading">
+
+                    <div class="assessment-section-icon">
+                        🚑
+                    </div>
+
+                    <div>
+
+                        <h3>
+                            ED Demand
+                        </h3>
+
+                        <p>
+                            Enter the total number of patients currently in the emergency department, including admitted boarders.
+                        </p>
+
+                    </div>
+
+                </div>
 
 
                 <div class="input-grid">
@@ -256,9 +330,25 @@ export function SituationAssessment():string {
 
             <div class="assessment-section">
 
-                <h3>
-                    Hospital Capacity
-                </h3>
+                <div class="assessment-section-heading">
+
+                    <div class="assessment-section-icon">
+                        🏥
+                    </div>
+
+                    <div>
+
+                        <h3>
+                            Hospital Capacity
+                        </h3>
+
+                        <p>
+                            Enter the number of occupied medical beds out of the configured 273-bed medical capacity.
+                        </p>
+
+                    </div>
+
+                </div>
 
 
                 <div class="input-grid">
@@ -269,9 +359,18 @@ export function SituationAssessment():string {
 
                         "Occupied Medical Beds",
 
-                        0,
+                        0
 
-                        273
+                    )}
+
+
+                    ${createNumberInput(
+
+                        "staffedMedicalBeds",
+
+                        "Staffed Medical Beds",
+
+                        1
 
                     )}
 
@@ -282,14 +381,25 @@ export function SituationAssessment():string {
 
             <div class="assessment-section">
 
-                <h3>
-                    Patient Acuity Distribution
-                </h3>
+                <div class="assessment-section-heading">
 
+                    <div class="assessment-section-icon">
+                        🩺
+                    </div>
 
-                <p class="section-description">
-                    Enter the number of current ED patients in each Emergency Severity Index category.
-                </p>
+                    <div>
+
+                        <h3>
+                            Patient Acuity Distribution
+                        </h3>
+
+                        <p>
+                            Enter the number of current ED patients in each Emergency Severity Index category.
+                        </p>
+
+                    </div>
+
+                </div>
 
 
                 <div class="input-grid">
@@ -371,15 +481,23 @@ export function SituationAssessment():string {
 
                 <div class="historical-section-header">
 
-                    <div>
+                    <div class="assessment-section-heading">
 
-                        <h3>
-                            Historical Expectations
-                        </h3>
+                        <div class="assessment-section-icon">
+                            📈
+                        </div>
 
-                        <p id="historicalPeriodDisplay">
-                            Based on the weekday and hour when EDORI is calculated.
-                        </p>
+                        <div>
+
+                            <h3>
+                                Historical Expectations
+                            </h3>
+
+                            <p id="historicalPeriodDisplay">
+                                Based on the weekday and hour when EDORI is calculated.
+                            </p>
+
+                        </div>
 
                     </div>
 
@@ -436,29 +554,63 @@ export function SituationAssessment():string {
             </div>
 
 
-            <div class="assessment-actions">
+            <div class="assessment-action-footer">
+
+                <div
+                    id="assessmentActionStatus"
+                    class="assessment-action-status"
+                >
+
+                    <span id="assessmentActionStatusIcon">
+                        ◯
+                    </span>
+
+
+                    <div>
+
+                        <strong id="assessmentActionStatusTitle">
+                            Assessment not calculated
+                        </strong>
+
+                        <small id="assessmentActionStatusDescription">
+                            Complete the operational inputs before calculating EDORI.
+                        </small>
+
+                    </div>
+
+
+                    <span
+                        id="assessmentDraftIndicator"
+                        class="assessment-draft-indicator"
+                        hidden
+                    >
+                        Draft changed
+                    </span>
+
+                </div>
+
 
                 <button
                     id="calculateEdoriButton"
-                    class="calculate-button"
+                    class="calculate-button assessment-calculate-button"
                     type="button"
                 >
                     Calculate EDORI
                 </button>
 
-
-                <p
-                    id="assessmentMessage"
-                    class="
-                        assessment-message
-                        assessment-message-default
-                    "
-                    aria-live="polite"
-                >
-                    Enter all operational data, then calculate.
-                </p>
-
             </div>
+
+
+            <p
+                id="assessmentMessage"
+                class="
+                    assessment-message
+                    assessment-message-default
+                "
+                aria-live="polite"
+            >
+                Enter all operational data, then calculate.
+            </p>
 
         </section>
 
@@ -616,6 +768,15 @@ function restoreDraftInput():void {
 
             ),
 
+        staffedMedicalBeds:
+            normalizeStoredPositiveNumber(
+
+                state.staffedMedicalBeds,
+
+                273
+
+            ),
+
         esi1:
             normalizeStoredNumber(
 
@@ -697,6 +858,13 @@ function initializeCurrentValueInputs():void {
                 "input",
 
                 () => {
+
+                    element.classList.add(
+
+                        CHANGED_FIELD_CLASS
+
+                    );
+
 
                     const value = parseInputValue(
 
@@ -867,6 +1035,9 @@ function submitAssessmentToEngine():void {
             occupiedMedicalBeds:
                 engineResult.assessment.occupiedMedicalBeds,
 
+            staffedMedicalBeds:
+                engineResult.assessment.staffedMedicalBeds,
+
             esi1:
                 engineResult.assessment.esi1,
 
@@ -902,7 +1073,11 @@ function submitAssessmentToEngine():void {
 
         );
 
+
         showAssessmentCalculatedStatus();
+
+
+        clearChangedFieldIndicators();
 
     }
     catch(error){
@@ -1188,6 +1363,9 @@ function subscribeToHistoricalDataChanges():void {
                 "draft"
 
             );
+
+
+            showAssessmentDraftStatus();
 
         }
 
@@ -1519,6 +1697,8 @@ function createEmptyDraft():EdoriAssessmentInput {
 
         occupiedMedicalBeds:0,
 
+        staffedMedicalBeds:273,
+
         esi1:0,
 
         esi2:0,
@@ -1558,6 +1738,42 @@ function normalizeStoredNumber(
     ){
 
         return 0;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Normalize a stored positive number with a
+ * fallback value.
+ */
+function normalizeStoredPositiveNumber(
+
+    value:unknown,
+
+    fallback:number
+
+):number {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+        ||
+
+        value <= 0
+
+    ){
+
+        return fallback;
 
     }
 
@@ -1794,9 +2010,6 @@ function setElementText(
 /**
  * Show that draft values changed.
  */
-/**
- * Show that draft values changed.
- */
 function showDraftChangedMessage():void {
 
     showAssessmentMessage(
@@ -1926,8 +2139,8 @@ function initializeAssessmentProgress():void {
 
 
 /**
- * Update the assessment completion display and
- * Calculate EDORI button state.
+ * Update the completion display and calculation
+ * action state.
  */
 function updateAssessmentProgress():void {
 
@@ -1961,16 +2174,24 @@ function updateAssessmentProgress():void {
     );
 
 
-    const progressText = document.getElementById(
+    setElementText(
 
-        "assessmentProgressText"
+        "assessmentProgressText",
+
+        completionPercent === 100
+
+            ? "Ready to calculate"
+
+            : `${completedFieldCount} of ${REQUIRED_ASSESSMENT_FIELD_IDS.length} required fields complete`
 
     );
 
 
-    const progressPercent = document.getElementById(
+    setElementText(
 
-        "assessmentProgressPercent"
+        "assessmentProgressPercent",
+
+        `${completionPercent}%`
 
     );
 
@@ -1980,28 +2201,6 @@ function updateAssessmentProgress():void {
         "assessmentProgressFill"
 
     );
-
-
-    if(progressText){
-
-        progressText.textContent =
-
-            completionPercent === 100
-
-                ? "Ready to calculate"
-
-                : `${completedFieldCount} of ${REQUIRED_ASSESSMENT_FIELD_IDS.length} required fields complete`;
-
-    }
-
-
-    if(progressPercent){
-
-        progressPercent.textContent =
-
-            `${completionPercent}%`;
-
-    }
 
 
     if(progressFill){
@@ -2023,8 +2222,8 @@ function updateAssessmentProgress():void {
 
 
 /**
- * Determine whether one assessment field contains
- * a valid nonnegative number.
+ * Determine whether one required input contains a
+ * valid nonnegative number.
  */
 function isAssessmentFieldComplete(
 
@@ -2064,48 +2263,34 @@ function isAssessmentFieldComplete(
     );
 
 
-    return Number.isFinite(
+    if(fieldId === "staffedMedicalBeds"){
 
-        value
+        return Number.isFinite(value)
 
-    )
+            &&
 
-    &&
+            value > 0;
 
-    value >= 0;
+    }
+
+
+    return Number.isFinite(value)
+
+        &&
+
+        value >= 0;
 
 }
 
 
 /**
- * Update the persistent assessment-action status.
+ * Update the persistent calculation-area status.
  */
 function updateAssessmentActionStatus(
 
     completionPercent:number
 
 ):void {
-
-    const icon = document.getElementById(
-
-        "assessmentActionStatusIcon"
-
-    );
-
-
-    const title = document.getElementById(
-
-        "assessmentActionStatusTitle"
-
-    );
-
-
-    const description = document.getElementById(
-
-        "assessmentActionStatusDescription"
-
-    );
-
 
     const button = document.getElementById(
 
@@ -2116,29 +2301,26 @@ function updateAssessmentActionStatus(
 
     if(completionPercent === 100){
 
-        if(icon){
+        if(!hasCommittedAssessment()){
 
-            icon.textContent =
+            setAssessmentActionStatus(
 
-                "✓";
+                "✓",
 
-        }
+                "Assessment ready",
 
+                "Review the entered values, then calculate the current EDORI result.",
 
-        if(title){
+                "ready"
 
-            title.textContent =
-
-                "Assessment ready";
-
-        }
+            );
 
 
-        if(description){
+            setDraftIndicatorVisibility(
 
-            description.textContent =
+                false
 
-                "Review the entered values, then calculate the current EDORI result.";
+            );
 
         }
 
@@ -2155,31 +2337,17 @@ function updateAssessmentActionStatus(
     }
 
 
-    if(icon){
+    setAssessmentActionStatus(
 
-        icon.textContent =
+        "◯",
 
-            "◯";
+        "Assessment incomplete",
 
-    }
+        "Complete all required operational inputs before calculating EDORI.",
 
+        "incomplete"
 
-    if(title){
-
-        title.textContent =
-
-            "Assessment incomplete";
-
-    }
-
-
-    if(description){
-
-        description.textContent =
-
-            "Complete all required operational inputs before calculating EDORI.";
-
-    }
+    );
 
 
     if(button){
@@ -2196,50 +2364,24 @@ function updateAssessmentActionStatus(
  */
 function showAssessmentCalculatedStatus():void {
 
-    const icon = document.getElementById(
+    setAssessmentActionStatus(
 
-        "assessmentActionStatusIcon"
+        "✓",
 
-    );
+        "Assessment calculated",
 
+        "The dashboard now reflects the committed operational assessment.",
 
-    const title = document.getElementById(
-
-        "assessmentActionStatusTitle"
-
-    );
-
-
-    const description = document.getElementById(
-
-        "assessmentActionStatusDescription"
+        "calculated"
 
     );
 
 
-    if(icon){
+    setDraftIndicatorVisibility(
 
-        icon.textContent = "✓";
+        false
 
-    }
-
-
-    if(title){
-
-        title.textContent =
-
-            "Assessment calculated";
-
-    }
-
-
-    if(description){
-
-        description.textContent =
-
-            "The dashboard now reflects the committed operational assessment.";
-
-    }
+    );
 
 }
 
@@ -2249,52 +2391,176 @@ function showAssessmentCalculatedStatus():void {
  */
 function showAssessmentDraftStatus():void {
 
-    const icon = document.getElementById(
+    setAssessmentActionStatus(
 
-        "assessmentActionStatusIcon"
+        "↻",
 
-    );
+        "Changes not calculated",
 
+        "Select Calculate EDORI to update the dashboard with the current values.",
 
-    const title = document.getElementById(
-
-        "assessmentActionStatusTitle"
-
-    );
-
-
-    const description = document.getElementById(
-
-        "assessmentActionStatusDescription"
+        "draft"
 
     );
 
 
-    if(icon){
+    setDraftIndicatorVisibility(
 
-        icon.textContent = "↻";
+        true
+
+    );
+
+}
+
+
+/**
+ * Apply action-status content and visual state.
+ */
+function setAssessmentActionStatus(
+
+    icon:string,
+
+    title:string,
+
+    description:string,
+
+    status:
+
+        | "ready"
+
+        | "calculated"
+
+        | "draft"
+
+        | "incomplete"
+
+):void {
+
+    setElementText(
+
+        "assessmentActionStatusIcon",
+
+        icon
+
+    );
+
+
+    setElementText(
+
+        "assessmentActionStatusTitle",
+
+        title
+
+    );
+
+
+    setElementText(
+
+        "assessmentActionStatusDescription",
+
+        description
+
+    );
+
+
+    const statusElement = document.getElementById(
+
+        "assessmentActionStatus"
+
+    );
+
+
+    if(!statusElement){
+
+        return;
 
     }
 
 
-    if(title){
+    statusElement.classList.remove(
 
-        title.textContent =
+        "status-ready",
 
-            "Changes not calculated";
+        "status-calculated",
 
-    }
+        "status-draft",
+
+        "status-incomplete"
+
+    );
 
 
-    if(description){
+    statusElement.classList.add(
 
-        description.textContent =
+        `status-${status}`
 
-            "Select Calculate EDORI to update the dashboard with the current values.";
+    );
+
+}
+
+
+/**
+ * Show or hide the draft-change indicator.
+ */
+function setDraftIndicatorVisibility(
+
+    visible:boolean
+
+):void {
+
+    const draftIndicator = document.getElementById(
+
+        "assessmentDraftIndicator"
+
+    );
+
+
+    if(draftIndicator){
+
+        draftIndicator.hidden = !visible;
 
     }
 
 }
+
+
+/**
+ * Remove changed-field highlighting after a
+ * successful committed calculation.
+ */
+function clearChangedFieldIndicators():void {
+
+    CURRENT_VALUE_FIELDS.forEach(
+
+        field => {
+
+            const element = document.getElementById(
+
+                field
+
+            );
+
+
+            if(
+
+                element instanceof HTMLInputElement
+
+            ){
+
+                element.classList.remove(
+
+                    CHANGED_FIELD_CLASS
+
+                );
+
+            }
+
+        }
+
+    );
+
+}
+
 
 /**
  * Update Calculate button state.

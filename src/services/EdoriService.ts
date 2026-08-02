@@ -21,15 +21,6 @@
 
 import {
 
-    HOSPITAL
-
-}
-
-from "../config/constants";
-
-
-import {
-
     areWeightsValid,
 
     WEIGHTS
@@ -400,7 +391,19 @@ function calculateHospitalScore(
 
 ):number {
 
-    if(HOSPITAL.MEDICAL_BEDS <= 0){
+    if(
+
+        !Number.isFinite(
+
+            assessment.staffedMedicalBeds
+
+        )
+
+        ||
+
+        assessment.staffedMedicalBeds <= 0
+
+    ){
 
         return 0;
 
@@ -413,7 +416,7 @@ function calculateHospitalScore(
 
         /
 
-        HOSPITAL.MEDICAL_BEDS
+        assessment.staffedMedicalBeds
 
         *
 
@@ -449,7 +452,33 @@ function calculateAcuityScore(
 
 ):number {
 
-    if(assessment.totalEDVolume <= 0){
+    const assignedEsiCount =
+
+        assessment.esi1
+
+        +
+
+        assessment.esi2
+
+        +
+
+        assessment.esi3
+
+        +
+
+        assessment.esi4
+
+        +
+
+        assessment.esi5;
+
+
+    /*
+     * Acuity cannot be calculated when no patients
+     * currently have an assigned ESI.
+     */
+
+    if(assignedEsiCount <= 0){
 
         return 0;
 
@@ -477,13 +506,22 @@ function calculateAcuityScore(
         assessment.esi5;
 
 
+    /*
+     * Calculate acuity using only patients with an
+     * assigned ESI.
+     *
+     * Patients without an assigned ESI continue to
+     * contribute to total ED demand but do not receive
+     * an artificial acuity weight of zero.
+     */
+
     const averageAcuityWeight =
 
         weightedAcuityBurden
 
         /
 
-        assessment.totalEDVolume;
+        assignedEsiCount;
 
 
     /*
@@ -849,7 +887,7 @@ function addHospitalDriver(
         expectedValue:
             Math.round(
 
-                HOSPITAL.MEDICAL_BEDS
+                assessment.staffedMedicalBeds
 
                 *
 

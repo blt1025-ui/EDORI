@@ -1,40 +1,57 @@
-import { Header } from "./Header";
-import { Sidebar } from "./Sidebar";
-import { Dashboard, initializeDashboard } from "./Dashboard";
+/**
+ * App
+ *
+ * Renders the main EDORI application structure.
+ *
+ * Component initialization is handled by main.ts
+ * after this markup has been inserted into the DOM.
+ */
+
+import {
+
+    Header
+
+}
+
+from "./Header";
 
 
-export function App() {
+import {
+
+    Sidebar
+
+}
+
+from "./Sidebar";
 
 
-    setTimeout(()=>{
+import {
+
+    Dashboard
+
+}
+
+from "./Dashboard";
 
 
-        initializeDashboard();
-
-
-    },0);
-
-
+/**
+ * Render the complete application.
+ */
+export function App():string {
 
     return `
-
 
         ${Header()}
 
 
         <div class="main-layout">
 
-
             ${Sidebar()}
-
 
             ${Dashboard()}
 
-
         </div>
 
-
     `;
-
 
 }

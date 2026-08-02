@@ -679,6 +679,9 @@ function serializeSnapshot(
         occupiedMedicalBeds:
             snapshot.occupiedMedicalBeds,
 
+        staffedMedicalBeds:
+            snapshot.staffedMedicalBeds,
+
         esi1:
             snapshot.esi1,
 
@@ -783,6 +786,8 @@ function normalizeSnapshot(
         boardedPatients?:unknown;
 
         occupiedMedicalBeds?:unknown;
+
+        staffedMedicalBeds?:unknown;
 
         esi1?:unknown;
 
@@ -894,6 +899,14 @@ function normalizeSnapshot(
 
                 candidate.id
 
+            )
+
+            ??
+
+            createSnapshotId(
+
+                timestamp
+
             ),
 
         totalEDVolume:
@@ -901,126 +914,209 @@ function normalizeSnapshot(
 
                 candidate.totalEDVolume
 
-            ),
+            )
+
+            ??
+
+            0,
 
         boardedPatients:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.boardedPatients
 
-            ),
+            )
+
+            ??
+
+            0,
 
         occupiedMedicalBeds:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.occupiedMedicalBeds
 
-            ),
+            )
+
+            ??
+
+            0,
+
+        staffedMedicalBeds:
+            normalizeOptionalPositiveNumber(
+
+                candidate.staffedMedicalBeds
+
+            )
+
+            ??
+
+            273,
 
         esi1:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.esi1
 
-            ),
+            )
+
+            ??
+
+            0,
 
         esi2:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.esi2
 
-            ),
+            )
+
+            ??
+
+            0,
 
         esi3:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.esi3
 
-            ),
+            )
+
+            ??
+
+            0,
 
         esi4:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.esi4
 
-            ),
+            )
+
+            ??
+
+            0,
 
         esi5:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.esi5
 
-            ),
+            )
+
+            ??
+
+            0,
 
         expectedVolume:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.expectedVolume
 
-            ),
+            )
+
+            ??
+
+            0,
 
         expectedBoarders:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.expectedBoarders
 
-            ),
+            )
+
+            ??
+
+            0,
 
         expectedArrivals:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.expectedArrivals
 
-            ),
+            )
+
+            ??
+
+            0,
 
         expectedDepartures:
             normalizeOptionalNonNegativeNumber(
 
                 candidate.expectedDepartures
 
-            ),
+            )
+
+            ??
+
+            0,
 
         demandScore:
             normalizeOptionalScore(
 
                 candidate.demandScore
 
-            ),
+            )
+
+            ??
+
+            0,
 
         boardingScore:
             normalizeOptionalScore(
 
                 candidate.boardingScore
 
-            ),
+            )
+
+            ??
+
+            0,
 
         hospitalScore:
             normalizeOptionalScore(
 
                 candidate.hospitalScore
 
-            ),
+            )
+
+            ??
+
+            0,
 
         acuityScore:
             normalizeOptionalScore(
 
                 candidate.acuityScore
 
-            ),
+            )
+
+            ??
+
+            0,
 
         forecastScore:
             normalizeOptionalScore(
 
                 candidate.forecastScore
 
-            ),
+            )
+
+            ??
+
+            0,
 
         day:
             normalizeOptionalString(
 
                 candidate.day
 
-            ),
+            )
+
+            ??
+
+            "Sunday",
 
         hour:
             normalizeOptionalHour(
@@ -1028,6 +1124,10 @@ function normalizeSnapshot(
                 candidate.hour
 
             )
+
+            ??
+
+            0
 
     };
 
@@ -1213,6 +1313,9 @@ function cloneSnapshot(
         occupiedMedicalBeds:
             snapshot.occupiedMedicalBeds,
 
+        staffedMedicalBeds:
+            snapshot.staffedMedicalBeds,
+
         esi1:
             snapshot.esi1,
 
@@ -1391,6 +1494,14 @@ function snapshotsContainSameAssessment(
             ===
 
             candidate.occupiedMedicalBeds
+
+        &&
+
+        previous.staffedMedicalBeds
+
+            ===
+
+            candidate.staffedMedicalBeds
 
         &&
 
@@ -1636,6 +1747,39 @@ function normalizeOptionalNonNegativeNumber(
 
 
 /**
+ * Normalize an optional positive number.
+ */
+function normalizeOptionalPositiveNumber(
+
+    value:unknown
+
+):number | undefined {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(value)
+
+        ||
+
+        value <= 0
+
+    ){
+
+        return undefined;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
  * Normalize an optional score.
  */
 function normalizeOptionalScore(
@@ -1817,6 +1961,23 @@ function isDateInput(
         ||
 
         typeof value === "number";
+
+}
+
+
+/**
+ * Create a stable fallback identifier for restored
+ * snapshots that predate snapshot IDs.
+ */
+function createSnapshotId(
+
+    timestamp:Date
+
+):string {
+
+    return `snapshot-${timestamp.getTime()}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
 
 }
 

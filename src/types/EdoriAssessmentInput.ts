@@ -11,32 +11,14 @@
 
 export interface EdoriAssessmentInput {
 
-    /**
-     * Current total emergency department census.
-     */
     totalEDVolume:number;
 
-
-    /**
-     * Current number of admitted patients
-     * boarding in the emergency department.
-     */
     boardedPatients:number;
 
-
-    /**
-     * Current occupied medical beds.
-     *
-     * EDORI uses 273 medical beds as the
-     * configured denominator.
-     */
     occupiedMedicalBeds:number;
 
+    staffedMedicalBeds:number;
 
-    /**
-     * Current Emergency Severity Index
-     * distribution.
-     */
     esi1:number;
 
     esi2:number;

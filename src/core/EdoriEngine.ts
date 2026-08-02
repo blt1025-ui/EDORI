@@ -274,6 +274,9 @@ export function runEdoriAssessment(
         occupiedMedicalBeds:
             input.occupiedMedicalBeds,
 
+            staffedMedicalBeds:
+    input.staffedMedicalBeds,
+
         esi1:
             input.esi1,
 
@@ -366,6 +369,10 @@ export function runEdoriAssessment(
 
     const snapshot:EdoriSnapshot = {
 
+id:
+    crypto.randomUUID(),
+
+
     score:
         result.score,
 
@@ -398,6 +405,8 @@ export function runEdoriAssessment(
     occupiedMedicalBeds:
         assessment.occupiedMedicalBeds,
 
+        staffedMedicalBeds:
+    assessment.staffedMedicalBeds,
 
     /*
      * ESI distribution

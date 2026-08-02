@@ -62,6 +62,9 @@ EdoriScenario[] = [
             occupiedMedicalBeds:
                 205,
 
+                staffedMedicalBeds:
+                273,
+
             esi1:
                 0,
 
@@ -147,6 +150,9 @@ EdoriScenario[] = [
 
             occupiedMedicalBeds:
                 230,
+
+                staffedMedicalBeds:
+                273,
 
             esi1:
                 1,
@@ -234,6 +240,9 @@ EdoriScenario[] = [
             occupiedMedicalBeds:
                 250,
 
+                staffedMedicalBeds:
+                273,
+
             esi1:
                 2,
 
@@ -319,6 +328,9 @@ EdoriScenario[] = [
 
             occupiedMedicalBeds:
                 267,
+
+                staffedMedicalBeds:
+                273,
 
             esi1:
                 2,
@@ -406,6 +418,8 @@ EdoriScenario[] = [
             occupiedMedicalBeds:
                 273,
 
+                staffedMedicalBeds:273,
+
             esi1:
                 5,
 
@@ -491,6 +505,8 @@ EdoriScenario[] = [
             occupiedMedicalBeds:
                 225,
 
+                staffedMedicalBeds:273,
+
             esi1:
                 5,
 
@@ -574,6 +590,9 @@ EdoriScenario[] = [
             occupiedMedicalBeds:
                 270,
 
+                staffedMedicalBeds:
+                273,
+
             esi1:
                 1,
 
@@ -656,6 +675,9 @@ EdoriScenario[] = [
 
             occupiedMedicalBeds:
                 245,
+
+                staffedMedicalBeds:
+                273,
 
             esi1:
                 2,

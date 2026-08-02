@@ -1,27 +1,21 @@
 /**
  * Dashboard
  *
- * Main EDORI operational dashboard.
+ * Main EDORI dashboard layout.
  *
  * Responsibilities:
  *
- * - Render the primary dashboard structure
- * - Initialize dashboard components
- * - Display the trigger-adjusted status banner
- * - Display assessment freshness
+ * - Render the command-center structure
+ * - Render the left assessment column
+ * - Render the collapsible right-column panels
+ * - Initialize all dashboard components
+ * - Initialize sidebar navigation
  *
- * Detailed right-column layout and toolbar logic
- * are delegated to focused dashboard components.
+ * Operational calculations, event subscriptions,
+ * status updates, and component-specific behavior
+ * are delegated to focused services and dashboard
+ * controllers.
  */
-
-import {
-
-    APP_EVENTS
-
-}
-
-from "../config/appEvents";
-
 
 import {
 
@@ -52,6 +46,15 @@ from "./assessment/SituationAssessment";
 
 import {
 
+    DashboardCommandBar
+
+}
+
+from "./dashboard/DashboardCommandBar";
+
+
+import {
+
     DashboardRightColumn
 
 }
@@ -70,69 +73,11 @@ from "./dashboard/DashboardController";
 
 import {
 
-    subscribe
+    initializeSidebar
 
 }
 
-from "../services/EventService";
-
-
-import {
-
-    createOperationalAssessment
-
-}
-
-from "../services/OperationalAssessmentService";
-
-
-import {
-
-    getLatestResult,
-
-    getResultInvalidationReason
-
-}
-
-from "../services/ResultService";
-
-
-import {
-
-    getSnapshots
-
-}
-
-from "../services/SnapshotService";
-
-
-import {
-
-    getState,
-
-    hasCommittedAssessment
-
-}
-
-from "../services/StateService";
-
-
-import type {
-
-    OperationalState
-
-}
-
-from "../config/operationalStates";
-
-
-import type {
-
-    SituationAssessment as SituationAssessmentType
-
-}
-
-from "../types/SituationAssessment";
+from "./Sidebar";
 
 
 /**
@@ -142,59 +87,70 @@ export function Dashboard():string {
 
     return `
 
-        <main class="dashboard">
+        <main
+            id="dashboard"
+            class="dashboard"
+        >
 
-            <div class="dashboard-header">
+            <section
+                id="currentStatusSection"
+                class="dashboard-current-status-section"
+            >
 
-                <div
-                    id="statusBanner"
-                    class="
-                        status-banner
-                        status-awaiting-assessment
-                    "
-                    aria-live="polite"
-                >
+                ${DashboardCommandBar()}
 
-                    ${createAwaitingAssessmentBanner()}
-
-                </div>
+            </section>
 
 
-                <div class="dashboard-title-group">
+            <div class="dashboard-title-row">
+
+                <div>
+
+                    <span class="dashboard-title-eyebrow">
+                        Emergency Department Operations
+                    </span>
+
 
                     <h2>
-                        Emergency Department Dashboard
+                        EDORI Command Center
                     </h2>
 
+
                     <p>
-                        Operational Readiness Overview
+                        Emergency Department Operational Readiness Index
                     </p>
-
-                </div>
-
-
-                <div
-                    id="assessmentFreshness"
-                    class="assessment-freshness"
-                    aria-live="polite"
-                >
-
-                    Assessment not yet calculated.
 
                 </div>
 
             </div>
 
 
-            ${ExecutiveSummary()}
+            <section
+                id="executiveSummarySection"
+                class="dashboard-executive-summary-section"
+            >
+
+                ${ExecutiveSummary()}
+
+            </section>
 
 
-            ${SummaryCards()}
+            <section
+                id="summaryCardsSection"
+                class="dashboard-summary-cards-section"
+            >
+
+                ${SummaryCards()}
+
+            </section>
 
 
             <div class="dashboard-grid">
 
-                <div class="left-column">
+                <div
+                    id="situationAssessmentSection"
+                    class="left-column"
+                >
 
                     ${SituationAssessment()}
 
@@ -213,834 +169,22 @@ export function Dashboard():string {
 
 
 /**
- * Initialize the dashboard after its markup has
- * been inserted into the document.
+ * Initialize all dashboard components after the
+ * dashboard markup has been inserted into the DOM.
  */
 export function initializeDashboard():void {
 
+    /*
+     * Initialize the dashboard components first so
+     * collapsible panels and section markup are ready.
+     */
     initializeDashboardComponents();
 
 
-    updateDashboard();
-
-
-    subscribe(
-
-        APP_EVENTS.RESULT_CHANGED,
-
-        updateDashboard
-
-    );
-
-
-    subscribe(
-
-        APP_EVENTS.HISTORICAL_DATA_CHANGED,
-
-        updateDashboard
-
-    );
-
-
-    subscribe(
-
-        APP_EVENTS.HISTORY_CHANGED,
-
-        updateDashboard
-
-    );
-
-}
-
-
-/**
- * Update the dashboard banner and assessment
- * freshness from authoritative services.
- */
-function updateDashboard():void {
-
-    const assessment = getState();
-
-
-    updateAssessmentFreshness(
-
-        assessment
-
-    );
-
-
-    const invalidationReason =
-
-        getResultInvalidationReason();
-
-
-    if(invalidationReason){
-
-        updateRecalculationRequiredBanner(
-
-            invalidationReason
-
-        );
-
-
-        return;
-
-    }
-
-
-    const result = getLatestResult();
-
-
-    if(
-
-        !result
-
-        ||
-
-        !hasCommittedAssessment()
-
-    ){
-
-        updateAwaitingAssessmentBanner();
-
-
-        return;
-
-    }
-
-
-    try {
-
-        const operationalAssessment =
-
-            createOperationalAssessment({
-
-                assessment,
-
-                result,
-
-                snapshots:
-                    getSnapshots(),
-
-                evaluatedAt:
-                    new Date()
-
-            });
-
-
-        updateStatusBanner(
-
-            operationalAssessment
-                .scoreResult
-                .score,
-
-            operationalAssessment
-                .finalOperationalState,
-
-            operationalAssessment
-                .baseOperationalState
-                .title,
-
-            operationalAssessment
-                .activeTriggers
-                .length
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to build the dashboard operational assessment:",
-
-            error
-
-        );
-
-
-        updateStatusBanner(
-
-            result.score,
-
-            result.operationalState,
-
-            result.operationalState.title,
-
-            0
-
-        );
-
-    }
-
-}
-
-
-/**
- * Display the trigger-adjusted operational status.
- */
-function updateStatusBanner(
-
-    score:number,
-
-    operationalState:OperationalState,
-
-    baseStateTitle:string,
-
-    activeTriggerCount:number
-
-):void {
-
-    const banner = document.getElementById(
-
-        "statusBanner"
-
-    );
-
-
-    if(!banner){
-
-        return;
-
-    }
-
-
-    const safeScore = Math.min(
-
-        100,
-
-        Math.max(
-
-            0,
-
-            Math.round(score)
-
-        )
-
-    );
-
-
-    const stateClass = createStateClassName(
-
-        operationalState.title
-
-    );
-
-
-    const stateWasEscalated =
-
-        operationalState.title !== baseStateTitle;
-
-
-    const triggerText = activeTriggerCount === 1
-
-        ? "1 active operational trigger"
-
-        : `${activeTriggerCount} active operational triggers`;
-
-
-    banner.className =
-
-        `status-banner ${stateClass}`;
-
-
-    banner.style.setProperty(
-
-        "--status-color",
-
-        operationalState.color
-
-    );
-
-
-    banner.innerHTML = `
-
-        <div class="status-header">
-
-            <div
-                id="statusIcon"
-                class="status-icon"
-                aria-hidden="true"
-            >
-
-                ${escapeHtml(
-                    operationalState.icon
-                )}
-
-            </div>
-
-
-            <div class="status-title-group">
-
-                <div
-                    id="statusTitle"
-                    class="status-title"
-                >
-
-                    ${escapeHtml(
-                        operationalState.title
-                    )}
-
-                </div>
-
-
-                <div class="status-score">
-
-                    EDORI Score:
-
-                    <strong>
-                        ${safeScore}
-                    </strong>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="status-recommendation">
-
-            ${escapeHtml(
-                operationalState.recommendation
-            )}
-
-        </div>
-
-
-        <div class="status-context">
-
-            <span>
-
-                Score-derived level:
-
-                <strong>
-
-                    ${escapeHtml(
-                        baseStateTitle
-                    )}
-
-                </strong>
-
-            </span>
-
-
-            <span>
-
-                ${escapeHtml(
-                    triggerText
-                )}
-
-            </span>
-
-
-            ${stateWasEscalated
-
-                ? `
-
-                    <span class="status-escalation-note">
-
-                        Operational triggers elevated the final level.
-
-                    </span>
-
-                `
-
-                : ""
-
-            }
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Display a recalculation-required banner.
- */
-function updateRecalculationRequiredBanner(
-
-    reason:string
-
-):void {
-
-    const banner = document.getElementById(
-
-        "statusBanner"
-
-    );
-
-
-    if(!banner){
-
-        return;
-
-    }
-
-
-    banner.className =
-
-        "status-banner status-recalculation-required";
-
-
-    banner.style.removeProperty(
-
-        "--status-color"
-
-    );
-
-
-    banner.innerHTML = `
-
-        <div class="status-header">
-
-            <div
-                class="status-icon"
-                aria-hidden="true"
-            >
-                ⚠️
-            </div>
-
-
-            <div class="status-title-group">
-
-                <div class="status-title">
-                    Recalculation Required
-                </div>
-
-                <div class="status-score">
-                    The previous EDORI result is no longer current.
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="status-recommendation">
-
-            ${escapeHtml(reason)}
-
-            Review the current values and select
-
-            <strong>
-                Calculate EDORI
-            </strong>
-
-            to generate an updated result.
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Display the awaiting-assessment banner.
- */
-function updateAwaitingAssessmentBanner():void {
-
-    const banner = document.getElementById(
-
-        "statusBanner"
-
-    );
-
-
-    if(!banner){
-
-        return;
-
-    }
-
-
-    banner.className =
-
-        "status-banner status-awaiting-assessment";
-
-
-    banner.style.removeProperty(
-
-        "--status-color"
-
-    );
-
-
-    banner.innerHTML =
-
-        createAwaitingAssessmentBanner();
-
-}
-
-
-/**
- * Create the initial banner markup.
- */
-function createAwaitingAssessmentBanner():string {
-
-    return `
-
-        <div class="status-header">
-
-            <div
-                class="status-icon"
-                aria-hidden="true"
-            >
-                ◯
-            </div>
-
-
-            <div class="status-title-group">
-
-                <div class="status-title">
-                    Awaiting Assessment
-                </div>
-
-                <div class="status-score">
-                    No current EDORI result is available.
-                </div>
-
-            </div>
-
-        </div>
-
-
-        <div class="status-recommendation">
-
-            Complete the Situation Assessment and select
-
-            <strong>
-                Calculate EDORI
-            </strong>
-
-            to generate the operational readiness assessment.
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Display the age of the committed assessment.
- */
-function updateAssessmentFreshness(
-
-    assessment:SituationAssessmentType
-
-):void {
-
-    const element = document.getElementById(
-
-        "assessmentFreshness"
-
-    );
-
-
-    if(!element){
-
-        return;
-
-    }
-
-
-    element.classList.remove(
-
-        "assessment-current",
-
-        "assessment-warning",
-
-        "assessment-critical",
-
-        "assessment-recalculation"
-
-    );
-
-
-    const invalidationReason =
-
-        getResultInvalidationReason();
-
-
-    if(invalidationReason){
-
-        element.textContent =
-
-            "The current operational assessment requires recalculation.";
-
-
-        element.classList.add(
-
-            "assessment-recalculation"
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(
-
-        !hasCommittedAssessment()
-
-        ||
-
-        !assessment.assessmentTime
-
-    ){
-
-        element.textContent =
-
-            "Assessment not yet calculated.";
-
-
-        return;
-
-    }
-
-
-    const assessmentDate = new Date(
-
-        assessment.assessmentTime
-
-    );
-
-
-    if(Number.isNaN(assessmentDate.getTime())){
-
-        element.textContent =
-
-            "Assessment time is unavailable.";
-
-
-        element.classList.add(
-
-            "assessment-warning"
-
-        );
-
-
-        return;
-
-    }
-
-
-    const elapsedMilliseconds = Math.max(
-
-        0,
-
-        Date.now() - assessmentDate.getTime()
-
-    );
-
-
-    const minutes = Math.floor(
-
-        elapsedMilliseconds / 60000
-
-    );
-
-
-    element.textContent = createFreshnessMessage(
-
-        minutes,
-
-        assessmentDate
-
-    );
-
-
-    if(minutes < 30){
-
-        element.classList.add(
-
-            "assessment-current"
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(minutes < 60){
-
-        element.classList.add(
-
-            "assessment-warning"
-
-        );
-
-
-        return;
-
-    }
-
-
-    element.classList.add(
-
-        "assessment-critical"
-
-    );
-
-}
-
-
-/**
- * Create a readable assessment-age message.
- */
-function createFreshnessMessage(
-
-    minutes:number,
-
-    assessmentDate:Date
-
-):string {
-
-    const timeText = assessmentDate.toLocaleTimeString(
-
-        [],
-
-        {
-
-            hour:
-                "2-digit",
-
-            minute:
-                "2-digit"
-
-        }
-
-    );
-
-
-    if(minutes === 0){
-
-        return `Calculated less than one minute ago at ${timeText}`;
-
-    }
-
-
-    if(minutes === 1){
-
-        return `Calculated 1 minute ago at ${timeText}`;
-
-    }
-
-
-    if(minutes < 60){
-
-        return `Calculated ${minutes} minutes ago at ${timeText}`;
-
-    }
-
-
-    const hours = Math.floor(
-
-        minutes / 60
-
-    );
-
-
-    const remainingMinutes = minutes % 60;
-
-
-    if(remainingMinutes === 0){
-
-        return hours === 1
-
-            ? `Calculated 1 hour ago at ${timeText}`
-
-            : `Calculated ${hours} hours ago at ${timeText}`;
-
-    }
-
-
-    const hourText = hours === 1
-
-        ? "1 hour"
-
-        : `${hours} hours`;
-
-
-    const minuteText = remainingMinutes === 1
-
-        ? "1 minute"
-
-        : `${remainingMinutes} minutes`;
-
-
-    return `Calculated ${hourText} and ${minuteText} ago at ${timeText}`;
-
-}
-
-
-/**
- * Convert a state title into a CSS class.
- */
-function createStateClassName(
-
-    title:string
-
-):string {
-
-    return `status-${title
-
-        .toLowerCase()
-
-        .replaceAll(
-
-            "&",
-
-            "and"
-
-        )
-
-        .replace(
-
-            /[^a-z0-9]+/g,
-
-            "-"
-
-        )
-
-        .replace(
-
-            /^-+|-+$/g,
-
-            ""
-
-        )}`;
-
-}
-
-
-/**
- * Escape text inserted into HTML.
- */
-function escapeHtml(
-
-    value:string
-
-):string {
-
-    return value
-
-        .replaceAll("&", "&amp;")
-
-        .replaceAll("<", "&lt;")
-
-        .replaceAll(">", "&gt;")
-
-        .replaceAll("\"", "&quot;")
-
-        .replaceAll("'", "&#039;");
+    /*
+     * Initialize sidebar navigation after all
+     * dashboard sections exist in the DOM.
+     */
+    initializeSidebar();
 
 }

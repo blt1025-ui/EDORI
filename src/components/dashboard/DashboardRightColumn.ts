@@ -1,37 +1,18 @@
 /**
  * DashboardRightColumn
  *
- * Renders the detailed operational panels shown
- * in the dashboard's right column.
+ * Renders and organizes the detailed operational
+ * panels shown in the dashboard's right column.
+ *
+ * Panels are grouped into:
+ *
+ * - Immediate Situation
+ * - Operational Detail
+ * - History and Administration
  *
  * This component only organizes presentation.
  * It does not calculate or modify EDORI data.
  */
-
-import {
-
-    ExecutiveAssessmentReport
-
-}
-
-from "../ExecutiveAssessmentReport";
-
-
-import {
-
-    ShiftHandoffSummary
-
-}
-
-from "../ShiftHandoffSummary";
-
-import {
-
-    OperationalForecast
-
-}
-
-from "../OperationalForecast";
 
 import {
 
@@ -53,11 +34,29 @@ from "../AssessmentHistory";
 
 import {
 
+    DataExportCenter
+
+}
+
+from "../DataExportCenter";
+
+
+import {
+
     Drivers
 
 }
 
 from "../Drivers";
+
+
+import {
+
+    ExecutiveAssessmentReport
+
+}
+
+from "../ExecutiveAssessmentReport";
 
 
 import {
@@ -76,6 +75,24 @@ import {
 }
 
 from "../HistoricalDataManager";
+
+
+import {
+
+    HistoryRestoreCenter
+
+}
+
+from "../HistoryRestoreCenter";
+
+
+import {
+
+    OperationalForecast
+
+}
+
+from "../OperationalForecast";
 
 
 import {
@@ -112,6 +129,15 @@ import {
 }
 
 from "../Recommendations";
+
+
+import {
+
+    ShiftHandoffSummary
+
+}
+
+from "../ShiftHandoffSummary";
 
 
 import {
@@ -153,6 +179,15 @@ export function DashboardRightColumn():string {
             ${DashboardToolbar()}
 
 
+            ${createPanelGroupHeading(
+
+                "Immediate Situation",
+
+                "Current score, drivers, actions, and near-term outlook"
+
+            )}
+
+
             ${CollapsiblePanel({
 
                 id:
@@ -165,7 +200,10 @@ export function DashboardRightColumn():string {
                     "Current numerical score and final operational level",
 
                 content:
-                    Gauge()
+                    Gauge(),
+
+                initiallyOpen:
+                    true
 
             })}
 
@@ -182,9 +220,81 @@ export function DashboardRightColumn():string {
                     "Trigger-adjusted readiness, pillars, and active conditions",
 
                 content:
-                    OperationalOverview()
+                    OperationalOverview(),
+
+                initiallyOpen:
+                    true
 
             })}
+
+
+            ${CollapsiblePanel({
+
+                id:
+                    "drivers-panel",
+
+                title:
+                    "Primary Drivers",
+
+                description:
+                    "Conditions contributing to the current operational level",
+
+                content:
+                    Drivers(),
+
+                initiallyOpen:
+                    true
+
+            })}
+
+
+            ${CollapsiblePanel({
+
+                id:
+                    "recommendations-panel",
+
+                title:
+                    "Recommended Actions",
+
+                description:
+                    "Prioritized operational interventions",
+
+                content:
+                    Recommendations(),
+
+                initiallyOpen:
+                    true
+
+            })}
+
+
+            ${CollapsiblePanel({
+
+                id:
+                    "operational-forecast-panel",
+
+                title:
+                    "Operational Outlook",
+
+                description:
+                    "Directional 2-hour and 4-hour ED scenario estimates",
+
+                content:
+                    OperationalForecast(),
+
+                initiallyOpen:
+                    true
+
+            })}
+
+
+            ${createPanelGroupHeading(
+
+                "Operational Detail",
+
+                "Reference information, assessment details, and leadership summaries"
+
+            )}
 
 
             ${CollapsiblePanel({
@@ -224,16 +334,16 @@ export function DashboardRightColumn():string {
             ${CollapsiblePanel({
 
                 id:
-                    "drivers-panel",
+                    "shift-handoff-panel",
 
                 title:
-                    "Primary Drivers",
+                    "Shift Handoff Summary",
 
                 description:
-                    "Conditions contributing to the current operational level",
+                    "Current status, active risks, actions, and near-term outlook",
 
                 content:
-                    Drivers()
+                    ShiftHandoffSummary()
 
             })}
 
@@ -241,67 +351,61 @@ export function DashboardRightColumn():string {
             ${CollapsiblePanel({
 
                 id:
-                    "recommendations-panel",
+                    "executive-assessment-report-panel",
 
                 title:
-                    "Recommended Actions",
+                    "Executive Assessment Report",
 
                 description:
-                    "Prioritized operational interventions",
+                    "Printable leadership summary and PDF-ready report",
 
                 content:
-                    Recommendations()
+                    ExecutiveAssessmentReport()
 
             })}
 
-${CollapsiblePanel({
 
-    id:
-        "operational-forecast-panel",
+            ${createPanelGroupHeading(
 
-    title:
-        "Operational Outlook",
+                "History and Administration",
 
-    description:
-        "Directional 2-hour and 4-hour ED scenario estimates",
+                "Trend review, saved records, backup, export, and historical baselines"
 
-    content:
-        OperationalForecast()
-
-})}
+            )}
 
 
-${CollapsiblePanel({
+            ${CollapsiblePanel({
 
-    id:
-        "shift-handoff-panel",
+                id:
+                    "data-export-center-panel",
 
-    title:
-        "Shift Handoff Summary",
+                title:
+                    "Data Export Center",
 
-    description:
-        "Current status, active risks, actions, and near-term outlook",
+                description:
+                    "Download current assessment and saved history files",
 
-    content:
-        ShiftHandoffSummary()
+                content:
+                    DataExportCenter()
 
-})}
+            })}
 
-${CollapsiblePanel({
 
-    id:
-        "executive-assessment-report-panel",
+            ${CollapsiblePanel({
 
-    title:
-        "Executive Assessment Report",
+                id:
+                    "history-restore-center-panel",
 
-    description:
-        "Printable leadership summary and PDF-ready report",
+                title:
+                    "History Restore Center",
 
-    content:
-        ExecutiveAssessmentReport()
+                description:
+                    "Validate and restore a saved EDORI JSON backup",
 
-})}
+                content:
+                    HistoryRestoreCenter()
+
+            })}
 
 
             ${CollapsiblePanel({
@@ -374,5 +478,102 @@ ${CollapsiblePanel({
         </div>
 
     `;
+
+}
+
+
+/**
+ * Render one dashboard panel-group heading.
+ */
+function createPanelGroupHeading(
+
+    title:string,
+
+    description:string
+
+):string {
+
+    return `
+
+        <div class="dashboard-panel-group-heading">
+
+            <div>
+
+                <span>
+
+                    ${escapeHtml(
+                        title
+                    )}
+
+                </span>
+
+
+                <p>
+
+                    ${escapeHtml(
+                        description
+                    )}
+
+                </p>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
+ */
+function escapeHtml(
+
+    value:string
+
+):string {
+
+    return value
+
+        .replaceAll(
+
+            "&",
+
+            "&amp;"
+
+        )
+
+        .replaceAll(
+
+            "<",
+
+            "&lt;"
+
+        )
+
+        .replaceAll(
+
+            ">",
+
+            "&gt;"
+
+        )
+
+        .replaceAll(
+
+            "\"",
+
+            "&quot;"
+
+        )
+
+        .replaceAll(
+
+            "'",
+
+            "&#039;"
+
+        );
 
 }

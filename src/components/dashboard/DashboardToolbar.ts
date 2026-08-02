@@ -32,11 +32,11 @@ export function DashboardToolbar():string {
             <div>
 
                 <strong>
-                    Dashboard Details
+                    Operational Panels
                 </strong>
 
                 <span>
-                    Expand individual sections or control all panels.
+                    Open the sections needed for the current operational review.
                 </span>
 
             </div>

@@ -6,8 +6,8 @@
  * Responsibilities:
  *
  * - Load global styles
- * - Render the application
- * - Initialize dashboard behavior
+ * - Render the application once
+ * - Initialize dashboard behavior once
  * - Expose development-only testing tools
  */
 
@@ -64,8 +64,7 @@ from "./scenarios/runOperationalAssessment";
 
 
 /**
- * Locate the application root created by
- * index.html.
+ * Locate the application root created by index.html.
  */
 const appElement = document.querySelector<
 
@@ -79,8 +78,8 @@ const appElement = document.querySelector<
 
 
 /**
- * Stop initialization if the root element
- * cannot be found.
+ * Stop initialization if the root element cannot
+ * be found.
  */
 if(!appElement){
 
@@ -94,14 +93,17 @@ if(!appElement){
 
 
 /**
- * Render the complete application HTML.
+ * Render the complete application HTML once.
  */
 appElement.innerHTML = App();
 
 
 /**
- * Initialize all dashboard components after
- * the HTML has been inserted into the page.
+ * Initialize all dashboard behavior after the HTML
+ * has been inserted into the page.
+ *
+ * initializeDashboard() also initializes the
+ * functional sidebar.
  */
 initializeDashboard();
 
@@ -113,9 +115,8 @@ initializeDashboard();
  *
  * npm run dev
  *
- * They remain available to TypeScript during
- * production compilation, but are not attached
- * to window in a production build.
+ * They are not attached to window in a production
+ * build.
  */
 if(import.meta.env.DEV){
 
