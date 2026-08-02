@@ -2,14 +2,15 @@
  * Recommendations
  *
  * Displays prioritized operational actions from the
- * authoritative EDORI OperationalAssessment.
+ * authoritative OperationalAssessment.
  *
  * This component does not:
  *
  * - Calculate EDORI
  * - Evaluate triggers
- * - Generate independent recommendations
+ * - Estimate intervention effectiveness
  * - Modify application state
+ * - Save results or snapshots
  */
 
 import {
@@ -72,6 +73,15 @@ from "../services/StateService";
 
 import type {
 
+    OperationalAssessment
+
+}
+
+from "../types/OperationalAssessment";
+
+
+import type {
+
     OperationalRecommendation
 
 }
@@ -80,7 +90,32 @@ from "../types/OperationalRecommendation";
 
 
 /**
- * Render the recommendations panel.
+ * Maximum number of actions displayed in each
+ * priority section.
+ */
+const MAXIMUM_ACTIONS_PER_SECTION = 8;
+
+
+/**
+ * Action-center priority order.
+ */
+const PRIORITY_ORDER:
+
+OperationalRecommendation["priority"][] = [
+
+    "Immediate",
+
+    "High",
+
+    "Moderate",
+
+    "Routine"
+
+];
+
+
+/**
+ * Render the Recommended Actions panel.
  */
 export function Recommendations():string {
 
@@ -97,7 +132,7 @@ export function Recommendations():string {
                     </h3>
 
                     <p class="panel-description">
-                        Prioritized actions based on current operational triggers
+                        Prioritized operational interventions
                     </p>
 
                 </div>
@@ -114,8 +149,8 @@ export function Recommendations():string {
 
 
             <div
-                id="recommendations-list"
-                class="recommendations-list"
+                id="recommendationsContent"
+                class="recommendations-content"
                 aria-live="polite"
             >
 
@@ -131,7 +166,7 @@ export function Recommendations():string {
 
 
 /**
- * Initialize the recommendations panel.
+ * Initialize recommendation-panel behavior.
  */
 export function initializeRecommendations():void {
 
@@ -168,14 +203,14 @@ export function initializeRecommendations():void {
 
 
 /**
- * Refresh recommendations from the current
- * authoritative operational assessment.
+ * Refresh recommendations from authoritative
+ * application services.
  */
 function updateRecommendations():void {
 
     const container = document.getElementById(
 
-        "recommendations-list"
+        "recommendationsContent"
 
     );
 
@@ -203,7 +238,11 @@ function updateRecommendations():void {
 
         container.innerHTML =
 
-            createRecalculationRequiredState();
+            createRecalculationRequiredState(
+
+                invalidationReason
+
+            );
 
 
         return;
@@ -272,60 +311,20 @@ function updateRecommendations():void {
             });
 
 
-        const recommendations =
+        container.innerHTML =
 
-            operationalAssessment.recommendations;
+            createActionCenterMarkup(
 
+                operationalAssessment
 
-        updateRecommendationCount(
-
-            recommendations.length
-
-        );
-
-
-        if(recommendations.length === 0){
-
-            container.innerHTML =
-
-                createRoutineOperationsState();
-
-
-            return;
-
-        }
-
-
-        container.innerHTML = recommendations
-
-            .slice()
-
-            .sort(
-
-                compareRecommendations
-
-            )
-
-            .map(
-
-                recommendation =>
-
-                    createRecommendationCard(
-
-                        recommendation
-
-                    )
-
-            )
-
-            .join("");
+            );
 
     }
     catch(error){
 
         console.error(
 
-            "Unable to update operational recommendations:",
+            "Unable to update recommended actions:",
 
             error
 
@@ -344,7 +343,7 @@ function updateRecommendations():void {
             <div class="recommendations-empty-state error">
 
                 <strong>
-                    Recommendations unavailable
+                    Recommended actions unavailable
                 </strong>
 
                 <p>
@@ -361,130 +360,275 @@ function updateRecommendations():void {
 
 
 /**
- * Create one recommendation card.
+ * Create the completed Action Center.
  */
-function createRecommendationCard(
+function createActionCenterMarkup(
 
-    recommendation:OperationalRecommendation
+    operationalAssessment:OperationalAssessment
 
 ):string {
 
-    const priorityClass =
+    const recommendations =
 
-        createPriorityClassName(
+        operationalAssessment.recommendations
 
-            recommendation.priority
+            .slice()
+
+            .sort(
+
+                compareRecommendations
+
+            );
+
+
+    updateRecommendationCount(
+
+        recommendations.length
+
+    );
+
+
+    if(recommendations.length === 0){
+
+        return createRoutineState();
+
+    }
+
+
+    const shortestReassessment =
+
+        determineShortestReassessment(
+
+            recommendations
 
         );
 
 
-    const responsibleGroupMarkup =
+    const immediateCount = recommendations.filter(
 
-        recommendation.responsibleGroup
+        recommendation =>
 
-            ? `
+            recommendation.priority === "Immediate"
 
-                <div class="recommendation-metadata-item">
+    ).length;
 
-                    <span>
-                        Responsible Group
-                    </span>
 
-                    <strong>
+    const responsibleGroups = Array.from(
 
-                        ${escapeHtml(
+        new Set(
+
+            recommendations
+
+                .map(
+
+                    recommendation =>
+
+                        normalizeOptionalText(
+
                             recommendation.responsibleGroup
-                        )}
-
-                    </strong>
-
-                </div>
-
-            `
-
-            : "";
-
-
-    const reassessmentMarkup =
-
-        recommendation.reassessmentMinutes
-
-            ? `
-
-                <div class="recommendation-metadata-item">
-
-                    <span>
-                        Reassess
-                    </span>
-
-                    <strong>
-
-                        ${recommendation.reassessmentMinutes}
-                        minutes
-
-                    </strong>
-
-                </div>
-
-            `
-
-            : "";
-
-
-    const sourceMarkup =
-
-        recommendation.sourceIds.length > 0
-
-            ? `
-
-                <div class="recommendation-source">
-
-                    Trigger source:
-
-                    ${recommendation.sourceIds
-
-                        .map(
-
-                            sourceId =>
-
-                                escapeHtml(
-
-                                    formatIdentifier(
-
-                                        sourceId
-
-                                    )
-
-                                )
 
                         )
 
-                        .join(", ")}
+                )
 
-                </div>
+                .filter(
 
-            `
+                    (
 
-            : "";
+                        value
+
+                    ):value is string =>
+
+                        value !== null
+
+                )
+
+        )
+
+    );
 
 
     return `
 
-        <article
+        <div class="action-center-summary">
+
+            <div class="action-center-summary-item">
+
+                <span>
+                    Total Actions
+                </span>
+
+                <strong>
+                    ${recommendations.length}
+                </strong>
+
+            </div>
+
+
+            <div class="action-center-summary-item">
+
+                <span>
+                    Immediate
+                </span>
+
+                <strong>
+                    ${immediateCount}
+                </strong>
+
+            </div>
+
+
+            <div class="action-center-summary-item">
+
+                <span>
+                    Next Reassessment
+                </span>
+
+                <strong>
+
+                    ${shortestReassessment === null
+
+                        ? "Routine"
+
+                        : `${shortestReassessment} min`
+
+                    }
+
+                </strong>
+
+            </div>
+
+
+            <div class="action-center-summary-item">
+
+                <span>
+                    Responsible Groups
+                </span>
+
+                <strong>
+                    ${responsibleGroups.length}
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <div class="action-center-sections">
+
+            ${PRIORITY_ORDER
+
+                .map(
+
+                    priority => {
+
+                        const matchingRecommendations =
+
+                            recommendations.filter(
+
+                                recommendation =>
+
+                                    recommendation.priority
+
+                                    ===
+
+                                    priority
+
+                            );
+
+
+                        if(
+
+                            matchingRecommendations.length
+
+                            ===
+
+                            0
+
+                        ){
+
+                            return "";
+
+                        }
+
+
+                        return createPrioritySection(
+
+                            priority,
+
+                            matchingRecommendations
+
+                        );
+
+                    }
+
+                )
+
+                .join("")}
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Create one recommendation-priority section.
+ */
+function createPrioritySection(
+
+    priority:OperationalRecommendation["priority"],
+
+    recommendations:OperationalRecommendation[]
+
+):string {
+
+    const visibleRecommendations =
+
+        recommendations.slice(
+
+            0,
+
+            MAXIMUM_ACTIONS_PER_SECTION
+
+        );
+
+
+    const hiddenCount = Math.max(
+
+        0,
+
+        recommendations.length
+
+        -
+
+        visibleRecommendations.length
+
+    );
+
+
+    return `
+
+        <section
             class="
-                recommendation-card
-                ${priorityClass}
+                action-center-section
+                action-center-section-${createPriorityClass(
+                    priority
+                )}
             "
         >
 
-            <div class="recommendation-card-header">
+            <div class="action-center-section-header">
 
                 <div>
 
-                    <span class="recommendation-priority">
+                    <span class="action-center-section-kicker">
 
                         ${escapeHtml(
-                            recommendation.priority
+                            createPriorityKicker(
+                                priority
+                            )
                         )}
 
                     </span>
@@ -493,7 +637,9 @@ function createRecommendationCard(
                     <h4>
 
                         ${escapeHtml(
-                            recommendation.title
+                            createPriorityHeading(
+                                priority
+                            )
                         )}
 
                     </h4>
@@ -501,61 +647,265 @@ function createRecommendationCard(
                 </div>
 
 
-                <span
-                    class="
-                        recommendation-priority-badge
-                        ${priorityClass}
-                    "
-                >
+                <span class="action-center-section-count">
 
-                    ${escapeHtml(
-                        recommendation.priority
-                    )}
+                    ${recommendations.length}
 
                 </span>
 
             </div>
 
 
-            <p class="recommendation-description">
+            <div class="action-center-list">
 
-                ${escapeHtml(
-                    recommendation.description
-                )}
+                ${visibleRecommendations
 
-            </p>
+                    .map(
 
+                        (
 
-            <div class="recommendation-rationale">
+                            recommendation,
 
-                <strong>
-                    Why this action is suggested
-                </strong>
+                            index
 
-                <p>
+                        ) =>
 
-                    ${escapeHtml(
-                        recommendation.rationale
-                    )}
+                            createActionCard(
 
-                </p>
+                                recommendation,
+
+                                index + 1
+
+                            )
+
+                    )
+
+                    .join("")}
 
             </div>
 
 
-            ${responsibleGroupMarkup
+            ${hiddenCount > 0
 
-                ||
+                ? `
 
-                reassessmentMarkup
+                    <div class="action-center-additional">
+
+                        ${hiddenCount}
+
+                        additional
+
+                        ${escapeHtml(
+                            priority.toLowerCase()
+                        )}
+
+                        ${hiddenCount === 1
+
+                            ? "action is"
+
+                            : "actions are"
+
+                        }
+
+                        not shown in this condensed view.
+
+                    </div>
+
+                `
+
+                : ""
+
+            }
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Create one action card.
+ */
+function createActionCard(
+
+    recommendation:OperationalRecommendation,
+
+    position:number
+
+):string {
+
+    const priorityClass = createPriorityClass(
+
+        recommendation.priority
+
+    );
+
+
+    const responsibleGroup = normalizeOptionalText(
+
+        recommendation.responsibleGroup
+
+    );
+
+
+    const rationale = normalizeOptionalText(
+
+        recommendation.rationale
+
+    );
+
+
+    const reassessmentText =
+
+        recommendation.reassessmentMinutes === null
+
+        ||
+
+        !Number.isFinite(
+
+            recommendation.reassessmentMinutes
+
+        )
+
+        ||
+
+        recommendation.reassessmentMinutes <= 0
+
+            ? "Routine interval"
+
+            : `${Math.round(
+                recommendation.reassessmentMinutes
+            )} minutes`;
+
+
+    return `
+
+        <article
+            class="
+                action-center-card
+                action-center-card-${priorityClass}
+            "
+        >
+
+            <div class="action-center-card-number">
+
+                ${position}
+
+            </div>
+
+
+            <div class="action-center-card-body">
+
+                <div class="action-center-card-header">
+
+                    <div>
+
+                        <span
+                            class="
+                                action-center-priority-badge
+                                action-center-priority-${priorityClass}
+                            "
+                        >
+
+                            ${escapeHtml(
+                                recommendation.priority
+                            )}
+
+                        </span>
+
+
+                        <h5>
+
+                            ${escapeHtml(
+                                recommendation.title
+                            )}
+
+                        </h5>
+
+                    </div>
+
+
+                    <span
+                        class="action-center-time-badge"
+                        title="Recommended reassessment interval"
+                    >
+
+                        ${escapeHtml(
+                            reassessmentText
+                        )}
+
+                    </span>
+
+                </div>
+
+
+                <p class="action-center-description">
+
+                    ${escapeHtml(
+                        recommendation.description
+                    )}
+
+                </p>
+
+
+                <div class="action-center-metadata">
+
+                    <div class="action-center-metadata-item">
+
+                        <span>
+                            Responsible Group
+                        </span>
+
+                        <strong>
+
+                            ${escapeHtml(
+                                responsibleGroup
+
+                                ?? "Local operational leadership"
+                            )}
+
+                        </strong>
+
+                    </div>
+
+
+                    <div class="action-center-metadata-item">
+
+                        <span>
+                            Reassessment
+                        </span>
+
+                        <strong>
+
+                            ${escapeHtml(
+                                reassessmentText
+                            )}
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                ${rationale
 
                     ? `
 
-                        <div class="recommendation-metadata">
+                        <div class="action-center-rationale">
 
-                            ${responsibleGroupMarkup}
+                            <strong>
+                                Operational rationale
+                            </strong>
 
-                            ${reassessmentMarkup}
+                            <p>
+
+                                ${escapeHtml(
+                                    rationale
+                                )}
+
+                            </p>
 
                         </div>
 
@@ -563,10 +913,14 @@ function createRecommendationCard(
 
                     : ""
 
-            }
+                }
 
 
-            ${sourceMarkup}
+                ${createRecommendationSourceMarkup(
+                    recommendation
+                )}
+
+            </div>
 
         </article>
 
@@ -576,8 +930,157 @@ function createRecommendationCard(
 
 
 /**
- * Order recommendations from highest to lowest
- * operational priority.
+ * Create a source-trigger display when the
+ * recommendation type provides source trigger IDs.
+ */
+function createRecommendationSourceMarkup(
+
+    recommendation:OperationalRecommendation
+
+):string {
+
+    const sourceTriggerIds =
+
+        readSourceTriggerIds(
+
+            recommendation
+
+        );
+
+
+    if(sourceTriggerIds.length === 0){
+
+        return "";
+
+    }
+
+
+    return `
+
+        <div class="action-center-source">
+
+            <span>
+                Source triggers
+            </span>
+
+
+            <div class="action-center-source-list">
+
+                ${sourceTriggerIds
+
+                    .map(
+
+                        triggerId => `
+
+                            <code>
+
+                                ${escapeHtml(
+                                    triggerId
+                                )}
+
+                            </code>
+
+                        `
+
+                    )
+
+                    .join("")}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Safely read source trigger IDs without requiring
+ * the interface to define the optional property.
+ */
+function readSourceTriggerIds(
+
+    recommendation:OperationalRecommendation
+
+):string[] {
+
+    const candidate = recommendation as
+
+        OperationalRecommendation
+
+        &
+
+        {
+
+            sourceTriggerIds?:unknown;
+
+            triggerIds?:unknown;
+
+        };
+
+
+    const possibleValues = [
+
+        candidate.sourceTriggerIds,
+
+        candidate.triggerIds
+
+    ];
+
+
+    for(const value of possibleValues){
+
+        if(!Array.isArray(value)){
+
+            continue;
+
+        }
+
+
+        const normalizedValues = value
+
+            .filter(
+
+                item =>
+
+                    typeof item === "string"
+
+            )
+
+            .map(
+
+                item =>
+
+                    item.trim()
+
+            )
+
+            .filter(
+
+                item =>
+
+                    item.length > 0
+
+            );
+
+
+        if(normalizedValues.length > 0){
+
+            return normalizedValues;
+
+        }
+
+    }
+
+
+    return [];
+
+}
+
+
+/**
+ * Sort actions by priority and reassessment time.
  */
 function compareRecommendations(
 
@@ -611,25 +1114,40 @@ function compareRecommendations(
     }
 
 
-    const firstReassessment =
+    const firstInterval =
 
-        first.reassessmentMinutes
+        normalizeReassessmentInterval(
 
-        ?? Number.MAX_SAFE_INTEGER;
+            first.reassessmentMinutes
 
-
-    const secondReassessment =
-
-        second.reassessmentMinutes
-
-        ?? Number.MAX_SAFE_INTEGER;
+        );
 
 
-    return firstReassessment
+    const secondInterval =
 
-        -
+        normalizeReassessmentInterval(
 
-        secondReassessment;
+            second.reassessmentMinutes
+
+        );
+
+
+    if(firstInterval !== secondInterval){
+
+        return firstInterval
+
+            -
+
+            secondInterval;
+
+    }
+
+
+    return first.title.localeCompare(
+
+        second.title
+
+    );
 
 }
 
@@ -672,6 +1190,219 @@ function getPriorityRank(
 
 
 /**
+ * Normalize reassessment time for sorting.
+ */
+function normalizeReassessmentInterval(
+
+    value:number | null
+
+):number {
+
+    if(
+
+        value === null
+
+        ||
+
+        !Number.isFinite(value)
+
+        ||
+
+        value <= 0
+
+    ){
+
+        return Number.MAX_SAFE_INTEGER;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Determine the shortest recommendation interval.
+ */
+function determineShortestReassessment(
+
+    recommendations:OperationalRecommendation[]
+
+):number | null {
+
+    const intervals = recommendations
+
+        .map(
+
+            recommendation =>
+
+                recommendation.reassessmentMinutes
+
+        )
+
+        .filter(
+
+            (
+
+                value
+
+            ):value is number =>
+
+                value !== null
+
+                &&
+
+                Number.isFinite(value)
+
+                &&
+
+                value > 0
+
+        );
+
+
+    if(intervals.length === 0){
+
+        return null;
+
+    }
+
+
+    return Math.round(
+
+        Math.min(
+
+            ...intervals
+
+        )
+
+    );
+
+}
+
+
+/**
+ * Convert priority into a CSS-friendly class.
+ */
+function createPriorityClass(
+
+    priority:OperationalRecommendation["priority"]
+
+):"routine" | "moderate" | "high" | "immediate" {
+
+    return priority.toLowerCase() as
+
+        | "routine"
+
+        | "moderate"
+
+        | "high"
+
+        | "immediate";
+
+}
+
+
+/**
+ * Create the user-facing priority heading.
+ */
+function createPriorityHeading(
+
+    priority:OperationalRecommendation["priority"]
+
+):string {
+
+    switch(priority){
+
+        case "Immediate":
+
+            return "Immediate Actions";
+
+
+        case "High":
+
+            return "High-Priority Actions";
+
+
+        case "Moderate":
+
+            return "Moderate-Priority Actions";
+
+
+        case "Routine":
+
+            return "Routine Actions";
+
+    }
+
+}
+
+
+/**
+ * Create the priority section kicker.
+ */
+function createPriorityKicker(
+
+    priority:OperationalRecommendation["priority"]
+
+):string {
+
+    switch(priority){
+
+        case "Immediate":
+
+            return "Act Now";
+
+
+        case "High":
+
+            return "Escalated Response";
+
+
+        case "Moderate":
+
+            return "Operational Mitigation";
+
+
+        case "Routine":
+
+            return "Ongoing Management";
+
+    }
+
+}
+
+
+/**
+ * Normalize optional text values.
+ */
+function normalizeOptionalText(
+
+    value:unknown
+
+):string | null {
+
+    if(typeof value !== "string"){
+
+        return null;
+
+    }
+
+
+    const normalized = value.trim();
+
+
+    return normalized.length > 0
+
+        ? normalized
+
+        : null;
+
+}
+
+
+/**
  * Update the action count.
  */
 function updateRecommendationCount(
@@ -694,13 +1425,35 @@ function updateRecommendationCount(
     }
 
 
-    element.textContent =
+    element.textContent = count === 1
 
-        count === 1
+        ? "1 action"
 
-            ? "1 action"
+        : `${count} actions`;
 
-            : `${count} actions`;
+}
+
+
+/**
+ * Create the routine state.
+ */
+function createRoutineState():string {
+
+    return `
+
+        <div class="recommendations-empty-state routine">
+
+            <strong>
+                Continue routine operations
+            </strong>
+
+            <p>
+                No trigger-based operational intervention is currently recommended.
+            </p>
+
+        </div>
+
+    `;
 
 }
 
@@ -719,7 +1472,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to generate operational recommendations.
+                Calculate EDORI to generate prioritized operational actions.
             </p>
 
         </div>
@@ -732,7 +1485,11 @@ function createAwaitingAssessmentState():string {
 /**
  * Create the recalculation-required state.
  */
-function createRecalculationRequiredState():string {
+function createRecalculationRequiredState(
+
+    reason:string
+
+):string {
 
     return `
 
@@ -743,97 +1500,16 @@ function createRecalculationRequiredState():string {
             </strong>
 
             <p>
-                Submit the current operational assessment to update recommendations.
+
+                ${escapeHtml(
+                    reason
+                )}
+
             </p>
 
         </div>
 
     `;
-
-}
-
-
-/**
- * Create the state shown when no triggers require
- * additional operational action.
- */
-function createRoutineOperationsState():string {
-
-    return `
-
-        <div class="recommendations-empty-state routine">
-
-            <strong>
-                Continue routine operations
-            </strong>
-
-            <p>
-                No trigger-based operational actions are currently required.
-            </p>
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Convert priority text into a CSS class.
- */
-function createPriorityClassName(
-
-    priority:OperationalRecommendation["priority"]
-
-):string {
-
-    return `priority-${priority
-
-        .toLowerCase()
-
-        .replace(
-
-            /[^a-z0-9]+/g,
-
-            "-"
-
-        )}`;
-
-}
-
-
-/**
- * Convert an identifier into readable text.
- */
-function formatIdentifier(
-
-    identifier:string
-
-):string {
-
-    return identifier
-
-        .split("-")
-
-        .filter(
-
-            word => word.length > 0
-
-        )
-
-        .map(
-
-            word =>
-
-                word.charAt(0).toUpperCase()
-
-                +
-
-                word.slice(1)
-
-        )
-
-        .join(" ");
 
 }
 

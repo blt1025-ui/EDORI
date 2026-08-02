@@ -1,11 +1,15 @@
 /**
  * Gauge
  *
- * Displays the current EDORI score together with
- * the trigger-adjusted final operational state.
+ * Displays the current EDORI score and the
+ * trigger-adjusted Alpha–Echo operational level.
  *
- * This component does not calculate EDORI,
- * evaluate triggers, or modify application state.
+ * This component does not:
+ *
+ * - Calculate EDORI
+ * - Evaluate operational triggers
+ * - Modify application state
+ * - Save assessment history
  */
 
 import {
@@ -66,8 +70,26 @@ import {
 from "../services/StateService";
 
 
+import type {
+
+    EdoriSnapshot
+
+}
+
+from "../types/EdoriSnapshot";
+
+
+import type {
+
+    OperationalAssessment
+
+}
+
+from "../types/OperationalAssessment";
+
+
 /**
- * Render the EDORI gauge.
+ * Render the EDORI gauge panel.
  */
 export function Gauge():string {
 
@@ -80,11 +102,11 @@ export function Gauge():string {
                 <div>
 
                     <h3>
-                        EDORI Score
+                        EDORI Gauge
                     </h3>
 
                     <p class="panel-description">
-                        Current operational readiness score
+                        Current score and trigger-adjusted operational level
                     </p>
 
                 </div>
@@ -110,7 +132,7 @@ export function Gauge():string {
 
 
 /**
- * Initialize the gauge.
+ * Initialize gauge behavior.
  */
 export function initializeGauge():void {
 
@@ -128,7 +150,7 @@ export function initializeGauge():void {
 
     subscribe(
 
-        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+        APP_EVENTS.HISTORY_CHANGED,
 
         updateGauge
 
@@ -137,7 +159,7 @@ export function initializeGauge():void {
 
     subscribe(
 
-        APP_EVENTS.HISTORY_CHANGED,
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
 
         updateGauge
 
@@ -174,7 +196,11 @@ function updateGauge():void {
 
         container.innerHTML =
 
-            createRecalculationRequiredState();
+            createRecalculationRequiredState(
+
+                invalidationReason
+
+            );
 
 
         return;
@@ -211,6 +237,9 @@ function updateGauge():void {
 
     try {
 
+        const snapshots = getSnapshots();
+
+
         const operationalAssessment =
 
             createOperationalAssessment({
@@ -220,8 +249,7 @@ function updateGauge():void {
 
                 result,
 
-                snapshots:
-                    getSnapshots(),
+                snapshots,
 
                 evaluatedAt:
                     new Date()
@@ -231,25 +259,17 @@ function updateGauge():void {
 
         container.innerHTML =
 
-            createGaugeMarkup(
+            createCompletedGauge(
 
-                operationalAssessment.scoreResult.score,
+                operationalAssessment,
 
-                operationalAssessment
-                    .baseOperationalState
-                    .title,
+                determineLatestScoreChange(
 
-                operationalAssessment
-                    .finalOperationalState
-                    .title,
+                    snapshots,
 
-                operationalAssessment
-                    .finalOperationalState
-                    .color,
+                    result.score
 
-                operationalAssessment
-                    .activeTriggers
-                    .length
+                )
 
             );
 
@@ -265,21 +285,21 @@ function updateGauge():void {
         );
 
 
-        container.innerHTML =
+        container.innerHTML = `
 
-            createGaugeMarkup(
+            <div class="gauge-empty-state error">
 
-                result.score,
+                <strong>
+                    Gauge unavailable
+                </strong>
 
-                result.operationalState.title,
+                <p>
+                    Review the browser console for additional details.
+                </p>
 
-                result.operationalState.title,
+            </div>
 
-                result.operationalState.color,
-
-                0
-
-            );
+        `;
 
     }
 
@@ -287,133 +307,207 @@ function updateGauge():void {
 
 
 /**
- * Create the completed gauge.
+ * Create the completed command-center gauge.
  */
-function createGaugeMarkup(
+function createCompletedGauge(
 
-    score:number,
+    operationalAssessment:OperationalAssessment,
 
-    baseStateTitle:string,
-
-    finalStateTitle:string,
-
-    stateColor:string,
-
-    activeTriggerCount:number
+    scoreChange:number | null
 
 ):string {
 
-    const safeScore = Math.min(
+    const score = clampScore(
 
-        100,
-
-        Math.max(
-
-            0,
-
-            Math.round(
-
-                score
-
-            )
-
-        )
+        operationalAssessment
+            .scoreResult
+            .score
 
     );
 
 
-    const rotation =
+    const roundedScore = Math.round(
+
+        score
+
+    );
+
+
+    const finalState =
+
+        operationalAssessment.finalOperationalState;
+
+
+    const baseState =
+
+        operationalAssessment.baseOperationalState;
+
+
+    const needleRotation =
 
         -90
 
         +
 
-        safeScore * 1.8;
+        score * 1.8;
 
 
-    const stateWasEscalated =
+    const activeTriggerCount =
 
-        baseStateTitle
+        operationalAssessment.activeTriggers.length;
+
+
+    const levelWasEscalated =
+
+        finalState.title
 
         !==
 
-        finalStateTitle;
-
-
-    const triggerText = activeTriggerCount === 1
-
-        ? "1 active trigger"
-
-        : `${activeTriggerCount} active triggers`;
+        baseState.title;
 
 
     return `
 
         <div
-            class="gauge-visual"
+            class="
+                command-gauge
+                command-gauge-${finalState.title.toLowerCase()}
+            "
             style="
-                --gauge-score:${safeScore};
-                --gauge-color:${escapeAttribute(stateColor)};
-                --gauge-rotation:${rotation}deg;
+                --gauge-color:${escapeAttribute(
+                    finalState.color
+                )};
+                --gauge-rotation:${needleRotation}deg;
             "
         >
 
-            <div class="gauge-arc">
-
-                <div class="gauge-needle">
-                </div>
-
-                <div class="gauge-center">
-                </div>
-
-            </div>
-
-
-            <div class="gauge-score-display">
-
-                <strong>
-
-                    ${safeScore}
-
-                </strong>
+            <div class="command-gauge-level">
 
                 <span>
-                    out of 100
-                </span>
-
-            </div>
-
-        </div>
-
-
-        <div class="gauge-status-summary">
-
-            <div class="gauge-final-state">
-
-                <span>
-                    Final Operational State
+                    Final Operational Level
                 </span>
 
                 <strong>
 
-                    ${escapeHtml(finalStateTitle)}
+                    ${escapeHtml(
+                        finalState.title
+                    )}
 
                 </strong>
 
             </div>
 
 
-            <div class="gauge-context-grid">
+            <div class="command-gauge-visual">
+
+                <div class="command-gauge-arc">
+
+                    ${createTickMarks()}
+
+
+                    <span class="command-gauge-label gauge-label-alpha">
+                        Alpha
+                    </span>
+
+                    <span class="command-gauge-label gauge-label-bravo">
+                        Bravo
+                    </span>
+
+                    <span class="command-gauge-label gauge-label-charlie">
+                        Charlie
+                    </span>
+
+                    <span class="command-gauge-label gauge-label-delta">
+                        Delta
+                    </span>
+
+                    <span class="command-gauge-label gauge-label-echo">
+                        Echo
+                    </span>
+
+
+                    <div class="command-gauge-inner">
+                    </div>
+
+
+                    <div class="command-gauge-needle">
+                    </div>
+
+
+                    <div class="command-gauge-center">
+                    </div>
+
+                </div>
+
+
+                <div class="command-gauge-score">
+
+                    <strong>
+
+                        ${roundedScore}
+
+                    </strong>
+
+                    <span>
+                        EDORI
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div class="command-gauge-change">
+
+                ${createScoreChangeMarkup(
+                    scoreChange
+                )}
+
+            </div>
+
+
+            <div class="command-gauge-scale">
+
+                <span>
+                    0
+                </span>
+
+                <span>
+                    20
+                </span>
+
+                <span>
+                    40
+                </span>
+
+                <span>
+                    60
+                </span>
+
+                <span>
+                    80
+                </span>
+
+                <span>
+                    100
+                </span>
+
+            </div>
+
+
+            <div class="command-gauge-context">
 
                 <div>
 
                     <span>
-                        Score-Derived State
+                        Score-Derived Level
                     </span>
 
                     <strong>
 
-                        ${escapeHtml(baseStateTitle)}
+                        ${escapeHtml(
+                            baseState.title
+                        )}
 
                     </strong>
 
@@ -423,12 +517,29 @@ function createGaugeMarkup(
                 <div>
 
                     <span>
-                        Operational Triggers
+                        Active Triggers
                     </span>
 
                     <strong>
 
-                        ${escapeHtml(triggerText)}
+                        ${activeTriggerCount}
+
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Trend
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(
+                            operationalAssessment.riskDirection
+                        )}
 
                     </strong>
 
@@ -437,13 +548,31 @@ function createGaugeMarkup(
             </div>
 
 
-            ${stateWasEscalated
+            ${levelWasEscalated
 
                 ? `
 
-                    <div class="gauge-escalation-message">
+                    <div class="command-gauge-escalation">
 
-                        Operational triggers elevated the final state above the score-derived state.
+                        <strong>
+                            Trigger escalation
+                        </strong>
+
+                        <span>
+
+                            Active operational triggers elevated the final level from
+
+                            ${escapeHtml(
+                                baseState.title
+                            )}
+
+                            to
+
+                            ${escapeHtml(
+                                finalState.title
+                            )}.
+
+                        </span>
 
                     </div>
 
@@ -461,7 +590,288 @@ function createGaugeMarkup(
 
 
 /**
- * Create the initial gauge state.
+ * Create visual tick marks at ten-point intervals.
+ */
+function createTickMarks():string {
+
+    return Array.from(
+
+        {
+
+            length:
+                11
+
+        },
+
+        (
+
+            _,
+
+            index
+
+        ) => {
+
+            const rotation =
+
+                -90
+
+                +
+
+                index * 18;
+
+
+            const majorTick =
+
+                index % 2 === 0;
+
+
+            return `
+
+                <span
+                    class="
+                        command-gauge-tick
+                        ${majorTick
+                            ? "command-gauge-tick-major"
+                            : ""
+                        }
+                    "
+                    style="
+                        --tick-rotation:${rotation}deg;
+                    "
+                    aria-hidden="true"
+                >
+                </span>
+
+            `;
+
+        }
+
+    ).join("");
+
+}
+
+
+/**
+ * Create the score-change display.
+ */
+function createScoreChangeMarkup(
+
+    scoreChange:number | null
+
+):string {
+
+    if(scoreChange === null){
+
+        return `
+
+            <span class="gauge-change-neutral">
+                No previous assessment comparison
+            </span>
+
+        `;
+
+    }
+
+
+    const roundedChange = Math.round(
+
+        scoreChange
+
+    );
+
+
+    if(roundedChange > 0){
+
+        return `
+
+            <span class="${
+                roundedChange >= 10
+
+                    ? "gauge-change-critical"
+
+                    : "gauge-change-increasing"
+            }">
+
+                ▲ +${roundedChange}
+
+                since previous assessment
+
+            </span>
+
+        `;
+
+    }
+
+
+    if(roundedChange < 0){
+
+        return `
+
+            <span class="gauge-change-improving">
+
+                ▼ ${roundedChange}
+
+                since previous assessment
+
+            </span>
+
+        `;
+
+    }
+
+
+    return `
+
+        <span class="gauge-change-neutral">
+            No score change
+        </span>
+
+    `;
+
+}
+
+
+/**
+ * Determine the latest score change.
+ *
+ * Snapshot history may already contain the current
+ * result. This function avoids comparing the current
+ * score with itself.
+ */
+function determineLatestScoreChange(
+
+    snapshots:EdoriSnapshot[],
+
+    currentScore:number
+
+):number | null {
+
+    const validSnapshots = snapshots
+
+        .filter(
+
+            snapshot =>
+
+                Number.isFinite(
+
+                    snapshot.score
+
+                )
+
+                &&
+
+                !Number.isNaN(
+
+                    new Date(
+
+                        snapshot.timestamp
+
+                    ).getTime()
+
+                )
+
+        )
+
+        .slice()
+
+        .sort(
+
+            (
+
+                first,
+
+                second
+
+            ) =>
+
+                new Date(
+
+                    first.timestamp
+
+                ).getTime()
+
+                -
+
+                new Date(
+
+                    second.timestamp
+
+                ).getTime()
+
+        );
+
+
+    if(validSnapshots.length === 0){
+
+        return null;
+
+    }
+
+
+    const latestSnapshot =
+
+        validSnapshots[
+
+            validSnapshots.length - 1
+
+        ];
+
+
+    const currentResultIsLatestSnapshot =
+
+        Math.abs(
+
+            latestSnapshot.score
+
+            -
+
+            currentScore
+
+        )
+
+        <
+
+        0.001;
+
+
+    if(currentResultIsLatestSnapshot){
+
+        if(validSnapshots.length < 2){
+
+            return null;
+
+        }
+
+
+        const previousSnapshot =
+
+            validSnapshots[
+
+                validSnapshots.length - 2
+
+            ];
+
+
+        return currentScore
+
+            -
+
+            previousSnapshot.score;
+
+    }
+
+
+    return currentScore
+
+        -
+
+        latestSnapshot.score;
+
+}
+
+
+/**
+ * Create the initial state.
  */
 function createAwaitingAssessmentState():string {
 
@@ -474,7 +884,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to display the current readiness score.
+                Calculate EDORI to display the command-center gauge.
             </p>
 
         </div>
@@ -487,7 +897,11 @@ function createAwaitingAssessmentState():string {
 /**
  * Create the recalculation-required state.
  */
-function createRecalculationRequiredState():string {
+function createRecalculationRequiredState(
+
+    reason:string
+
+):string {
 
     return `
 
@@ -498,12 +912,49 @@ function createRecalculationRequiredState():string {
             </strong>
 
             <p>
-                Submit the current assessment to update the EDORI score and operational state.
+
+                ${escapeHtml(
+                    reason
+                )}
+
             </p>
 
         </div>
 
     `;
+
+}
+
+
+/**
+ * Clamp an EDORI score to 0–100.
+ */
+function clampScore(
+
+    value:number
+
+):number {
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+
+    return Math.min(
+
+        100,
+
+        Math.max(
+
+            0,
+
+            value
+
+        )
+
+    );
 
 }
 
@@ -519,51 +970,21 @@ function escapeHtml(
 
     return value
 
-        .replaceAll(
+        .replaceAll("&", "&amp;")
 
-            "&",
+        .replaceAll("<", "&lt;")
 
-            "&amp;"
+        .replaceAll(">", "&gt;")
 
-        )
+        .replaceAll("\"", "&quot;")
 
-        .replaceAll(
-
-            "<",
-
-            "&lt;"
-
-        )
-
-        .replaceAll(
-
-            ">",
-
-            "&gt;"
-
-        )
-
-        .replaceAll(
-
-            "\"",
-
-            "&quot;"
-
-        )
-
-        .replaceAll(
-
-            "'",
-
-            "&#039;"
-
-        );
+        .replaceAll("'", "&#039;");
 
 }
 
 
 /**
- * Escape text inserted into an HTML attribute.
+ * Escape text inserted into HTML attributes.
  */
 function escapeAttribute(
 

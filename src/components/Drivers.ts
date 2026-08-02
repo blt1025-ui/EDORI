@@ -1,20 +1,18 @@
 /**
  * Drivers
  *
- * Displays the primary factors contributing to the
- * current EDORI OperationalAssessment.
+ * Displays the primary operational conditions
+ * contributing to the current EDORI assessment.
  *
- * Sources include:
- *
- * - Existing EDORI calculation drivers
- * - Operational pillar details
- * - Active operational triggers
+ * Driver information is read from the authoritative
+ * OperationalAssessment.
  *
  * This component does not:
  *
  * - Calculate EDORI
  * - Evaluate triggers
  * - Modify application state
+ * - Save results or snapshots
  */
 
 import {
@@ -95,9 +93,7 @@ from "../types/OperationalAssessment";
 
 import type {
 
-    OperationalPillarDetail,
-
-    OperationalPillarFactor
+    OperationalPillarDetail
 
 }
 
@@ -114,12 +110,24 @@ from "../types/OperationalTriggerResult";
 
 
 /**
- * Maximum number of items displayed in each
- * driver section.
+ * Maximum number of primary driver cards displayed
+ * in each section.
  */
-const MAXIMUM_DISPLAYED_DRIVERS = 5;
+const MAXIMUM_PRIMARY_DRIVERS = 6;
 
-const MAXIMUM_DISPLAYED_TRIGGERS = 5;
+
+/**
+ * Visual severity used by driver cards.
+ */
+type DriverVisualSeverity =
+
+    | "routine"
+
+    | "moderate"
+
+    | "high"
+
+    | "critical";
 
 
 /**
@@ -140,7 +148,7 @@ export function Drivers():string {
                     </h3>
 
                     <p class="panel-description">
-                        Conditions contributing to the current operational state
+                        Conditions contributing to the current operational level
                     </p>
 
                 </div>
@@ -157,8 +165,8 @@ export function Drivers():string {
 
 
             <div
-                id="drivers-list"
-                class="drivers-list"
+                id="driversContent"
+                class="drivers-content"
                 aria-live="polite"
             >
 
@@ -174,7 +182,7 @@ export function Drivers():string {
 
 
 /**
- * Initialize the drivers panel.
+ * Initialize driver-panel behavior.
  */
 export function initializeDrivers():void {
 
@@ -211,14 +219,13 @@ export function initializeDrivers():void {
 
 
 /**
- * Refresh drivers from the authoritative
- * OperationalAssessment.
+ * Refresh drivers from authoritative services.
  */
 function updateDrivers():void {
 
     const container = document.getElementById(
 
-        "drivers-list"
+        "driversContent"
 
     );
 
@@ -246,7 +253,11 @@ function updateDrivers():void {
 
         container.innerHTML =
 
-            createRecalculationRequiredState();
+            createRecalculationRequiredState(
+
+                invalidationReason
+
+            );
 
 
         return;
@@ -315,20 +326,20 @@ function updateDrivers():void {
             });
 
 
-        renderOperationalDrivers(
+        container.innerHTML =
 
-            container,
+            createDriversMarkup(
 
-            operationalAssessment
+                operationalAssessment
 
-        );
+            );
 
     }
     catch(error){
 
         console.error(
 
-            "Unable to update operational drivers:",
+            "Unable to update primary drivers:",
 
             error
 
@@ -347,7 +358,7 @@ function updateDrivers():void {
             <div class="drivers-empty-state error">
 
                 <strong>
-                    Operational drivers unavailable
+                    Drivers unavailable
                 </strong>
 
                 <p>
@@ -364,50 +375,15 @@ function updateDrivers():void {
 
 
 /**
- * Render all driver sections.
+ * Create the completed driver display.
  */
-function renderOperationalDrivers(
-
-    container:HTMLElement,
+function createDriversMarkup(
 
     operationalAssessment:OperationalAssessment
 
-):void {
+):string {
 
-    const calculationDrivers =
-
-        operationalAssessment.primaryDrivers
-
-            .slice()
-
-            .sort(
-
-                (
-
-                    first,
-
-                    second
-
-                ) =>
-
-                    second.severity
-
-                    -
-
-                    first.severity
-
-            )
-
-            .slice(
-
-                0,
-
-                MAXIMUM_DISPLAYED_DRIVERS
-
-            );
-
-
-    const activeTriggers =
+    const triggerDrivers =
 
         operationalAssessment.activeTriggers
 
@@ -415,20 +391,25 @@ function renderOperationalDrivers(
 
             .sort(
 
-                compareTriggerResults
-
-            )
-
-            .slice(
-
-                0,
-
-                MAXIMUM_DISPLAYED_TRIGGERS
+                compareTriggerPriority
 
             );
 
 
-    const importantPillars =
+    const scoreDrivers =
+
+        operationalAssessment.primaryDrivers
+
+            .slice()
+
+            .sort(
+
+                compareDriverSeverity
+
+            );
+
+
+    const pillarDrivers =
 
         operationalAssessment.pillarDetails
 
@@ -438,104 +419,83 @@ function renderOperationalDrivers(
 
                     pillar.score !== null
 
-                    &&
-
-                    pillar.score >= 40
-
             )
+
+            .slice()
 
             .sort(
 
-                (
-
-                    first,
-
-                    second
-
-                ) =>
-
-                    (
-
-                        second.score
-
-                        ?? 0
-
-                    )
-
-                    -
-
-                    (
-
-                        first.score
-
-                        ?? 0
-
-                    )
+                comparePillarScore
 
             );
 
 
-    const totalCount =
+    const totalDriverCount =
 
-        calculationDrivers.length
+        triggerDrivers.length
 
         +
 
-        activeTriggers.length;
+        scoreDrivers.length
+
+        +
+
+        pillarDrivers.length;
 
 
     updateDriverCount(
 
-        totalCount
+        totalDriverCount
 
     );
 
 
-    if(
+    if(totalDriverCount === 0){
 
-        calculationDrivers.length === 0
-
-        &&
-
-        activeTriggers.length === 0
-
-        &&
-
-        importantPillars.length === 0
-
-    ){
-
-        container.innerHTML =
-
-            createNoSignificantDriversState();
-
-
-        return;
+        return createRoutineState();
 
     }
 
 
-    container.innerHTML = `
+    return `
 
-        ${createTriggerSection(
+        ${triggerDrivers.length > 0
 
-            activeTriggers
+            ? createTriggerDriverSection(
 
-        )}
+                triggerDrivers
+
+            )
+
+            : ""
+
+        }
 
 
-        ${createCalculationDriverSection(
+        ${scoreDrivers.length > 0
 
-            calculationDrivers
+            ? createScoreDriverSection(
 
-        )}
+                scoreDrivers
+
+            )
+
+            : ""
+
+        }
 
 
-        ${createPillarSection(
+        ${pillarDrivers.length > 0
 
-            importantPillars
+            ? createPillarDriverSection(
 
-        )}
+                pillarDrivers
+
+            )
+
+            : ""
+
+        }
 
     `;
 
@@ -543,33 +503,53 @@ function renderOperationalDrivers(
 
 
 /**
- * Create the active-trigger driver section.
+ * Create the active operational-trigger section.
  */
-function createTriggerSection(
+function createTriggerDriverSection(
 
-    triggers:OperationalTriggerResult[]
+    triggerDrivers:OperationalTriggerResult[]
 
 ):string {
-
-    if(triggers.length === 0){
-
-        return "";
-
-    }
-
 
     return `
 
         <div class="driver-section">
 
-            <h4>
-                Active Operational Triggers
-            </h4>
+            <div class="driver-section-heading">
+
+                <div>
+
+                    <span class="driver-section-kicker">
+                        Active Conditions
+                    </span>
+
+                    <h4>
+                        Operational Triggers
+                    </h4>
+
+                </div>
+
+
+                <span class="driver-section-count">
+
+                    ${triggerDrivers.length}
+
+                </span>
+
+            </div>
 
 
             <div class="driver-section-content">
 
-                ${triggers
+                ${triggerDrivers
+
+                    .slice(
+
+                        0,
+
+                        MAXIMUM_PRIMARY_DRIVERS
+
+                    )
 
                     .map(
 
@@ -587,6 +567,25 @@ function createTriggerSection(
 
             </div>
 
+
+            ${triggerDrivers.length > MAXIMUM_PRIMARY_DRIVERS
+
+                ? createAdditionalDriverMessage(
+
+                    triggerDrivers.length
+
+                    -
+
+                    MAXIMUM_PRIMARY_DRIVERS,
+
+                    "operational triggers"
+
+                )
+
+                : ""
+
+            }
+
         </div>
 
     `;
@@ -595,195 +594,59 @@ function createTriggerSection(
 
 
 /**
- * Create one active-trigger card.
+ * Create the EDORI score-driver section.
  */
-function createTriggerDriverCard(
+function createScoreDriverSection(
 
-    triggerResult:OperationalTriggerResult
+    scoreDrivers:Driver[]
 
 ):string {
-
-    const trigger =
-
-        triggerResult.trigger;
-
-
-    const priorityClass =
-
-        createPriorityClassName(
-
-            trigger.priority
-
-        );
-
-
-    const conditionSummary =
-
-        triggerResult.conditionResults
-
-            .map(
-
-                condition =>
-
-                    condition.explanation
-
-            )
-
-            .join(" ");
-
-
-    return `
-
-        <article
-            class="
-                driver-card
-                trigger-driver-card
-                ${priorityClass}
-            "
-        >
-
-            <div class="driver-card-header">
-
-                <div>
-
-                    <span class="driver-category">
-
-                        ${escapeHtml(
-                            trigger.category
-                        )}
-
-                    </span>
-
-
-                    <h5>
-
-                        ${escapeHtml(
-                            trigger.title
-                        )}
-
-                    </h5>
-
-                </div>
-
-
-                <span
-                    class="
-                        driver-priority-badge
-                        ${priorityClass}
-                    "
-                >
-
-                    ${escapeHtml(
-                        trigger.priority
-                    )}
-
-                </span>
-
-            </div>
-
-
-            <p class="driver-description">
-
-                ${escapeHtml(
-                    trigger.description
-                )}
-
-            </p>
-
-
-            <div class="driver-trigger-reason">
-
-                ${escapeHtml(
-                    conditionSummary
-                )}
-
-            </div>
-
-
-            <div class="driver-trigger-metadata">
-
-                <span>
-
-                    Proximity:
-
-                    <strong>
-
-                        ${Math.round(
-                            triggerResult.proximityPercent
-                        )}%
-
-                    </strong>
-
-                </span>
-
-
-                ${trigger.minimumOperationalState
-
-                    ? `
-
-                        <span>
-
-                            Minimum State:
-
-                            <strong>
-
-                                ${escapeHtml(
-                                    trigger.minimumOperationalState
-                                )}
-
-                            </strong>
-
-                        </span>
-
-                    `
-
-                    : ""
-
-                }
-
-            </div>
-
-        </article>
-
-    `;
-
-}
-
-
-/**
- * Create the EDORI calculation-driver section.
- */
-function createCalculationDriverSection(
-
-    drivers:Driver[]
-
-):string {
-
-    if(drivers.length === 0){
-
-        return "";
-
-    }
-
 
     return `
 
         <div class="driver-section">
 
-            <h4>
-                EDORI Score Drivers
-            </h4>
+            <div class="driver-section-heading">
+
+                <div>
+
+                    <span class="driver-section-kicker">
+                        Score Contribution
+                    </span>
+
+                    <h4>
+                        EDORI Drivers
+                    </h4>
+
+                </div>
+
+
+                <span class="driver-section-count">
+
+                    ${scoreDrivers.length}
+
+                </span>
+
+            </div>
 
 
             <div class="driver-section-content">
 
-                ${drivers
+                ${scoreDrivers
+
+                    .slice(
+
+                        0,
+
+                        MAXIMUM_PRIMARY_DRIVERS
+
+                    )
 
                     .map(
 
                         driver =>
 
-                            createCalculationDriverCard(
+                            createScoreDriverCard(
 
                                 driver
 
@@ -795,143 +658,26 @@ function createCalculationDriverSection(
 
             </div>
 
+
+            ${scoreDrivers.length > MAXIMUM_PRIMARY_DRIVERS
+
+                ? createAdditionalDriverMessage(
+
+                    scoreDrivers.length
+
+                    -
+
+                    MAXIMUM_PRIMARY_DRIVERS,
+
+                    "EDORI drivers"
+
+                )
+
+                : ""
+
+            }
+
         </div>
-
-    `;
-
-}
-
-
-/**
- * Create one score-driver card.
- */
-function createCalculationDriverCard(
-
-    driver:Driver
-
-):string {
-
-    const severity = clampPercent(
-
-        driver.severity
-
-    );
-
-
-    const difference =
-
-        driver.currentValue
-
-        -
-
-        driver.expectedValue;
-
-
-    return `
-
-        <article class="driver-card score-driver-card">
-
-            <div class="driver-card-header">
-
-                <div>
-
-                    <span class="driver-category">
-                        Score Driver
-                    </span>
-
-
-                    <h5>
-
-                        ${escapeHtml(
-                            driver.title
-                        )}
-
-                    </h5>
-
-                </div>
-
-
-                <strong class="driver-severity-value">
-
-                    ${Math.round(severity)}
-
-                </strong>
-
-            </div>
-
-
-            <p class="driver-description">
-
-                ${escapeHtml(
-                    driver.description
-                )}
-
-            </p>
-
-
-            <div class="driver-values-grid">
-
-                ${createDriverValue(
-
-                    "Current",
-
-                    formatNumber(
-
-                        driver.currentValue
-
-                    )
-
-                )}
-
-
-                ${createDriverValue(
-
-                    "Comparison",
-
-                    formatNumber(
-
-                        driver.expectedValue
-
-                    )
-
-                )}
-
-
-                ${createDriverValue(
-
-                    "Difference",
-
-                    formatSignedNumber(
-
-                        difference
-
-                    )
-
-                )}
-
-            </div>
-
-
-            <div
-                class="driver-severity-track"
-                role="progressbar"
-                aria-label="${escapeAttribute(
-                    `${driver.title} severity`
-                )}"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow="${Math.round(severity)}"
-            >
-
-                <div
-                    class="driver-severity-fill"
-                    style="width:${severity}%;"
-                >
-                </div>
-
-            </div>
-
-        </article>
 
     `;
 
@@ -941,31 +687,43 @@ function createCalculationDriverCard(
 /**
  * Create the operational-pillar section.
  */
-function createPillarSection(
+function createPillarDriverSection(
 
-    pillars:OperationalPillarDetail[]
+    pillarDrivers:OperationalPillarDetail[]
 
 ):string {
-
-    if(pillars.length === 0){
-
-        return "";
-
-    }
-
 
     return `
 
         <div class="driver-section">
 
-            <h4>
-                Operational Pillars
-            </h4>
+            <div class="driver-section-heading">
+
+                <div>
+
+                    <span class="driver-section-kicker">
+                        Operational Domains
+                    </span>
+
+                    <h4>
+                        Pillar Conditions
+                    </h4>
+
+                </div>
+
+
+                <span class="driver-section-count">
+
+                    ${pillarDrivers.length}
+
+                </span>
+
+            </div>
 
 
             <div class="driver-section-content">
 
-                ${pillars
+                ${pillarDrivers
 
                     .map(
 
@@ -991,81 +749,105 @@ function createPillarSection(
 
 
 /**
- * Create one pillar card.
+ * Create one active-trigger driver card.
  */
-function createPillarDriverCard(
+function createTriggerDriverCard(
 
-    pillar:OperationalPillarDetail
+    triggerResult:OperationalTriggerResult
 
 ):string {
 
-    const score =
+    const severity = createTriggerSeverity(
 
-        pillar.score
+        triggerResult.trigger.priority
 
-        ?? 0;
+    );
 
 
-    const factors = pillar.factors
+    const severityLabel =
 
-        .slice()
+        triggerResult.trigger.priority;
 
-        .sort(
 
-            (
+    const proximity = clampPercentage(
 
-                first,
+        triggerResult.proximityPercent
 
-                second
+    );
 
-            ) =>
 
-                second.severity
+    const reassessmentText =
 
-                -
+        triggerResult.trigger.reassessmentMinutes === null
 
-                first.severity
+            ? "Routine"
 
-        )
+            : `${triggerResult.trigger.reassessmentMinutes} min`;
 
-        .slice(
 
-            0,
+    const minimumLevel =
 
-            3
+        triggerResult.trigger.minimumOperationalState
 
-        );
+        ?? "No forced level";
 
 
     return `
 
-        <article class="driver-card pillar-driver-card">
+        <article
+            class="
+                driver-card
+                driver-card-${severity}
+            "
+        >
 
             <div class="driver-card-header">
 
-                <div>
+                <div class="driver-card-title-group">
 
-                    <span class="driver-category">
-                        Operational Pillar
+                    <span
+                        class="driver-card-indicator"
+                        aria-hidden="true"
+                    >
                     </span>
 
 
-                    <h5>
+                    <div>
 
-                        ${escapeHtml(
-                            pillar.title
-                        )}
+                        <span class="driver-category">
 
-                    </h5>
+                            ${escapeHtml(
+                                triggerResult.trigger.category
+                            )}
+
+                        </span>
+
+
+                        <h5>
+
+                            ${escapeHtml(
+                                triggerResult.trigger.title
+                            )}
+
+                        </h5>
+
+                    </div>
 
                 </div>
 
 
-                <strong class="driver-severity-value">
+                <span
+                    class="
+                        driver-priority-badge
+                        driver-priority-${severity}
+                    "
+                >
 
-                    ${Math.round(score)}
+                    ${escapeHtml(
+                        severityLabel
+                    )}
 
-                </strong>
+                </span>
 
             </div>
 
@@ -1073,57 +855,80 @@ function createPillarDriverCard(
             <p class="driver-description">
 
                 ${escapeHtml(
-                    pillar.summary
+                    triggerResult.trigger.description
                 )}
 
             </p>
 
 
-            ${factors.length > 0
+            <div class="driver-trigger-reason">
 
-                ? `
+                <strong>
+                    Why it is active
+                </strong>
 
-                    <div class="pillar-factor-list">
+                <span>
 
-                        ${factors
+                    ${escapeHtml(
+                        triggerResult.activationReason
+                    )}
 
-                            .map(
+                </span>
 
-                                factor =>
-
-                                    createPillarFactor(
-
-                                        factor
-
-                                    )
-
-                            )
-
-                            .join("")}
-
-                    </div>
-
-                `
-
-                : ""
-
-            }
+            </div>
 
 
-            <div
-                class="driver-severity-track"
-                role="progressbar"
-                aria-label="${escapeAttribute(
-                    `${pillar.title} score`
-                )}"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow="${Math.round(score)}"
-            >
+            <div class="driver-values-grid">
+
+                ${createValueCell(
+
+                    "Proximity",
+
+                    `${proximity}%`
+
+                )}
+
+
+                ${createValueCell(
+
+                    "Reassess",
+
+                    reassessmentText
+
+                )}
+
+
+                ${createValueCell(
+
+                    "Minimum Level",
+
+                    minimumLevel
+
+                )}
+
+            </div>
+
+
+            <div class="driver-impact-row">
+
+                <span>
+                    Trigger intensity
+                </span>
+
+                <strong>
+                    ${proximity} / 100
+                </strong>
+
+            </div>
+
+
+            <div class="driver-severity-track">
 
                 <div
                     class="driver-severity-fill"
-                    style="width:${clampPercent(score)}%;"
+                    style="
+                        width:${proximity}%;
+                    "
                 >
                 </div>
 
@@ -1137,81 +942,408 @@ function createPillarDriverCard(
 
 
 /**
- * Create one pillar-factor row.
+ * Create one EDORI score-driver card.
  */
-function createPillarFactor(
+function createScoreDriverCard(
 
-    factor:OperationalPillarFactor
+    driver:Driver
 
 ):string {
 
-    const comparisonText =
+    const impact = clampPercentage(
 
-        factor.comparisonValue === null
+        driver.severity
 
-            ? "No comparison"
+    );
 
-            : `Compared with ${formatNumber(
-                factor.comparisonValue
-            )}`;
+
+    const severity = createNumericSeverity(
+
+        impact
+
+    );
+
+
+    const difference = calculateDriverDifference(
+
+        driver.currentValue,
+
+        driver.expectedValue
+
+    );
 
 
     return `
 
-        <div class="pillar-factor">
+        <article
+            class="
+                driver-card
+                driver-card-${severity}
+            "
+        >
 
-            <div>
+            <div class="driver-card-header">
 
-                <strong>
+                <div class="driver-card-title-group">
 
-                    ${escapeHtml(
-                        factor.label
-                    )}
-
-                </strong>
-
-
-                <span>
-
-                    ${escapeHtml(
-                        comparisonText
-                    )}
-
-                </span>
-
-            </div>
+                    <span
+                        class="driver-card-indicator"
+                        aria-hidden="true"
+                    >
+                    </span>
 
 
-            <div class="pillar-factor-values">
+                    <div>
 
-                <span>
+                        <span class="driver-category">
+                            EDORI Driver
+                        </span>
 
-                    ${formatNumber(
-                        factor.currentValue
-                    )}
+                        <h5>
 
-                </span>
-
-
-                ${factor.difference !== null
-
-                    ? `
-
-                        <small>
-
-                            ${formatSignedNumber(
-                                factor.difference
+                            ${escapeHtml(
+                                driver.title
                             )}
 
-                        </small>
+                        </h5>
 
-                    `
+                    </div>
 
-                    : ""
+                </div>
 
-                }
+
+                <div class="driver-impact-score">
+
+                    <span>
+                        Impact
+                    </span>
+
+                    <strong>
+                        ${impact}
+                    </strong>
+
+                </div>
 
             </div>
+
+
+            <p class="driver-description">
+
+                ${escapeHtml(
+                    driver.description
+                )}
+
+            </p>
+
+
+            <div class="driver-values-grid">
+
+                ${createValueCell(
+
+                    "Current",
+
+                    formatUnknownValue(
+
+                        driver.currentValue
+
+                    )
+
+                )}
+
+
+                ${createValueCell(
+
+                    "Expected",
+
+                    formatUnknownValue(
+
+                        driver.expectedValue
+
+                    )
+
+                )}
+
+
+                ${createValueCell(
+
+                    "Difference",
+
+                    formatSignedUnknownValue(
+
+                        difference
+
+                    )
+
+                )}
+
+            </div>
+
+
+            <div class="driver-impact-row">
+
+                <span>
+                    Relative contribution
+                </span>
+
+                <strong>
+                    ${impact} / 100
+                </strong>
+
+            </div>
+
+
+            <div class="driver-severity-track">
+
+                <div
+                    class="driver-severity-fill"
+                    style="
+                        width:${impact}%;
+                    "
+                >
+                </div>
+
+            </div>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create one operational-pillar driver card.
+ */
+function createPillarDriverCard(
+
+    pillar:OperationalPillarDetail
+
+):string {
+
+    const score = clampPercentage(
+
+        pillar.score
+
+        ?? 0
+
+    );
+
+
+    const severity = createNumericSeverity(
+
+        score
+
+    );
+
+
+    return `
+
+        <article
+            class="
+                driver-card
+                driver-card-${severity}
+            "
+        >
+
+            <div class="driver-card-header">
+
+                <div class="driver-card-title-group">
+
+                    <span
+                        class="driver-card-indicator"
+                        aria-hidden="true"
+                    >
+                    </span>
+
+
+                    <div>
+
+                        <span class="driver-category">
+                            Operational Pillar
+                        </span>
+
+                        <h5>
+
+                            ${escapeHtml(
+                                pillar.title
+                            )}
+
+                        </h5>
+
+                    </div>
+
+                </div>
+
+
+                <div class="driver-impact-score">
+
+                    <span>
+                        Score
+                    </span>
+
+                    <strong>
+                        ${score}
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <p class="driver-description">
+
+                ${escapeHtml(
+                    pillar.summary
+                )}
+
+            </p>
+
+
+            ${pillar.factors.length > 0
+
+                ? createPillarFactorList(
+
+                    pillar
+
+                )
+
+                : ""
+
+            }
+
+
+            <div class="driver-impact-row">
+
+                <span>
+                    Pillar severity
+                </span>
+
+                <strong>
+                    ${score} / 100
+                </strong>
+
+            </div>
+
+
+            <div class="driver-severity-track">
+
+                <div
+                    class="driver-severity-fill"
+                    style="
+                        width:${score}%;
+                    "
+                >
+                </div>
+
+            </div>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create the factor list for one operational pillar.
+ */
+function createPillarFactorList(
+
+    pillar:OperationalPillarDetail
+
+):string {
+
+    return `
+
+        <div class="pillar-factor-list">
+
+            ${pillar.factors
+
+                .slice(
+
+                    0,
+
+                    4
+
+                )
+
+                .map(
+
+                    factor => {
+
+                        const differenceMarkup =
+
+                            factor.difference !== null
+
+                                ? `
+
+                                    <small>
+
+                                        ${escapeHtml(
+                                            formatSignedUnknownValue(
+                                                factor.difference
+                                            )
+                                        )}
+
+                                    </small>
+
+                                `
+
+                                : "";
+
+
+                        return `
+
+                            <div class="pillar-factor">
+
+                                <div>
+
+                                    <strong>
+
+                                        ${escapeHtml(
+                                            factor.label
+                                        )}
+
+                                    </strong>
+
+
+                                    <span>
+
+                                        ${escapeHtml(
+                                            factor.explanation
+                                        )}
+
+                                    </span>
+
+                                </div>
+
+
+                                <div class="pillar-factor-values">
+
+                                    <span>
+
+                                        ${escapeHtml(
+                                            formatUnknownValue(
+                                                factor.currentValue
+                                            )
+                                        )}
+
+                                    </span>
+
+
+                                    ${differenceMarkup}
+
+                                </div>
+
+                            </div>
+
+                        `;
+
+                    }
+
+                )
+
+                .join("")}
 
         </div>
 
@@ -1221,9 +1353,9 @@ function createPillarFactor(
 
 
 /**
- * Create one value cell.
+ * Create one driver value cell.
  */
-function createDriverValue(
+function createValueCell(
 
     label:string,
 
@@ -1236,11 +1368,19 @@ function createDriverValue(
         <div class="driver-value">
 
             <span>
-                ${escapeHtml(label)}
+
+                ${escapeHtml(
+                    label
+                )}
+
             </span>
 
             <strong>
-                ${escapeHtml(value)}
+
+                ${escapeHtml(
+                    value
+                )}
+
             </strong>
 
         </div>
@@ -1251,10 +1391,40 @@ function createDriverValue(
 
 
 /**
- * Sort operational triggers by priority and
- * proximity.
+ * Create a note when more drivers exist than can
+ * be displayed.
  */
-function compareTriggerResults(
+function createAdditionalDriverMessage(
+
+    additionalCount:number,
+
+    label:string
+
+):string {
+
+    return `
+
+        <div class="driver-additional-message">
+
+            ${additionalCount}
+
+            additional
+
+            ${escapeHtml(label)}
+
+            are not shown in this condensed view.
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Sort active triggers by priority and proximity.
+ */
+function compareTriggerPriority(
 
     first:OperationalTriggerResult,
 
@@ -1296,7 +1466,59 @@ function compareTriggerResults(
 
 
 /**
- * Rank trigger priority.
+ * Sort EDORI drivers from highest to lowest impact.
+ */
+function compareDriverSeverity(
+
+    first:Driver,
+
+    second:Driver
+
+):number {
+
+    return second.severity
+
+        -
+
+        first.severity;
+
+}
+
+
+/**
+ * Sort operational pillars by score.
+ */
+function comparePillarScore(
+
+    first:OperationalPillarDetail,
+
+    second:OperationalPillarDetail
+
+):number {
+
+    return (
+
+        second.score
+
+        ?? 0
+
+    )
+
+    -
+
+    (
+
+        first.score
+
+        ?? 0
+
+    );
+
+}
+
+
+/**
+ * Rank trigger priorities.
  */
 function getTriggerPriorityRank(
 
@@ -1334,140 +1556,136 @@ function getTriggerPriorityRank(
 
 
 /**
- * Update the driver count.
+ * Convert trigger priority to visual severity.
  */
-function updateDriverCount(
-
-    count:number
-
-):void {
-
-    const element = document.getElementById(
-
-        "driverCount"
-
-    );
-
-
-    if(!element){
-
-        return;
-
-    }
-
-
-    element.textContent =
-
-        count === 1
-
-            ? "1 driver"
-
-            : `${count} drivers`;
-
-}
-
-
-/**
- * Create the initial state.
- */
-function createAwaitingAssessmentState():string {
-
-    return `
-
-        <div class="drivers-empty-state">
-
-            <strong>
-                Awaiting assessment
-            </strong>
-
-            <p>
-                Calculate EDORI to identify the current operational drivers.
-            </p>
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Create the recalculation-required state.
- */
-function createRecalculationRequiredState():string {
-
-    return `
-
-        <div class="drivers-empty-state warning">
-
-            <strong>
-                Recalculation required
-            </strong>
-
-            <p>
-                Submit the current operational assessment to update the driver analysis.
-            </p>
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Create the no-driver state.
- */
-function createNoSignificantDriversState():string {
-
-    return `
-
-        <div class="drivers-empty-state routine">
-
-            <strong>
-                No significant operational drivers
-            </strong>
-
-            <p>
-                Current conditions do not meet configured driver or trigger thresholds.
-            </p>
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Convert trigger priority into a CSS class.
- */
-function createPriorityClassName(
+function createTriggerSeverity(
 
     priority:
         OperationalTriggerResult["trigger"]["priority"]
 
-):string {
+):DriverVisualSeverity {
 
-    return `priority-${priority
+    switch(priority){
 
-        .toLowerCase()
+        case "Critical":
 
-        .replace(
+            return "critical";
 
-            /[^a-z0-9]+/g,
 
-            "-"
+        case "High":
 
-        )}`;
+            return "high";
+
+
+        case "Moderate":
+
+            return "moderate";
+
+
+        default:
+
+            return "routine";
+
+    }
 
 }
 
 
 /**
- * Clamp a percentage to 0–100.
+ * Convert a numerical severity to visual severity.
  */
-function clampPercent(
+function createNumericSeverity(
+
+    value:number
+
+):DriverVisualSeverity {
+
+    if(value >= 80){
+
+        return "critical";
+
+    }
+
+
+    if(value >= 60){
+
+        return "high";
+
+    }
+
+
+    if(value >= 35){
+
+        return "moderate";
+
+    }
+
+
+    return "routine";
+
+}
+
+
+/**
+ * Calculate the difference between a driver's
+ * current and expected values.
+ *
+ * A difference is returned only when both values
+ * are finite numbers.
+ */
+function calculateDriverDifference(
+
+    currentValue:unknown,
+
+    expectedValue:unknown
+
+):number | null {
+
+    if(
+
+        typeof currentValue !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            currentValue
+
+        )
+
+        ||
+
+        typeof expectedValue !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            expectedValue
+
+        )
+
+    ){
+
+        return null;
+
+    }
+
+
+    return currentValue
+
+        -
+
+        expectedValue;
+
+}
+
+
+/**
+ * Clamp a numerical value to a whole percentage
+ * between 0 and 100.
+ */
+function clampPercentage(
 
     value:number
 
@@ -1488,7 +1706,11 @@ function clampPercent(
 
             0,
 
-            value
+            Math.round(
+
+                value
+
+            )
 
         )
 
@@ -1498,7 +1720,104 @@ function clampPercent(
 
 
 /**
- * Format one number for display.
+ * Format an unknown display value.
+ */
+function formatUnknownValue(
+
+    value:unknown
+
+):string {
+
+    if(
+
+        typeof value === "number"
+
+        &&
+
+        Number.isFinite(
+
+            value
+
+        )
+
+    ){
+
+        return formatNumber(
+
+            value
+
+        );
+
+    }
+
+
+    if(
+
+        typeof value === "string"
+
+        &&
+
+        value.trim().length > 0
+
+    ){
+
+        return value.trim();
+
+    }
+
+
+    return "--";
+
+}
+
+
+/**
+ * Format a signed unknown display value.
+ */
+function formatSignedUnknownValue(
+
+    value:unknown
+
+):string {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+    ){
+
+        return "--";
+
+    }
+
+
+    if(value > 0){
+
+        return `+${formatNumber(value)}`;
+
+    }
+
+
+    return formatNumber(
+
+        value
+
+    );
+
+}
+
+
+/**
+ * Format a number with no unnecessary trailing
+ * zero.
  */
 function formatNumber(
 
@@ -1515,7 +1834,11 @@ function formatNumber(
 
     if(Number.isInteger(value)){
 
-        return String(value);
+        return String(
+
+            value
+
+        );
 
     }
 
@@ -1540,45 +1863,113 @@ function formatNumber(
 
 
 /**
- * Format a positive or negative difference.
+ * Update the displayed driver count.
  */
-function formatSignedNumber(
+function updateDriverCount(
 
-    value:number
+    count:number
+
+):void {
+
+    const element = document.getElementById(
+
+        "driverCount"
+
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.textContent = count === 1
+
+        ? "1 driver"
+
+        : `${count} drivers`;
+
+}
+
+
+/**
+ * Create the routine state.
+ */
+function createRoutineState():string {
+
+    return `
+
+        <div class="drivers-empty-state routine">
+
+            <strong>
+                No major operational drivers
+            </strong>
+
+            <p>
+                The current assessment does not identify a dominant operational concern.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Create the initial state.
+ */
+function createAwaitingAssessmentState():string {
+
+    return `
+
+        <div class="drivers-empty-state">
+
+            <strong>
+                Awaiting assessment
+            </strong>
+
+            <p>
+                Calculate EDORI to display the current operational drivers.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Create the recalculation-required state.
+ */
+function createRecalculationRequiredState(
+
+    reason:string
 
 ):string {
 
-    if(!Number.isFinite(value)){
+    return `
 
-        return "--";
+        <div class="drivers-empty-state warning">
 
-    }
+            <strong>
+                Recalculation required
+            </strong>
 
+            <p>
 
-    const formatted =
+                ${escapeHtml(
+                    reason
+                )}
 
-        formatNumber(
+            </p>
 
-            Math.abs(value)
+        </div>
 
-        );
-
-
-    if(value > 0){
-
-        return `+${formatted}`;
-
-    }
-
-
-    if(value < 0){
-
-        return `-${formatted}`;
-
-    }
-
-
-    return "0";
+    `;
 
 }
 
@@ -1633,23 +2024,5 @@ function escapeHtml(
             "&#039;"
 
         );
-
-}
-
-
-/**
- * Escape text inserted into an HTML attribute.
- */
-function escapeAttribute(
-
-    value:string
-
-):string {
-
-    return escapeHtml(
-
-        value
-
-    );
 
 }
