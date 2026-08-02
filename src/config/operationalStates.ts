@@ -1,8 +1,15 @@
 /**
  * Operational States
  *
- * Defines the visual and operational interpretation
- * associated with EDORI score ranges.
+ * Defines the five EDORI operational levels.
+ *
+ * Severity:
+ *
+ * Alpha   → Lowest
+ * Bravo
+ * Charlie
+ * Delta
+ * Echo    → Highest
  */
 
 import type {
@@ -13,9 +20,10 @@ import type {
 
 from "../types/OperationalStateTitle";
 
+
 export interface OperationalState {
 
-   title:OperationalStateTitle;
+    title:OperationalStateTitle;
 
     icon:string;
 
@@ -34,6 +42,8 @@ extends OperationalState {
 
     maximum:number;
 
+    description:string;
+
 }
 
 
@@ -43,105 +53,130 @@ OperationalStateRange[] = [
 
     {
 
-        minimum:0,
+        minimum:
+            0,
 
-        maximum:20,
+        maximum:
+            20,
 
         title:
-            "Normal Operations",
+            "Alpha",
 
         icon:
             "🟢",
 
         color:
-            "#2E7D32",
+            "#16A34A",
+
+        description:
+            "Routine operations",
 
         recommendation:
-            "Emergency department operations are stable. Continue routine monitoring."
+            "Emergency department conditions are stable and within expected operating variation. Continue routine monitoring."
 
     },
 
 
     {
 
-        minimum:21,
+        minimum:
+            21,
 
-        maximum:40,
-
-        title:
-            "Elevated Activity",
-
-        icon:
-            "🔵",
-
-        color:
-            "#1565C0",
-
-        recommendation:
-            "Patient demand is increasing. Monitor patient flow and hospital capacity closely."
-
-    },
-
-
-    {
-
-        minimum:41,
-
-        maximum:60,
+        maximum:
+            40,
 
         title:
-            "Busy",
+            "Bravo",
 
         icon:
             "🟡",
 
         color:
-            "#F9A825",
+            "#EAB308",
+
+        description:
+            "Watch conditions",
 
         recommendation:
-            "Operational strain is developing. Evaluate throughput barriers and available capacity."
+            "Operational demand is increasing. Monitor ED flow, boarding, acuity, and hospital capacity closely."
 
     },
 
 
     {
 
-        minimum:61,
+        minimum:
+            41,
 
-        maximum:80,
+        maximum:
+            60,
 
         title:
-            "Surge",
+            "Charlie",
 
         icon:
             "🟠",
 
         color:
-            "#EF6C00",
+            "#F97316",
+
+        description:
+            "Sustained operational strain",
 
         recommendation:
-            "Hospital surge interventions should be considered. Increase operational awareness and throughput response."
+            "Operational strain is developing. Review throughput barriers, available capacity, and emerging surge needs."
 
     },
 
 
     {
 
-        minimum:81,
+        minimum:
+            61,
 
-        maximum:100,
+        maximum:
+            80,
 
         title:
-            "Severe Surge",
+            "Delta",
 
         icon:
             "🔴",
 
         color:
-            "#C62828",
+            "#DC2626",
+
+        description:
+            "Elevated surge conditions",
 
         recommendation:
-            "Immediate hospital-wide intervention is recommended. Activate the highest appropriate surge response."
+            "Significant operational strain is present. Activate coordinated surge interventions and increase reassessment frequency."
+
+    },
+
+
+    {
+
+        minimum:
+            81,
+
+        maximum:
+            100,
+
+        title:
+            "Echo",
+
+        icon:
+            "⚫",
+
+        color:
+            "#111827",
+
+        description:
+            "Critical operational conditions",
+
+        recommendation:
+            "Emergency department and hospital operations are under severe strain. Activate the highest appropriate organizational response."
 
     }
 
@@ -194,46 +229,143 @@ export function getOperationalState(
     );
 
 
-    if(!match){
+    const selectedState = match
 
-        const fallback =
-
-            OPERATIONAL_STATES[0];
-
-
-        return {
-
-            title:
-                fallback.title,
-
-            icon:
-                fallback.icon,
-
-            color:
-                fallback.color,
-
-            recommendation:
-                fallback.recommendation
-
-        };
-
-    }
+        ?? OPERATIONAL_STATES[0];
 
 
     return {
 
         title:
-            match.title,
+            selectedState.title,
 
         icon:
-            match.icon,
+            selectedState.icon,
 
         color:
-            match.color,
+            selectedState.color,
 
         recommendation:
-            match.recommendation
+            selectedState.recommendation
 
     };
+
+}
+
+
+/**
+ * Return the full configured range for a score.
+ */
+export function getOperationalStateRange(
+
+    score:number
+
+):OperationalStateRange {
+
+    const safeScore = Math.min(
+
+        100,
+
+        Math.max(
+
+            0,
+
+            Math.round(
+
+                Number.isFinite(score)
+
+                    ? score
+
+                    : 0
+
+            )
+
+        )
+
+    );
+
+
+    return OPERATIONAL_STATES.find(
+
+        state =>
+
+            safeScore >= state.minimum
+
+            &&
+
+            safeScore <= state.maximum
+
+    )
+
+    ?? OPERATIONAL_STATES[0];
+
+}
+
+
+/**
+ * Return an operational state by title.
+ */
+export function getOperationalStateByTitle(
+
+    title:OperationalStateTitle
+
+):OperationalState {
+
+    const match = OPERATIONAL_STATES.find(
+
+        state =>
+
+            state.title === title
+
+    );
+
+
+    const selectedState = match
+
+        ?? OPERATIONAL_STATES[0];
+
+
+    return {
+
+        title:
+            selectedState.title,
+
+        icon:
+            selectedState.icon,
+
+        color:
+            selectedState.color,
+
+        recommendation:
+            selectedState.recommendation
+
+    };
+
+}
+
+
+/**
+ * Return severity rank from lowest to highest.
+ */
+export function getOperationalStateRank(
+
+    title:OperationalStateTitle
+
+):number {
+
+    const index = OPERATIONAL_STATES.findIndex(
+
+        state =>
+
+            state.title === title
+
+    );
+
+
+    return index >= 0
+
+        ? index
+
+        : 0;
 
 }

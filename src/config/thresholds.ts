@@ -1,10 +1,9 @@
 /**
- * EDORI Operational Thresholds
+ * EDORI Thresholds
  *
- * Maps EDORI scores to
- * operational states.
+ * Maps numerical EDORI scores to the configured
+ * Alpha through Echo operational states.
  */
-
 
 import {
 
@@ -17,172 +16,99 @@ from "./operationalStates";
 
 import type {
 
-    OperationalState
+    OperationalState,
+
+    OperationalStateRange
 
 }
 
 from "./operationalStates";
 
 
-
-
-
-
-
 export interface Threshold {
 
+    minimum:number;
 
-    min:number;
-
-
-    max:number;
-
+    maximum:number;
 
     operationalState:OperationalState;
-
 
 }
 
 
-
-
-
-
-
-export const THRESHOLDS:Threshold[] = [
-
-
-    {
-
-
-        min:0,
-
-
-        max:24,
-
-
-        operationalState:
-
-            OPERATIONAL_STATES[0]
-
-
-    },
-
-
-    {
-
-
-        min:25,
-
-
-        max:39,
-
-
-        operationalState:
-
-            OPERATIONAL_STATES[1]
-
-
-    },
-
-
-
-    {
-
-
-        min:40,
-
-
-        max:54,
-
-
-        operationalState:
-
-            OPERATIONAL_STATES[2]
-
-
-    },
-
-
-
-    {
-
-
-        min:55,
-
-
-        max:69,
-
-
-        operationalState:
-
-            OPERATIONAL_STATES[3]
-
-
-    },
-
-
-
-    {
-
-
-        min:70,
-
-
-        max:100,
-
-
-        operationalState:
-
-            OPERATIONAL_STATES[4]
-
-
-    }
-
-
-];
-
-
-
-
-
-
-
-
-
+/**
+ * Return the threshold associated with a score.
+ */
 export function getThreshold(
 
     score:number
 
 ):Threshold {
 
+    const safeScore = Math.min(
 
-    for(const threshold of THRESHOLDS){
+        100,
+
+        Math.max(
+
+            0,
+
+            Math.round(
+
+                Number.isFinite(score)
+
+                    ? score
+
+                    : 0
+
+            )
+
+        )
+
+    );
 
 
-        if(
+    const match:OperationalStateRange =
 
-            score >= threshold.min
+        OPERATIONAL_STATES.find(
 
-            &&
+            state =>
 
-            score <= threshold.max
+                safeScore >= state.minimum
 
-        ){
+                &&
+
+                safeScore <= state.maximum
+
+        )
+
+        ?? OPERATIONAL_STATES[0];
 
 
-            return threshold;
+    return {
 
+        minimum:
+            match.minimum,
+
+        maximum:
+            match.maximum,
+
+        operationalState:{
+
+            title:
+                match.title,
+
+            icon:
+                match.icon,
+
+            color:
+                match.color,
+
+            recommendation:
+                match.recommendation
 
         }
 
-
-    }
-
-
-
-
-    return THRESHOLDS[0];
-
+    };
 
 }

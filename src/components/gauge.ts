@@ -1,12 +1,12 @@
 /**
  * Gauge
  *
- * Displays the latest authoritative EDORI result.
+ * Displays the current EDORI score together with
+ * the trigger-adjusted final operational state.
  *
- * This component does not calculate EDORI.
- * It reads the stored result from ResultService.
+ * This component does not calculate EDORI,
+ * evaluate triggers, or modify application state.
  */
-
 
 import {
 
@@ -15,6 +15,7 @@ import {
 }
 
 from "../config/appEvents";
+
 
 import {
 
@@ -27,11 +28,42 @@ from "../services/EventService";
 
 import {
 
-    getLatestResult
+    createOperationalAssessment
+
+}
+
+from "../services/OperationalAssessmentService";
+
+
+import {
+
+    getLatestResult,
+
+    getResultInvalidationReason
 
 }
 
 from "../services/ResultService";
+
+
+import {
+
+    getSnapshots
+
+}
+
+from "../services/SnapshotService";
+
+
+import {
+
+    getState,
+
+    hasCommittedAssessment
+
+}
+
+from "../services/StateService";
 
 
 /**
@@ -52,7 +84,7 @@ export function Gauge():string {
                     </h3>
 
                     <p class="panel-description">
-                        Current operational readiness index
+                        Current operational readiness score
                     </p>
 
                 </div>
@@ -60,46 +92,13 @@ export function Gauge():string {
             </div>
 
 
-            <div class="gauge">
-
-                <div
-                    id="edori-icon"
-                    class="gauge-icon"
-                >
-
-                    ⚪
-
-                </div>
-
-
-                <div
-                    id="edori-score"
-                    class="gauge-value"
-                >
-
-                    --
-
-                </div>
-
-
-                <div
-                    id="edori-status"
-                    class="gauge-status"
-                >
-
-                    Awaiting Assessment
-
-                </div>
-
-            </div>
-
-
             <div
-                id="edori-recommendation"
-                class="gauge-recommendation"
+                id="gaugeContent"
+                class="gauge-content"
+                aria-live="polite"
             >
 
-                Complete and calculate the situation assessment.
+                ${createAwaitingAssessmentState()}
 
             </div>
 
@@ -120,55 +119,201 @@ export function initializeGauge():void {
 
     subscribe(
 
-    APP_EVENTS.RESULT_CHANGED,
+        APP_EVENTS.RESULT_CHANGED,
 
-    updateGauge
+        updateGauge
 
-);
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+
+        updateGauge
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORY_CHANGED,
+
+        updateGauge
+
+    );
 
 }
 
 
 /**
- * Update the gauge from the latest stored result.
+ * Refresh the gauge from authoritative services.
  */
 function updateGauge():void {
 
-    const result = getLatestResult();
+    const container = document.getElementById(
+
+        "gaugeContent"
+
+    );
 
 
-    if(!result){
-
-        resetGauge();
+    if(!container){
 
         return;
 
     }
 
 
-    const operationalState =
+    const invalidationReason =
 
-        result.operationalState;
-
-
-    setElementText(
-
-        "edori-icon",
-
-        operationalState.icon
-
-    );
+        getResultInvalidationReason();
 
 
-    setElementText(
+    if(invalidationReason){
 
-        "edori-score",
+        container.innerHTML =
 
-        String(
+            createRecalculationRequiredState();
+
+
+        return;
+
+    }
+
+
+    if(!hasCommittedAssessment()){
+
+        container.innerHTML =
+
+            createAwaitingAssessmentState();
+
+
+        return;
+
+    }
+
+
+    const result = getLatestResult();
+
+
+    if(!result){
+
+        container.innerHTML =
+
+            createAwaitingAssessmentState();
+
+
+        return;
+
+    }
+
+
+    try {
+
+        const operationalAssessment =
+
+            createOperationalAssessment({
+
+                assessment:
+                    getState(),
+
+                result,
+
+                snapshots:
+                    getSnapshots(),
+
+                evaluatedAt:
+                    new Date()
+
+            });
+
+
+        container.innerHTML =
+
+            createGaugeMarkup(
+
+                operationalAssessment.scoreResult.score,
+
+                operationalAssessment
+                    .baseOperationalState
+                    .title,
+
+                operationalAssessment
+                    .finalOperationalState
+                    .title,
+
+                operationalAssessment
+                    .finalOperationalState
+                    .color,
+
+                operationalAssessment
+                    .activeTriggers
+                    .length
+
+            );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to update the EDORI gauge:",
+
+            error
+
+        );
+
+
+        container.innerHTML =
+
+            createGaugeMarkup(
+
+                result.score,
+
+                result.operationalState.title,
+
+                result.operationalState.title,
+
+                result.operationalState.color,
+
+                0
+
+            );
+
+    }
+
+}
+
+
+/**
+ * Create the completed gauge.
+ */
+function createGaugeMarkup(
+
+    score:number,
+
+    baseStateTitle:string,
+
+    finalStateTitle:string,
+
+    stateColor:string,
+
+    activeTriggerCount:number
+
+):string {
+
+    const safeScore = Math.min(
+
+        100,
+
+        Math.max(
+
+            0,
 
             Math.round(
 
-                result.score
+                score
 
             )
 
@@ -177,144 +322,259 @@ function updateGauge():void {
     );
 
 
-    setElementText(
+    const rotation =
 
-        "edori-status",
+        -90
 
-        operationalState.title
+        +
 
-    );
-
-
-    setElementText(
-
-        "edori-recommendation",
-
-        operationalState.recommendation
-
-    );
+        safeScore * 1.8;
 
 
-    updateGaugeColor(
+    const stateWasEscalated =
 
-        operationalState.color
+        baseStateTitle
 
-    );
+        !==
+
+        finalStateTitle;
+
+
+    const triggerText = activeTriggerCount === 1
+
+        ? "1 active trigger"
+
+        : `${activeTriggerCount} active triggers`;
+
+
+    return `
+
+        <div
+            class="gauge-visual"
+            style="
+                --gauge-score:${safeScore};
+                --gauge-color:${escapeAttribute(stateColor)};
+                --gauge-rotation:${rotation}deg;
+            "
+        >
+
+            <div class="gauge-arc">
+
+                <div class="gauge-needle">
+                </div>
+
+                <div class="gauge-center">
+                </div>
+
+            </div>
+
+
+            <div class="gauge-score-display">
+
+                <strong>
+
+                    ${safeScore}
+
+                </strong>
+
+                <span>
+                    out of 100
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <div class="gauge-status-summary">
+
+            <div class="gauge-final-state">
+
+                <span>
+                    Final Operational State
+                </span>
+
+                <strong>
+
+                    ${escapeHtml(finalStateTitle)}
+
+                </strong>
+
+            </div>
+
+
+            <div class="gauge-context-grid">
+
+                <div>
+
+                    <span>
+                        Score-Derived State
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(baseStateTitle)}
+
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Operational Triggers
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(triggerText)}
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            ${stateWasEscalated
+
+                ? `
+
+                    <div class="gauge-escalation-message">
+
+                        Operational triggers elevated the final state above the score-derived state.
+
+                    </div>
+
+                `
+
+                : ""
+
+            }
+
+        </div>
+
+    `;
 
 }
 
 
 /**
- * Reset the gauge before the first result exists.
+ * Create the initial gauge state.
  */
-function resetGauge():void {
+function createAwaitingAssessmentState():string {
 
-    setElementText(
+    return `
 
-        "edori-icon",
+        <div class="gauge-empty-state">
 
-        "⚪"
+            <strong>
+                Awaiting assessment
+            </strong>
 
-    );
+            <p>
+                Calculate EDORI to display the current readiness score.
+            </p>
 
+        </div>
 
-    setElementText(
-
-        "edori-score",
-
-        "--"
-
-    );
-
-
-    setElementText(
-
-        "edori-status",
-
-        "Awaiting Assessment"
-
-    );
-
-
-    setElementText(
-
-        "edori-recommendation",
-
-        "Complete and calculate the situation assessment."
-
-    );
-
-
-    updateGaugeColor(
-
-        "#94a3b8"
-
-    );
+    `;
 
 }
 
 
 /**
- * Safely update a gauge element.
+ * Create the recalculation-required state.
  */
-function setElementText(
+function createRecalculationRequiredState():string {
 
-    elementId:string,
+    return `
+
+        <div class="gauge-empty-state warning">
+
+            <strong>
+                Recalculation required
+            </strong>
+
+            <p>
+                Submit the current assessment to update the EDORI score and operational state.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
+ */
+function escapeHtml(
 
     value:string
 
-):void {
+):string {
 
-    const element = document.getElementById(
+    return value
 
-        elementId
+        .replaceAll(
 
-    );
+            "&",
 
+            "&amp;"
 
-    if(!element){
+        )
 
-        console.warn(
+        .replaceAll(
 
-            `Gauge could not find element: ${elementId}`
+            "<",
+
+            "&lt;"
+
+        )
+
+        .replaceAll(
+
+            ">",
+
+            "&gt;"
+
+        )
+
+        .replaceAll(
+
+            "\"",
+
+            "&quot;"
+
+        )
+
+        .replaceAll(
+
+            "'",
+
+            "&#039;"
 
         );
-
-        return;
-
-    }
-
-
-    element.textContent = value;
 
 }
 
 
 /**
- * Apply the operational-state color.
+ * Escape text inserted into an HTML attribute.
  */
-function updateGaugeColor(
+function escapeAttribute(
 
-    color:string
+    value:string
 
-):void {
+):string {
 
-    const gauge = document.querySelector(
+    return escapeHtml(
 
-        ".gauge"
+        value
 
-    ) as HTMLElement | null;
-
-
-    if(!gauge){
-
-        return;
-
-    }
-
-
-    gauge.style.borderColor = color;
-
-    gauge.style.color = color;
+    );
 
 }

@@ -1029,25 +1029,17 @@ function isOperationalStateTitle(
 
     const titles:OperationalStateTitle[] = [
 
-        "Normal Operations",
+    "Alpha",
 
-        "Elevated Activity",
+    "Bravo",
 
-        "Busy",
+    "Charlie",
 
-        "Surge",
+    "Delta",
 
-        "Severe Surge",
+    "Echo"
 
-        "Elevated Awareness",
-
-        "Capacity Strain",
-
-        "High Surge",
-
-        "Critical Operations"
-
-    ];
+];
 
 
     return titles.includes(

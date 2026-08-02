@@ -1,15 +1,18 @@
 /**
  * Operational Trigger Configuration
  *
- * Initial EDORI 2.0 operational trigger library.
+ * Initial EDORI operational trigger library.
  *
- * These thresholds are design defaults and have
- * not yet been clinically or operationally
- * validated.
+ * Operational level hierarchy:
  *
- * Trigger rules are intentionally stored in
- * configuration rather than hard-coded inside
- * OperationalTriggerService.
+ * Alpha   → Lowest
+ * Bravo
+ * Charlie
+ * Delta
+ * Echo    → Highest
+ *
+ * These thresholds are configurable design defaults
+ * and have not yet been clinically validated.
  */
 
 import type {
@@ -26,7 +29,9 @@ export const OPERATIONAL_TRIGGERS:
 OperationalTrigger[] = [
 
     /*
-     * ED Demand
+     * =====================================================
+     * ED DEMAND TRIGGERS
+     * =====================================================
      */
 
     {
@@ -67,7 +72,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Elevated Awareness",
+            "Bravo",
 
         reassessmentMinutes:
             60,
@@ -124,7 +129,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Capacity Strain",
+            "Charlie",
 
         reassessmentMinutes:
             30,
@@ -147,63 +152,65 @@ OperationalTrigger[] = [
 
     {
 
-    id:
-        "ed-volume-above-expected",
+        id:
+            "ed-volume-above-expected",
 
-    title:
-        "ED Volume Significantly Above Expected",
+        title:
+            "ED Volume Significantly Above Expected",
 
-    description:
-        "Current ED census is at least 15 patients above the historical weekday and hour expectation.",
+        description:
+            "Current ED census is at least 15 patients above the historical weekday and hour expectation.",
 
-    enabled:
-        true,
+        enabled:
+            true,
 
-    category:
-        "Demand",
+        category:
+            "Demand",
 
-    priority:
-        "Moderate",
+        priority:
+            "Moderate",
 
-    conditions:[
+        conditions:[
 
-        {
+            {
 
-            metric:
-                "volumeAboveExpected",
+                metric:
+                    "volumeAboveExpected",
 
-            operator:
-                "greaterThanOrEqual",
+                operator:
+                    "greaterThanOrEqual",
 
-            threshold:
-                15
+                threshold:
+                    15
 
-        }
+            }
 
-    ],
+        ],
 
-    minimumOperationalState:
-        "Capacity Strain",
+        minimumOperationalState:
+            "Charlie",
 
-    reassessmentMinutes:
-        60,
+        reassessmentMinutes:
+            60,
 
-    interventionIds:[
+        interventionIds:[
 
-        "review-ed-flow",
+            "review-ed-flow",
 
-        "evaluate-overflow-space"
+            "evaluate-overflow-space"
 
-    ],
+        ],
 
-    rationale:
-        "Historical comparison identifies demand that is unusually high for the selected weekday and hour."
+        rationale:
+            "Historical comparison identifies demand that is unusually high for the selected weekday and hour."
 
-},
+    },
 
 
     /*
-     * Boarding
+     * =====================================================
+     * BOARDING TRIGGERS
+     * =====================================================
      */
 
     {
@@ -244,7 +251,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Elevated Awareness",
+            "Bravo",
 
         reassessmentMinutes:
             60,
@@ -301,7 +308,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "High Surge",
+            "Delta",
 
         reassessmentMinutes:
             30,
@@ -362,7 +369,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Capacity Strain",
+            "Charlie",
 
         reassessmentMinutes:
             30,
@@ -419,7 +426,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Capacity Strain",
+            "Charlie",
 
         reassessmentMinutes:
             30,
@@ -441,7 +448,9 @@ OperationalTrigger[] = [
 
 
     /*
-     * Hospital Throughput
+     * =====================================================
+     * HOSPITAL THROUGHPUT TRIGGERS
+     * =====================================================
      */
 
     {
@@ -536,6 +545,7 @@ OperationalTrigger[] = [
 
             },
 
+
             {
 
                 metric:
@@ -552,7 +562,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "High Surge",
+            "Delta",
 
         reassessmentMinutes:
             30,
@@ -574,10 +584,6 @@ OperationalTrigger[] = [
 
     },
 
-
-    /*
-     * Expected Flow
-     */
 
     {
 
@@ -637,7 +643,9 @@ OperationalTrigger[] = [
 
 
     /*
-     * Clinical Complexity
+     * =====================================================
+     * CLINICAL COMPLEXITY TRIGGERS
+     * =====================================================
      */
 
     {
@@ -698,7 +706,9 @@ OperationalTrigger[] = [
 
 
     /*
-     * Momentum
+     * =====================================================
+     * OPERATIONAL MOMENTUM TRIGGERS
+     * =====================================================
      */
 
     {
@@ -739,7 +749,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Capacity Strain",
+            "Charlie",
 
         reassessmentMinutes:
             30,
@@ -798,7 +808,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Capacity Strain",
+            "Charlie",
 
         reassessmentMinutes:
             30,

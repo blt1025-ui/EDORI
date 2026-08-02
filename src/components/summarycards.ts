@@ -1,11 +1,15 @@
 /**
  * SummaryCards
  *
- * Displays the latest committed EDORI assessment
- * and authoritative calculation result.
+ * Displays concise operational metrics from the
+ * authoritative EDORI OperationalAssessment.
  *
- * Staffing is intentionally excluded from the
- * EDORI score and from this summary display.
+ * This component does not:
+ *
+ * - Calculate EDORI
+ * - Evaluate operational triggers
+ * - Modify application state
+ * - Save results or snapshots
  */
 
 import {
@@ -28,144 +32,67 @@ from "../services/EventService";
 
 import {
 
-    getState
+    createOperationalAssessment
 
 }
 
-from "../services/StateService";
+from "../services/OperationalAssessmentService";
 
 
 import {
 
-    getLatestResult
+    getLatestResult,
+
+    getResultInvalidationReason
 
 }
 
 from "../services/ResultService";
 
 
-const MEDICAL_BED_CAPACITY = 273;
+import {
+
+    getSnapshots
+
+}
+
+from "../services/SnapshotService";
+
+
+import {
+
+    getState,
+
+    hasCommittedAssessment
+
+}
+
+from "../services/StateService";
+
+
+import type {
+
+    OperationalAssessment
+
+}
+
+from "../types/OperationalAssessment";
 
 
 /**
- * Render the Operational Readiness cards.
+ * Render the summary-card region.
  */
 export function SummaryCards():string {
 
     return `
 
-        <section class="summary-cards-section">
+        <section
+            id="summaryCards"
+            class="summary-cards"
+            aria-live="polite"
+        >
 
-            <div class="summary-cards">
-
-                <div class="card">
-
-                    <h3>
-                        EDORI
-                    </h3>
-
-                    <h1 id="scoreCard">
-                        --
-                    </h1>
-
-                    <p class="card-detail">
-                        Overall operational readiness score
-                    </p>
-
-                </div>
-
-
-                <div class="card">
-
-                    <h3>
-                        ED Volume
-                    </h3>
-
-                    <h1 id="volumeCard">
-                        --
-                    </h1>
-
-                    <p class="card-detail">
-                        Current emergency department census
-                    </p>
-
-                </div>
-
-
-                <div class="card">
-
-                    <h3>
-                        Boarding
-                    </h3>
-
-                    <h1 id="boardingCard">
-                        --
-                    </h1>
-
-                    <p class="card-detail">
-                        Admitted patients boarding in the ED
-                    </p>
-
-                </div>
-
-
-                <div class="card">
-
-                    <h3>
-                        Hospital Occupancy
-                    </h3>
-
-                    <h1 id="medicalBedsCard">
-                        --
-                    </h1>
-
-                    <p
-                        id="medicalBedsDetail"
-                        class="card-detail"
-                    >
-                        Occupied medical beds
-                    </p>
-
-                </div>
-
-
-                <div class="card">
-
-                    <h3>
-                        Patient Acuity
-                    </h3>
-
-                    <h1 id="acuityCard">
-                        --
-                    </h1>
-
-                    <p
-                        id="acuityDetail"
-                        class="card-detail"
-                    >
-                        Current high-acuity patient volume
-                    </p>
-
-                </div>
-
-
-                <div class="card">
-
-                    <h3>
-                        Operational State
-                    </h3>
-
-                    <h1 id="statusCard">
-                        --
-                    </h1>
-
-                    <p class="card-detail">
-                        Current operational readiness level
-                    </p>
-
-                </div>
-
-            </div>
+            ${createAwaitingAssessmentCards()}
 
         </section>
 
@@ -175,7 +102,7 @@ export function SummaryCards():string {
 
 
 /**
- * Initialize the cards.
+ * Initialize summary-card behavior.
  */
 export function initializeSummaryCards():void {
 
@@ -184,22 +111,84 @@ export function initializeSummaryCards():void {
 
     subscribe(
 
-    APP_EVENTS.RESULT_CHANGED,
+        APP_EVENTS.RESULT_CHANGED,
 
-    updateSummaryCards
+        updateSummaryCards
 
-);
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+
+        updateSummaryCards
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORY_CHANGED,
+
+        updateSummaryCards
+
+    );
 
 }
 
 
 /**
- * Update all cards from the committed assessment
- * and latest authoritative EDORI result.
+ * Refresh summary cards from authoritative
+ * application services.
  */
 function updateSummaryCards():void {
 
-    const state = getState();
+    const container = document.getElementById(
+
+        "summaryCards"
+
+    );
+
+
+    if(!container){
+
+        return;
+
+    }
+
+
+    const invalidationReason =
+
+        getResultInvalidationReason();
+
+
+    if(invalidationReason){
+
+        container.innerHTML =
+
+            createRecalculationRequiredCards(
+
+                invalidationReason
+
+            );
+
+
+        return;
+
+    }
+
+
+    if(!hasCommittedAssessment()){
+
+        container.innerHTML =
+
+            createAwaitingAssessmentCards();
+
+
+        return;
+
+    }
 
 
     const result = getLatestResult();
@@ -207,56 +196,109 @@ function updateSummaryCards():void {
 
     if(!result){
 
-        resetSummaryCards();
+        container.innerHTML =
+
+            createAwaitingAssessmentCards();
+
 
         return;
 
     }
 
 
-    const operationalState =
+    try {
 
-        result.operationalState;
+        const operationalAssessment =
+
+            createOperationalAssessment({
+
+                assessment:
+                    getState(),
+
+                result,
+
+                snapshots:
+                    getSnapshots(),
+
+                evaluatedAt:
+                    new Date()
+
+            });
 
 
-    const hospitalOccupancy =
+        container.innerHTML =
 
-        calculateHospitalOccupancy(
+            createCompletedSummaryCards(
 
-            state.occupiedMedicalBeds
+                operationalAssessment
+
+            );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to update summary cards:",
+
+            error
 
         );
 
 
-    const highAcuityPatients =
+        container.innerHTML = `
 
-        state.esi1
+            <article
+                class="
+                    summary-card
+                    summary-card-wide
+                    summary-card-error
+                "
+            >
 
-        +
+                <span class="summary-card-label">
+                    Summary unavailable
+                </span>
 
-        state.esi2;
+                <strong class="summary-card-value">
+                    Error
+                </strong>
+
+                <p class="summary-card-description">
+                    Review the browser console for additional details.
+                </p>
+
+            </article>
+
+        `;
+
+    }
+
+}
 
 
-    const highAcuityPercentage =
+/**
+ * Create completed summary cards.
+ */
+function createCompletedSummaryCards(
 
-        calculateHighAcuityPercentage(
+    operationalAssessment:OperationalAssessment
 
-            highAcuityPatients,
+):string {
 
-            state.totalEDVolume
+    const score = Math.min(
 
-        );
+        100,
 
+        Math.max(
 
-    setCardText(
-
-        "scoreCard",
-
-        String(
+            0,
 
             Math.round(
 
-                result.score
+                operationalAssessment
+                    .scoreResult
+                    .score
 
             )
 
@@ -265,347 +307,383 @@ function updateSummaryCards():void {
     );
 
 
-    setCardText(
+    const finalState =
 
-        "volumeCard",
+        operationalAssessment.finalOperationalState;
 
-        String(
 
-            state.totalEDVolume
+    const baseState =
 
-        )
+        operationalAssessment.baseOperationalState;
 
-    );
 
+    const activeTriggerCount =
 
-    setCardText(
+        operationalAssessment.activeTriggers.length;
 
-        "boardingCard",
 
-        String(
+    const approachingTriggerCount =
 
-            state.boardedPatients
+        operationalAssessment.triggerResults.filter(
 
-        )
+            triggerResult =>
 
-    );
+                triggerResult.approaching
 
+                &&
 
-    setCardText(
+                !triggerResult.active
 
-        "medicalBedsCard",
+        ).length;
 
-        `${hospitalOccupancy}%`
 
-    );
+    const nextReassessment =
 
+        determineNextReassessment(
 
-    setCardText(
-
-        "medicalBedsDetail",
-
-        `${state.occupiedMedicalBeds} of ${MEDICAL_BED_CAPACITY} beds occupied`
-
-    );
-
-
-    setCardText(
-
-        "acuityCard",
-
-        String(
-
-            highAcuityPatients
-
-        )
-
-    );
-
-
-    setCardText(
-
-        "acuityDetail",
-
-        `${highAcuityPercentage}% of ED patients are ESI 1 or ESI 2`
-
-    );
-
-
-    setCardText(
-
-        "statusCard",
-
-        `${operationalState.icon} ${operationalState.title}`
-
-    );
-
-
-    updateCardAccent(
-
-        "scoreCard",
-
-        operationalState.color
-
-    );
-
-
-    updateCardAccent(
-
-        "statusCard",
-
-        operationalState.color
-
-    );
-
-
-    updateStatusTextColor(
-
-        operationalState.color
-
-    );
-
-}
-
-
-/**
- * Calculate hospital medical-bed occupancy.
- */
-function calculateHospitalOccupancy(
-
-    occupiedMedicalBeds:number
-
-):number {
-
-    if(
-
-        !Number.isFinite(
-
-            occupiedMedicalBeds
-
-        )
-
-        ||
-
-        occupiedMedicalBeds < 0
-
-    ){
-
-        return 0;
-
-    }
-
-
-    return Math.round(
-
-        (
-
-            occupiedMedicalBeds
-
-            /
-
-            MEDICAL_BED_CAPACITY
-
-        )
-
-        * 100
-
-    );
-
-}
-
-
-/**
- * Calculate the percentage of current ED patients
- * categorized as ESI 1 or ESI 2.
- */
-function calculateHighAcuityPercentage(
-
-    highAcuityPatients:number,
-
-    totalEDVolume:number
-
-):number {
-
-    if(
-
-        !Number.isFinite(
-
-            highAcuityPatients
-
-        )
-
-        ||
-
-        !Number.isFinite(
-
-            totalEDVolume
-
-        )
-
-        ||
-
-        totalEDVolume <= 0
-
-    ){
-
-        return 0;
-
-    }
-
-
-    return Math.round(
-
-        (
-
-            highAcuityPatients
-
-            /
-
-            totalEDVolume
-
-        )
-
-        * 100
-
-    );
-
-}
-
-
-/**
- * Safely update card text.
- */
-function setCardText(
-
-    elementId:string,
-
-    value:string
-
-):void {
-
-    const element = document.getElementById(
-
-        elementId
-
-    );
-
-
-    if(!element){
-
-        console.warn(
-
-            `SummaryCards could not find element: ${elementId}`
+            operationalAssessment
 
         );
 
-        return;
 
-    }
+    const levelWasEscalated =
+
+        finalState.title
+
+        !==
+
+        baseState.title;
 
 
-    element.textContent = value;
+    return `
+
+        ${createSummaryCard({
+
+            label:
+                "EDORI Score",
+
+            value:
+                String(score),
+
+            description:
+                "Current numerical operational readiness score.",
+
+            className:
+                "summary-card-score"
+
+        })}
+
+
+        ${createSummaryCard({
+
+            label:
+                "Final Level",
+
+            value:
+                `${finalState.icon} ${finalState.title}`,
+
+            description:
+                levelWasEscalated
+
+                    ? `Triggers elevated the level from ${baseState.title}.`
+
+                    : `Score-derived level: ${baseState.title}.`,
+
+            className:
+                "summary-card-level",
+
+            accentColor:
+                finalState.color
+
+        })}
+
+
+        ${createSummaryCard({
+
+            label:
+                "Operational Trend",
+
+            value:
+                operationalAssessment.riskDirection,
+
+            description:
+                createTrendDescription(
+
+                    operationalAssessment.riskDirection
+
+                ),
+
+            className:
+                createTrendClassName(
+
+                    operationalAssessment.riskDirection
+
+                )
+
+        })}
+
+
+        ${createSummaryCard({
+
+            label:
+                "Active Triggers",
+
+            value:
+                String(activeTriggerCount),
+
+            description:
+                createTriggerDescription(
+
+                    activeTriggerCount,
+
+                    approachingTriggerCount
+
+                ),
+
+            className:
+                activeTriggerCount > 0
+
+                    ? "summary-card-trigger-active"
+
+                    : "summary-card-trigger-clear"
+
+        })}
+
+
+        ${createSummaryCard({
+
+            label:
+                "Confidence",
+
+            value:
+                operationalAssessment.confidence,
+
+            description:
+                createConfidenceDescription(
+
+                    operationalAssessment.confidence
+
+                ),
+
+            className:
+                createConfidenceClassName(
+
+                    operationalAssessment.confidence
+
+                )
+
+        })}
+
+
+        ${createSummaryCard({
+
+            label:
+                "Next Reassessment",
+
+            value:
+                nextReassessment === null
+
+                    ? "Routine"
+
+                    : `${nextReassessment} min`,
+
+            description:
+                nextReassessment === null
+
+                    ? "Continue the usual local reassessment schedule."
+
+                    : "Use the shortest interval recommended by active triggers.",
+
+            className:
+                nextReassessment !== null
+
+                    &&
+
+                    nextReassessment <= 30
+
+                        ? "summary-card-reassessment-urgent"
+
+                        : "summary-card-reassessment-routine"
+
+        })}
+
+    `;
 
 }
 
 
 /**
- * Reset all cards before the first calculation.
+ * Create one summary card.
  */
-function resetSummaryCards():void {
+function createSummaryCard(
 
-    setCardText(
+    options:{
 
-        "scoreCard",
+        label:string;
 
-        "--"
+        value:string;
+
+        description:string;
+
+        className:string;
+
+        accentColor?:string;
+
+    }
+
+):string {
+
+    const styleAttribute = options.accentColor
+
+        ? `style="--summary-accent:${escapeAttribute(
+            options.accentColor
+        )};"`
+
+        : "";
+
+
+    return `
+
+        <article
+            class="
+                summary-card
+                ${escapeAttribute(
+                    options.className
+                )}
+            "
+            ${styleAttribute}
+        >
+
+            <span class="summary-card-label">
+
+                ${escapeHtml(
+                    options.label
+                )}
+
+            </span>
+
+
+            <strong class="summary-card-value">
+
+                ${escapeHtml(
+                    options.value
+                )}
+
+            </strong>
+
+
+            <p class="summary-card-description">
+
+                ${escapeHtml(
+                    options.description
+                )}
+
+            </p>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Determine the shortest current reassessment
+ * interval from triggers and recommendations.
+ */
+function determineNextReassessment(
+
+    operationalAssessment:OperationalAssessment
+
+):number | null {
+
+    const intervals:number[] = [];
+
+
+    operationalAssessment.activeTriggers.forEach(
+
+        triggerResult => {
+
+            const interval =
+
+                triggerResult
+                    .trigger
+                    .reassessmentMinutes;
+
+
+            if(
+
+                interval !== null
+
+                &&
+
+                Number.isFinite(interval)
+
+                &&
+
+                interval > 0
+
+            ){
+
+                intervals.push(
+
+                    interval
+
+                );
+
+            }
+
+        }
 
     );
 
 
-    setCardText(
+    operationalAssessment.recommendations.forEach(
 
-        "volumeCard",
+        recommendation => {
 
-        "--"
+            const interval =
 
-    );
-
-
-    setCardText(
-
-        "boardingCard",
-
-        "--"
-
-    );
+                recommendation.reassessmentMinutes;
 
 
-    setCardText(
+            if(
 
-        "medicalBedsCard",
+                interval !== null
 
-        "--"
+                &&
 
-    );
+                Number.isFinite(interval)
 
+                &&
 
-    setCardText(
+                interval > 0
 
-        "medicalBedsDetail",
+            ){
 
-        "Occupied medical beds"
+                intervals.push(
 
-    );
+                    interval
 
+                );
 
-    setCardText(
+            }
 
-        "acuityCard",
-
-        "--"
+        }
 
     );
 
 
-    setCardText(
+    if(intervals.length === 0){
 
-        "acuityDetail",
+        return null;
 
-        "Current high-acuity patient volume"
-
-    );
+    }
 
 
-    setCardText(
+    return Math.min(
 
-        "statusCard",
-
-        "--"
-
-    );
-
-
-    updateCardAccent(
-
-        "scoreCard",
-
-        ""
-
-    );
-
-
-    updateCardAccent(
-
-        "statusCard",
-
-        ""
-
-    );
-
-
-    updateStatusTextColor(
-
-        ""
+        ...intervals
 
     );
 
@@ -613,90 +691,428 @@ function resetSummaryCards():void {
 
 
 /**
- * Update the colored top border of a card.
+ * Describe trigger counts.
  */
-function updateCardAccent(
+function createTriggerDescription(
 
-    elementId:string,
+    activeTriggerCount:number,
 
-    color:string
+    approachingTriggerCount:number
 
-):void {
+):string {
 
-    const valueElement = document.getElementById(
+    if(
 
-        elementId
+        activeTriggerCount === 0
 
-    );
+        &&
 
+        approachingTriggerCount === 0
 
-    const card = valueElement?.closest(
+    ){
 
-        ".card"
-
-    ) as HTMLElement | null;
-
-
-    if(!card){
-
-        return;
+        return "No active or approaching operational triggers.";
 
     }
 
 
-    if(color){
+    if(activeTriggerCount === 0){
 
-        card.style.borderTopColor = color;
+        return approachingTriggerCount === 1
 
-        return;
+            ? "One operational trigger is approaching activation."
+
+            : `${approachingTriggerCount} operational triggers are approaching activation.`;
 
     }
 
 
-    card.style.removeProperty(
+    if(approachingTriggerCount === 0){
 
-        "border-top-color"
+        return activeTriggerCount === 1
 
-    );
+            ? "One operational trigger is currently active."
+
+            : `${activeTriggerCount} operational triggers are currently active.`;
+
+    }
+
+
+    return `${activeTriggerCount} active and ${approachingTriggerCount} approaching triggers.`;
 
 }
 
 
 /**
- * Apply operational-state color to status text.
+ * Describe operational trend.
  */
-function updateStatusTextColor(
+function createTrendDescription(
 
-    color:string
+    riskDirection:
+        OperationalAssessment["riskDirection"]
 
-):void {
+):string {
 
-    const statusElement = document.getElementById(
+    switch(riskDirection){
 
-        "statusCard"
+        case "Improving":
 
-    ) as HTMLElement | null;
+            return "The latest EDORI score decreased meaningfully.";
 
 
-    if(!statusElement){
+        case "Stable":
 
-        return;
+            return "The latest score shows no meaningful deterioration.";
+
+
+        case "Increasing":
+
+            return "The latest EDORI score increased.";
+
+
+        case "Rapidly Worsening":
+
+            return "The latest EDORI score increased rapidly.";
+
+
+        case "Insufficient Data":
+
+            return "Additional saved assessments are required for trend analysis.";
 
     }
 
+}
 
-    if(color){
 
-        statusElement.style.color = color;
+/**
+ * Describe assessment confidence.
+ */
+function createConfidenceDescription(
 
-        return;
+    confidence:
+        OperationalAssessment["confidence"]
+
+):string {
+
+    switch(confidence){
+
+        case "High":
+
+            return "Historical expectations and sufficient trend history are available.";
+
+
+        case "Moderate":
+
+            return "Historical expectations and limited trend history are available.";
+
+
+        case "Low":
+
+            return "The assessment has limited supporting trend information.";
+
+
+        case "Insufficient Data":
+
+            return "The available data are insufficient to assess confidence.";
 
     }
 
+}
 
-    statusElement.style.removeProperty(
 
-        "color"
+/**
+ * Create a CSS class for trend direction.
+ */
+function createTrendClassName(
+
+    riskDirection:
+        OperationalAssessment["riskDirection"]
+
+):string {
+
+    switch(riskDirection){
+
+        case "Improving":
+
+            return "summary-card-trend-improving";
+
+
+        case "Increasing":
+
+            return "summary-card-trend-increasing";
+
+
+        case "Rapidly Worsening":
+
+            return "summary-card-trend-critical";
+
+
+        case "Stable":
+
+            return "summary-card-trend-stable";
+
+
+        case "Insufficient Data":
+
+            return "summary-card-trend-unknown";
+
+    }
+
+}
+
+
+/**
+ * Create a CSS class for confidence.
+ */
+function createConfidenceClassName(
+
+    confidence:
+        OperationalAssessment["confidence"]
+
+):string {
+
+    return `summary-card-confidence-${confidence
+
+        .toLowerCase()
+
+        .replace(
+
+            /[^a-z0-9]+/g,
+
+            "-"
+
+        )}`;
+
+}
+
+
+/**
+ * Create the initial card set.
+ */
+function createAwaitingAssessmentCards():string {
+
+    return `
+
+        ${createPlaceholderCard(
+
+            "EDORI Score",
+
+            "--",
+
+            "Awaiting calculation."
+
+        )}
+
+
+        ${createPlaceholderCard(
+
+            "Final Level",
+
+            "--",
+
+            "Awaiting calculation."
+
+        )}
+
+
+        ${createPlaceholderCard(
+
+            "Operational Trend",
+
+            "--",
+
+            "Additional assessments are required."
+
+        )}
+
+
+        ${createPlaceholderCard(
+
+            "Active Triggers",
+
+            "0",
+
+            "No assessment is available."
+
+        )}
+
+
+        ${createPlaceholderCard(
+
+            "Confidence",
+
+            "--",
+
+            "Awaiting assessment data."
+
+        )}
+
+
+        ${createPlaceholderCard(
+
+            "Next Reassessment",
+
+            "--",
+
+            "Awaiting assessment."
+
+        )}
+
+    `;
+
+}
+
+
+/**
+ * Create cards shown when the result is invalid.
+ */
+function createRecalculationRequiredCards(
+
+    reason:string
+
+):string {
+
+    return `
+
+        <article
+            class="
+                summary-card
+                summary-card-wide
+                summary-card-recalculation
+            "
+        >
+
+            <span class="summary-card-label">
+                Recalculation Required
+            </span>
+
+            <strong class="summary-card-value">
+                Update needed
+            </strong>
+
+            <p class="summary-card-description">
+
+                ${escapeHtml(reason)}
+
+            </p>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create one placeholder card.
+ */
+function createPlaceholderCard(
+
+    label:string,
+
+    value:string,
+
+    description:string
+
+):string {
+
+    return `
+
+        <article class="summary-card summary-card-placeholder">
+
+            <span class="summary-card-label">
+
+                ${escapeHtml(label)}
+
+            </span>
+
+
+            <strong class="summary-card-value">
+
+                ${escapeHtml(value)}
+
+            </strong>
+
+
+            <p class="summary-card-description">
+
+                ${escapeHtml(description)}
+
+            </p>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
+ */
+function escapeHtml(
+
+    value:string
+
+):string {
+
+    return value
+
+        .replaceAll(
+
+            "&",
+
+            "&amp;"
+
+        )
+
+        .replaceAll(
+
+            "<",
+
+            "&lt;"
+
+        )
+
+        .replaceAll(
+
+            ">",
+
+            "&gt;"
+
+        )
+
+        .replaceAll(
+
+            "\"",
+
+            "&quot;"
+
+        )
+
+        .replaceAll(
+
+            "'",
+
+            "&#039;"
+
+        );
+
+}
+
+
+/**
+ * Escape text inserted into HTML attributes.
+ */
+function escapeAttribute(
+
+    value:string
+
+):string {
+
+    return escapeHtml(
+
+        value
 
     );
 

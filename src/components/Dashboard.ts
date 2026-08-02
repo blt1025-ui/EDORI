@@ -8,7 +8,7 @@
  * - Render dashboard components
  * - Initialize dashboard behavior
  * - Display the latest authoritative result
- * - Build the trigger-adjusted operational state
+ * - Build the trigger-adjusted operational level
  * - Display assessment freshness
  *
  * This component does not calculate EDORI.
@@ -47,6 +47,17 @@ from "./Drivers";
 
 import {
 
+    ExecutiveSummary,
+
+    initializeExecutiveSummary
+
+}
+
+from "./ExecutiveSummary";
+
+
+import {
+
     Gauge,
 
     initializeGauge
@@ -76,6 +87,17 @@ import {
 }
 
 from "./OperationalOverview";
+
+
+import {
+
+    OperationalTimeline,
+
+    initializeOperationalTimeline
+
+}
+
+from "./OperationalTimeline";
 
 
 import {
@@ -240,6 +262,9 @@ export function Dashboard():string {
             </div>
 
 
+            ${ExecutiveSummary()}
+
+
             ${SummaryCards()}
 
 
@@ -264,6 +289,8 @@ export function Dashboard():string {
 
                     ${TrendChart()}
 
+                    ${OperationalTimeline()}
+
                     ${AssessmentHistory()}
 
                     ${HistoricalDataManager()}
@@ -286,6 +313,8 @@ export function initializeDashboard():void {
 
     initializeSituationAssessment();
 
+    initializeExecutiveSummary();
+
     initializeSummaryCards();
 
     initializeGauge();
@@ -297,6 +326,8 @@ export function initializeDashboard():void {
     initializeRecommendations();
 
     initializeTrendChart();
+
+    initializeOperationalTimeline();
 
     initializeAssessmentHistory();
 
@@ -336,8 +367,8 @@ export function initializeDashboard():void {
 
 
 /**
- * Update the dashboard banner and freshness
- * information from authoritative services.
+ * Update the dashboard banner and assessment
+ * freshness from authoritative services.
  */
 function updateDashboard():void {
 
@@ -612,7 +643,7 @@ function updateStatusBanner(
 
             <span>
 
-                Score-derived state:
+                Score-derived level:
 
                 <strong>
 
@@ -640,7 +671,7 @@ function updateStatusBanner(
 
                     <span class="status-escalation-note">
 
-                        Operational triggers elevated the final state.
+                        Operational triggers elevated the final level.
 
                     </span>
 
@@ -935,11 +966,15 @@ function updateAssessmentFreshness(
     );
 
 
-    if(Number.isNaN(
+    if(
 
-        assessmentDate.getTime()
+        Number.isNaN(
 
-    )){
+            assessmentDate.getTime()
+
+        )
+
+    ){
 
         element.textContent =
 
@@ -982,13 +1017,15 @@ function updateAssessmentFreshness(
     );
 
 
-    element.textContent = createFreshnessMessage(
+    element.textContent =
 
-        minutes,
+        createFreshnessMessage(
 
-        assessmentDate
+            minutes,
 
-    );
+            assessmentDate
+
+        );
 
 
     if(minutes < 30){

@@ -9,12 +9,19 @@
  * - Current committed SituationAssessment
  * - Current EdoriResult
  * - Operational triggers
+ * - Operational pillar scores
  * - Risk direction
  * - Confidence
- * - Pillar placeholders
- * - Current drivers
+ * - Trigger-adjusted operational state
+ * - Configured operational recommendations
  *
- * This service does not modify application state.
+ * This service does not:
+ *
+ * - Modify application state
+ * - Save results
+ * - Save snapshots
+ * - Emit application events
+ * - Recalculate EDORI
  */
 
 import {
@@ -24,6 +31,18 @@ import {
 }
 
 from "../config/interventions";
+
+
+import {
+
+    getOperationalStateByTitle,
+
+    getOperationalStateRank
+
+}
+
+from "../config/operationalStates";
+
 
 import {
 
@@ -106,88 +125,22 @@ export function createOperationalAssessment(
 
 ):OperationalAssessment {
 
-    const triggerResults =
+    const evaluationTime = normalizeDate(
 
-        evaluateOperationalTriggers(
-
-            context
-
-        );
-
-
-    const activeTriggers =
-
-        triggerResults.filter(
-
-            result => result.active
-
-        );
-
-
-    const pillarScores = createInitialPillarScores(
-
-        context
+        context.evaluatedAt
 
     );
 
 
-    const pillarDetails = createInitialPillarDetails(
-
-        context,
-
-        pillarScores
-
-    );
-
-
-    const riskDirection = determineRiskDirection(
-
-        context
-
-    );
-
-
-    const confidence = determineConfidence(
-
-        context
-
-    );
-
-
-    const finalOperationalState =
-
-        determineFinalOperationalState(
-
-            context.result.operationalState,
-
-            activeTriggers
-
-        );
-
-
-    const recommendations =
-
-        createInitialRecommendations(
-
-            activeTriggers
-
-        );
-
-
-    return {
-
-        id:
-            createOperationalAssessmentId(
-
-                context.evaluatedAt
-
-            ),
+    const normalizedContext:OperationalTriggerContext = {
 
         assessment:{
+
             ...context.assessment
+
         },
 
-        scoreResult:{
+        result:{
 
             ...context.result,
 
@@ -213,7 +166,7 @@ export function createOperationalAssessment(
 
             ],
 
-            timestamp:new Date(
+            timestamp:normalizeDate(
 
                 context.result.timestamp
 
@@ -221,41 +174,346 @@ export function createOperationalAssessment(
 
         },
 
-        baseOperationalState:{
+        snapshots:context.snapshots.map(
 
-            ...context.result.operationalState
+            snapshot => ({
 
-        },
+                ...snapshot,
 
-        finalOperationalState,
+                operationalState:{
 
-        pillarScores,
+                    ...snapshot.operationalState
 
-        pillarDetails,
+                },
 
-        riskDirection,
+                timestamp:normalizeDate(
 
-        confidence,
+                    snapshot.timestamp
 
-        triggerResults,
-
-        activeTriggers,
-
-        primaryDrivers:context.result.drivers.map(
-
-            driver => ({
-
-                ...driver
+                )
 
             })
 
         ),
 
-        recommendations,
+        evaluatedAt:evaluationTime
+
+    };
+
+
+    const triggerResults =
+
+        evaluateOperationalTriggers(
+
+            normalizedContext
+
+        );
+
+
+    const activeTriggers =
+
+        triggerResults.filter(
+
+            result => result.active
+
+        );
+
+
+    const pillarScores = createInitialPillarScores(
+
+        normalizedContext
+
+    );
+
+
+    const pillarDetails = createInitialPillarDetails(
+
+        normalizedContext,
+
+        pillarScores
+
+    );
+
+
+    const riskDirection = determineRiskDirection(
+
+        normalizedContext
+
+    );
+
+
+    const confidence = determineConfidence(
+
+        normalizedContext
+
+    );
+
+
+    const finalOperationalState =
+
+        determineFinalOperationalState(
+
+            normalizedContext
+                .result
+                .operationalState,
+
+            activeTriggers
+
+        );
+
+
+    const recommendations =
+
+        createOperationalRecommendations(
+
+            activeTriggers
+
+        );
+
+
+    return {
+
+        id:createOperationalAssessmentId(
+
+            evaluationTime
+
+        ),
+
+        assessment:{
+
+            ...normalizedContext.assessment
+
+        },
+
+        scoreResult:{
+
+            ...normalizedContext.result,
+
+            operationalState:{
+
+                ...normalizedContext
+                    .result
+                    .operationalState
+
+            },
+
+            drivers:normalizedContext
+                .result
+                .drivers
+                .map(
+
+                    driver => ({
+
+                        ...driver
+
+                    })
+
+                ),
+
+            recommendations:[
+
+                ...normalizedContext
+                    .result
+                    .recommendations
+
+            ],
+
+            timestamp:new Date(
+
+                normalizedContext
+                    .result
+                    .timestamp
+
+            )
+
+        },
+
+        baseOperationalState:{
+
+            ...normalizedContext
+                .result
+                .operationalState
+
+        },
+
+        finalOperationalState:{
+
+            ...finalOperationalState
+
+        },
+
+        pillarScores:{
+
+            ...pillarScores
+
+        },
+
+        pillarDetails:pillarDetails.map(
+
+            pillar => ({
+
+                ...pillar,
+
+                factors:pillar.factors.map(
+
+                    factor => ({
+
+                        ...factor
+
+                    })
+
+                )
+
+            })
+
+        ),
+
+        riskDirection,
+
+        confidence,
+
+        triggerResults:triggerResults.map(
+
+            result => ({
+
+                ...result,
+
+                trigger:{
+
+                    ...result.trigger,
+
+                    conditions:result
+                        .trigger
+                        .conditions
+                        .map(
+
+                            condition => ({
+
+                                ...condition
+
+                            })
+
+                        ),
+
+                    interventionIds:[
+
+                        ...result
+                            .trigger
+                            .interventionIds
+
+                    ]
+
+                },
+
+                conditionResults:result
+                    .conditionResults
+                    .map(
+
+                        conditionResult => ({
+
+                            ...conditionResult
+
+                        })
+
+                    ),
+
+                evaluatedAt:new Date(
+
+                    result.evaluatedAt
+
+                )
+
+            })
+
+        ),
+
+        activeTriggers:activeTriggers.map(
+
+            result => ({
+
+                ...result,
+
+                trigger:{
+
+                    ...result.trigger,
+
+                    conditions:result
+                        .trigger
+                        .conditions
+                        .map(
+
+                            condition => ({
+
+                                ...condition
+
+                            })
+
+                        ),
+
+                    interventionIds:[
+
+                        ...result
+                            .trigger
+                            .interventionIds
+
+                    ]
+
+                },
+
+                conditionResults:result
+                    .conditionResults
+                    .map(
+
+                        conditionResult => ({
+
+                            ...conditionResult
+
+                        })
+
+                    ),
+
+                evaluatedAt:new Date(
+
+                    result.evaluatedAt
+
+                )
+
+            })
+
+        ),
+
+        primaryDrivers:normalizedContext
+            .result
+            .drivers
+            .map(
+
+                driver => ({
+
+                    ...driver
+
+                })
+
+            ),
+
+        recommendations:recommendations.map(
+
+            recommendation => ({
+
+                ...recommendation,
+
+                sourceIds:[
+
+                    ...recommendation.sourceIds
+
+                ]
+
+            })
+
+        ),
 
         generatedAt:new Date(
 
-            context.evaluatedAt
+            evaluationTime
 
         )
 
@@ -265,11 +523,11 @@ export function createOperationalAssessment(
 
 
 /**
- * Create initial pillar values from the
+ * Create transitional pillar values from the
  * existing EDORI domain scores.
  *
- * These mappings are transitional and will
- * be replaced by dedicated pillar formulas.
+ * These mappings can later be replaced with
+ * dedicated EDORI 2.0 pillar formulas.
  */
 function createInitialPillarScores(
 
@@ -277,59 +535,69 @@ function createInitialPillarScores(
 
 ):OperationalPillarScores {
 
+    const operationalDemand = clampScore(
+
+        (
+
+            context.result.demandScore
+
+            +
+
+            context.result.boardingScore
+
+        )
+
+        /
+
+        2
+
+    );
+
+
+    const clinicalComplexity = clampScore(
+
+        context.result.acuityScore
+
+    );
+
+
+    const hospitalThroughput = clampScore(
+
+        (
+
+            context.result.hospitalScore
+
+            +
+
+            context.result.forecastScore
+
+        )
+
+        /
+
+        2
+
+    );
+
+
+    const operationalMomentum =
+
+        calculateMomentumScore(
+
+            context
+
+        );
+
+
     return {
 
-        operationalDemand:
-            clampScore(
+        operationalDemand,
 
-                (
+        clinicalComplexity,
 
-                    context.result.demandScore
+        hospitalThroughput,
 
-                    +
-
-                    context.result.boardingScore
-
-                )
-
-                /
-
-                2
-
-            ),
-
-        clinicalComplexity:
-            clampScore(
-
-                context.result.acuityScore
-
-            ),
-
-        hospitalThroughput:
-            clampScore(
-
-                (
-
-                    context.result.hospitalScore
-
-                    +
-
-                    context.result.forecastScore
-
-                )
-
-                /
-
-                2
-
-            ),
-
-        operationalMomentum:
-            calculateMomentumScore(
-
-                context
-
-            )
+        operationalMomentum
 
     };
 
@@ -337,7 +605,7 @@ function createInitialPillarScores(
 
 
 /**
- * Create initial explainable pillar details.
+ * Create explainable pillar details.
  */
 function createInitialPillarDetails(
 
@@ -346,6 +614,29 @@ function createInitialPillarDetails(
     scores:OperationalPillarScores
 
 ):OperationalPillarDetail[] {
+
+    const totalEDVolume =
+
+        context.assessment.totalEDVolume;
+
+
+    const highAcuityCount =
+
+        context.assessment.esi1
+
+        +
+
+        context.assessment.esi2;
+
+
+    const expectedNetFlow =
+
+        context.assessment.expectedArrivals
+
+        -
+
+        context.assessment.expectedDepartures;
+
 
     return [
 
@@ -361,7 +652,7 @@ function createInitialPillarDetails(
                 scores.operationalDemand,
 
             summary:
-                "Current ED workload based on demand and boarding strain.",
+                "Current ED workload based on volume and boarding strain.",
 
             factors:[
 
@@ -374,20 +665,24 @@ function createInitialPillarDetails(
                         "ED Volume",
 
                     currentValue:
-                        context.assessment.totalEDVolume,
+                        totalEDVolume,
 
                     comparisonValue:
                         context.assessment.expectedVolume,
 
                     difference:
-                        context.assessment.totalEDVolume
+                        totalEDVolume
 
                         -
 
                         context.assessment.expectedVolume,
 
                     severity:
-                        context.result.demandScore,
+                        clampScore(
+
+                            context.result.demandScore
+
+                        ),
 
                     explanation:
                         "Current ED census compared with the historical weekday and hour expectation."
@@ -417,7 +712,11 @@ function createInitialPillarDetails(
                         context.assessment.expectedBoarders,
 
                     severity:
-                        context.result.boardingScore,
+                        clampScore(
+
+                            context.result.boardingScore
+
+                        ),
 
                     explanation:
                         "Current boarding compared with the historical weekday and hour expectation."
@@ -454,11 +753,7 @@ function createInitialPillarDetails(
                         "ESI 1 and ESI 2 Patients",
 
                     currentValue:
-                        context.assessment.esi1
-
-                        +
-
-                        context.assessment.esi2,
+                        highAcuityCount,
 
                     comparisonValue:
                         null,
@@ -467,10 +762,60 @@ function createInitialPillarDetails(
                         null,
 
                     severity:
-                        context.result.acuityScore,
+                        clampScore(
+
+                            context.result.acuityScore
+
+                        ),
 
                     explanation:
                         "Number of current ED patients categorized as ESI 1 or ESI 2."
+
+                },
+
+
+                {
+
+                    id:
+                        "high-acuity-percent",
+
+                    label:
+                        "High-Acuity Percentage",
+
+                    currentValue:
+                        calculatePercentage(
+
+                            highAcuityCount,
+
+                            totalEDVolume
+
+                        ),
+
+                    comparisonValue:
+                        25,
+
+                    difference:
+                        calculatePercentage(
+
+                            highAcuityCount,
+
+                            totalEDVolume
+
+                        )
+
+                        -
+
+                        25,
+
+                    severity:
+                        clampScore(
+
+                            context.result.acuityScore
+
+                        ),
+
+                    explanation:
+                        "Percentage of the ED census categorized as ESI 1 or ESI 2."
 
                 }
 
@@ -504,20 +849,26 @@ function createInitialPillarDetails(
                         "Occupied Medical Beds",
 
                     currentValue:
-                        context.assessment.occupiedMedicalBeds,
+                        context.assessment
+                            .occupiedMedicalBeds,
 
                     comparisonValue:
                         273,
 
                     difference:
-                        273
+                        context.assessment
+                            .occupiedMedicalBeds
 
                         -
 
-                        context.assessment.occupiedMedicalBeds,
+                        273,
 
                     severity:
-                        context.result.hospitalScore,
+                        clampScore(
+
+                            context.result.hospitalScore
+
+                        ),
 
                     explanation:
                         "Current occupied medical beds compared with the configured 273-bed denominator."
@@ -534,24 +885,20 @@ function createInitialPillarDetails(
                         "Expected Net Flow",
 
                     currentValue:
-                        context.assessment.expectedArrivals
-
-                        -
-
-                        context.assessment.expectedDepartures,
+                        expectedNetFlow,
 
                     comparisonValue:
                         0,
 
                     difference:
-                        context.assessment.expectedArrivals
-
-                        -
-
-                        context.assessment.expectedDepartures,
+                        expectedNetFlow,
 
                     severity:
-                        context.result.forecastScore,
+                        clampScore(
+
+                            context.result.forecastScore
+
+                        ),
 
                     explanation:
                         "Expected arrivals minus expected departures for the current hourly period."
@@ -579,9 +926,19 @@ function createInitialPillarDetails(
 
                     ? "Insufficient history is available to calculate operational momentum."
 
-                    : "Recent EDORI score movement across persistent assessments.",
+                    : createMomentumSummary(
 
-            factors:[]
+                        context
+
+                    ),
+
+            factors:createMomentumFactors(
+
+                context,
+
+                scores.operationalMomentum
+
+            )
 
         }
 
@@ -613,13 +970,23 @@ function determineRiskDirection(
     }
 
 
+    const latestScore =
+
+        scores[scores.length - 1];
+
+
+    const previousScore =
+
+        scores[scores.length - 2];
+
+
     const latestChange =
 
-        scores[scores.length - 1]
+        latestScore
 
         -
 
-        scores[scores.length - 2];
+        previousScore;
 
 
     if(latestChange <= -5){
@@ -650,6 +1017,9 @@ function determineRiskDirection(
 
 /**
  * Determine assessment confidence.
+ *
+ * This is a data-completeness indicator, not a
+ * statistical confidence interval.
  */
 function determineConfidence(
 
@@ -679,7 +1049,31 @@ function determineConfidence(
         context.assessment.expectedDepartures >= 0;
 
 
-    if(!historicalValuesAvailable){
+    const assessmentTimestamp = new Date(
+
+        context.assessment.assessmentTime
+
+    );
+
+
+    const validAssessmentTime =
+
+        !Number.isNaN(
+
+            assessmentTimestamp.getTime()
+
+        );
+
+
+    if(
+
+        !historicalValuesAvailable
+
+        ||
+
+        !validAssessmentTime
+
+    ){
 
         return "Low";
 
@@ -707,7 +1101,7 @@ function determineConfidence(
 
 /**
  * Elevate the base state when an active trigger
- * requires a higher minimum operational state.
+ * requires a higher minimum Alpha–Echo level.
  */
 function determineFinalOperationalState(
 
@@ -730,7 +1124,8 @@ function determineFinalOperationalState(
 
             const minimumState =
 
-                result.trigger.minimumOperationalState;
+                result.trigger
+                    .minimumOperationalState;
 
 
             if(!minimumState){
@@ -740,29 +1135,41 @@ function determineFinalOperationalState(
             }
 
 
-            if(
+            const minimumStateRank =
 
-                getStateRank(
-
-                    minimumState
-
-                )
-
-                >
-
-                getStateRank(
-
-                    finalState.title
-
-                )
-
-            ){
-
-                finalState = createStateFromTitle(
+                getOperationalStateRank(
 
                     minimumState
 
                 );
+
+
+            const currentStateRank =
+
+                getOperationalStateRank(
+
+                    finalState.title
+
+                );
+
+
+            if(
+
+                minimumStateRank
+
+                >
+
+                currentStateRank
+
+            ){
+
+                finalState =
+
+                    getOperationalStateByTitle(
+
+                        minimumState
+
+                    );
 
             }
 
@@ -771,18 +1178,19 @@ function determineFinalOperationalState(
     );
 
 
-    return finalState;
+    return {
+
+        ...finalState
+
+    };
 
 }
 
 
 /**
- * Create initial trigger-based recommendations.
- */
-/**
  * Create configured trigger-based recommendations.
  */
-function createInitialRecommendations(
+function createOperationalRecommendations(
 
     activeTriggers:OperationalAssessment["activeTriggers"]
 
@@ -801,79 +1209,152 @@ function createInitialRecommendations(
 
         triggerResult => {
 
-            triggerResult.trigger.interventionIds.forEach(
+            triggerResult
+                .trigger
+                .interventionIds
+                .forEach(
 
-                interventionId => {
+                    interventionId => {
 
-                    const intervention =
+                        const intervention =
 
-                        getOperationalIntervention(
+                            getOperationalIntervention(
 
-                            interventionId
+                                interventionId
 
-                        );
-
-
-                    if(!intervention){
-
-                        console.warn(
-
-                            `No enabled operational intervention was found for "${interventionId}".`
-
-                        );
+                            );
 
 
-                        return;
+                        if(!intervention){
 
-                    }
+                            console.warn(
 
+                                `No enabled operational intervention was found for "${interventionId}".`
 
-                    const existingRecommendation =
-
-                        recommendations.get(
-
-                            interventionId
-
-                        );
+                            );
 
 
-                    const triggerPriority =
+                            return;
 
-                        mapTriggerPriority(
-
-                            triggerResult.trigger.priority
-
-                        );
+                        }
 
 
-                    const finalPriority =
+                        const existingRecommendation =
 
-                        getHigherRecommendationPriority(
+                            recommendations.get(
 
-                            intervention.defaultPriority,
+                                interventionId
 
-                            triggerPriority
-
-                        );
+                            );
 
 
-                    const reassessmentMinutes =
+                        const triggerPriority =
 
-                        selectShortestReassessmentInterval(
+                            mapTriggerPriority(
 
-                            existingRecommendation
-                                ?.reassessmentMinutes
+                                triggerResult
+                                    .trigger
+                                    .priority
 
-                            ?? intervention.reassessmentMinutes,
+                            );
+
+
+                        const finalPriority =
+
+                            getHigherRecommendationPriority(
+
+                                intervention
+                                    .defaultPriority,
+
+                                triggerPriority
+
+                            );
+
+
+                        const triggerInterval =
 
                             triggerResult
                                 .trigger
-                                .reassessmentMinutes
-
-                        );
+                                .reassessmentMinutes;
 
 
-                    if(existingRecommendation){
+                        const defaultInterval =
+
+                            intervention
+                                .reassessmentMinutes;
+
+
+                        if(existingRecommendation){
+
+                            recommendations.set(
+
+                                interventionId,
+
+                                {
+
+                                    ...existingRecommendation,
+
+                                    priority:
+                                        getHigherRecommendationPriority(
+
+                                            existingRecommendation
+                                                .priority,
+
+                                            finalPriority
+
+                                        ),
+
+                                    sourceIds:Array.from(
+
+                                        new Set([
+
+                                            ...existingRecommendation
+                                                .sourceIds,
+
+                                            triggerResult
+                                                .trigger
+                                                .id
+
+                                        ])
+
+                                    ),
+
+                                    rationale:
+                                        createCombinedRationale(
+
+                                            existingRecommendation
+                                                .rationale,
+
+                                            triggerResult
+                                                .activationReason
+
+                                        ),
+
+                                    reassessmentMinutes:
+                                        selectShortestReassessmentInterval(
+
+                                            existingRecommendation
+                                                .reassessmentMinutes,
+
+                                            selectShortestReassessmentInterval(
+
+                                                defaultInterval,
+
+                                                triggerInterval
+
+                                            )
+
+                                        )
+
+                                }
+
+                            );
+
+
+                            return;
+
+                        }
+
 
                         recommendations.set(
 
@@ -881,89 +1362,50 @@ function createInitialRecommendations(
 
                             {
 
-                                ...existingRecommendation,
+                                id:
+                                    intervention.id,
+
+                                title:
+                                    intervention.title,
+
+                                description:
+                                    intervention.description,
 
                                 priority:
-                                    getHigherRecommendationPriority(
-
-                                        existingRecommendation.priority,
-
-                                        finalPriority
-
-                                    ),
-
-                                sourceIds:Array.from(
-
-                                    new Set([
-
-                                        ...existingRecommendation.sourceIds,
-
-                                        triggerResult.trigger.id
-
-                                    ])
-
-                                ),
+                                    finalPriority,
 
                                 rationale:
-                                    createCombinedRationale(
+                                    triggerResult
+                                        .activationReason,
 
-                                        existingRecommendation.rationale,
+                                sourceIds:[
 
-                                        triggerResult.activationReason
+                                    triggerResult
+                                        .trigger
+                                        .id
 
-                                    ),
+                                ],
 
-                                reassessmentMinutes
+                                responsibleGroup:
+                                    intervention
+                                        .responsibleGroup,
+
+                                reassessmentMinutes:
+                                    selectShortestReassessmentInterval(
+
+                                        defaultInterval,
+
+                                        triggerInterval
+
+                                    )
 
                             }
 
                         );
 
-
-                        return;
-
                     }
 
-
-                    recommendations.set(
-
-                        interventionId,
-
-                        {
-
-                            id:
-                                intervention.id,
-
-                            title:
-                                intervention.title,
-
-                            description:
-                                intervention.description,
-
-                            priority:
-                                finalPriority,
-
-                            rationale:
-                                triggerResult.activationReason,
-
-                            sourceIds:[
-
-                                triggerResult.trigger.id
-
-                            ],
-
-                            responsibleGroup:
-                                intervention.responsibleGroup,
-
-                            reassessmentMinutes
-
-                        }
-
-                    );
-
-                }
-
-            );
+                );
 
         }
 
@@ -980,6 +1422,22 @@ function createInitialRecommendations(
 
             compareOperationalRecommendations
 
+        )
+
+        .map(
+
+            recommendation => ({
+
+                ...recommendation,
+
+                sourceIds:[
+
+                    ...recommendation.sourceIds
+
+                ]
+
+            })
+
         );
 
 }
@@ -987,6 +1445,11 @@ function createInitialRecommendations(
 
 /**
  * Calculate a transitional momentum score.
+ *
+ * A stable score begins at 50.
+ *
+ * Improving conditions move below 50.
+ * Worsening conditions move above 50.
  */
 function calculateMomentumScore(
 
@@ -1032,6 +1495,9 @@ function calculateMomentumScore(
 
 /**
  * Create a chronological score series.
+ *
+ * The current result is added only if it is not
+ * already represented by the latest snapshot.
  */
 function createScoreSeries(
 
@@ -1039,7 +1505,31 @@ function createScoreSeries(
 
 ):number[] {
 
-    const scores = context.snapshots
+    const validSnapshots = context.snapshots
+
+        .filter(
+
+            snapshot =>
+
+                Number.isFinite(
+
+                    snapshot.score
+
+                )
+
+                &&
+
+                !Number.isNaN(
+
+                    new Date(
+
+                        snapshot.timestamp
+
+                    ).getTime()
+
+                )
+
+        )
 
         .slice()
 
@@ -1067,28 +1557,69 @@ function createScoreSeries(
 
                 ).getTime()
 
-        )
-
-        .map(
-
-            snapshot => snapshot.score
-
         );
 
 
-    if(
+    const scores = validSnapshots.map(
 
-        scores.length === 0
+        snapshot =>
 
-        ||
+            snapshot.score
 
-        scores[scores.length - 1]
+    );
 
-        !==
+
+    const latestSnapshot =
+
+        validSnapshots[
+
+            validSnapshots.length - 1
+
+        ];
+
+
+    const resultTimestamp = new Date(
+
+        context.result.timestamp
+
+    ).getTime();
+
+
+    const latestSnapshotTimestamp =
+
+        latestSnapshot
+
+            ? new Date(
+
+                latestSnapshot.timestamp
+
+            ).getTime()
+
+            : null;
+
+
+    const resultAlreadyIncluded =
+
+        latestSnapshot !== undefined
+
+        &&
+
+        latestSnapshot.score
+
+        ===
 
         context.result.score
 
-    ){
+        &&
+
+        latestSnapshotTimestamp
+
+        ===
+
+        resultTimestamp;
+
+
+    if(!resultAlreadyIncluded){
 
         scores.push(
 
@@ -1105,178 +1636,138 @@ function createScoreSeries(
 
 
 /**
- * Rank supported operational states.
+ * Create a readable momentum summary.
  */
-function getStateRank(
+function createMomentumSummary(
 
-    title:string
+    context:OperationalTriggerContext
 
-):number {
+):string {
 
-    const ranks:Record<
+    const scores = createScoreSeries(
 
-        string,
+        context
 
-        number
-
-    > = {
-
-        "Normal Operations":
-            0,
-
-        "Elevated Activity":
-            1,
-
-        "Elevated Awareness":
-            1,
-
-        "Busy":
-            2,
-
-        "Capacity Strain":
-            2,
-
-        "Surge":
-            3,
-
-        "High Surge":
-            3,
-
-        "Severe Surge":
-            4,
-
-        "Critical Operations":
-            5
-
-    };
+    );
 
 
-    return ranks[title]
+    if(scores.length < 2){
 
-        ?? 0;
+        return "Insufficient history is available to calculate operational momentum.";
+
+    }
+
+
+    const latestChange =
+
+        scores[scores.length - 1]
+
+        -
+
+        scores[scores.length - 2];
+
+
+    if(latestChange >= 10){
+
+        return `EDORI increased rapidly by ${formatSignedNumber(latestChange)} points since the previous assessment.`;
+
+    }
+
+
+    if(latestChange > 0){
+
+        return `EDORI increased by ${formatSignedNumber(latestChange)} points since the previous assessment.`;
+
+    }
+
+
+    if(latestChange <= -5){
+
+        return `EDORI improved by ${Math.abs(latestChange)} points since the previous assessment.`;
+
+    }
+
+
+    return "EDORI is stable compared with the previous assessment.";
 
 }
 
 
 /**
- * Create an operational state from a state title.
+ * Create factors for the momentum pillar.
  */
-function createStateFromTitle(
+function createMomentumFactors(
 
-    title:string
+    context:OperationalTriggerContext,
 
-):OperationalAssessment["finalOperationalState"] {
+    momentumScore:number | null
 
-    const states:Record<
+):OperationalPillarDetail["factors"] {
 
-        string,
+    const scores = createScoreSeries(
 
-        OperationalAssessment["finalOperationalState"]
+        context
 
-    > = {
+    );
 
-        "Normal Operations":{
 
-            title:
-                "Normal Operations",
+    if(
 
-            icon:
-                "🟢",
+        scores.length < 2
 
-            color:
-                "#2E7D32",
+        ||
 
-            recommendation:
-                "Continue routine operational monitoring."
+        momentumScore === null
 
-        },
+    ){
 
-        "Elevated Awareness":{
+        return [];
 
-            title:
-                "Elevated Awareness",
+    }
 
-            icon:
-                "🔵",
 
-            color:
-                "#1565C0",
+    const latestScore =
 
-            recommendation:
-                "Increase situational awareness and monitor developing operational strain."
+        scores[scores.length - 1];
 
-        },
 
-        "Capacity Strain":{
+    const previousScore =
 
-            title:
-                "Capacity Strain",
+        scores[scores.length - 2];
 
-            icon:
-                "🟡",
 
-            color:
-                "#F9A825",
+    return [
 
-            recommendation:
-                "Review throughput barriers and prepare operational escalation."
+        {
 
-        },
+            id:
+                "latest-score-change",
 
-        "High Surge":{
+            label:
+                "Latest EDORI Change",
 
-            title:
-                "High Surge",
+            currentValue:
+                latestScore,
 
-            icon:
-                "🟠",
+            comparisonValue:
+                previousScore,
 
-            color:
-                "#EF6C00",
+            difference:
+                latestScore
 
-            recommendation:
-                "Activate coordinated surge interventions and increase reassessment frequency."
+                -
 
-        },
+                previousScore,
 
-        "Severe Surge":{
+            severity:
+                momentumScore,
 
-            title:
-                "Severe Surge",
-
-            icon:
-                "🔴",
-
-            color:
-                "#C62828",
-
-            recommendation:
-                "Initiate immediate hospital-wide operational response."
-
-        },
-
-        "Critical Operations":{
-
-            title:
-                "Critical Operations",
-
-            icon:
-                "🔴",
-
-            color:
-                "#8B0000",
-
-            recommendation:
-                "Activate the highest appropriate organizational response and executive oversight."
+            explanation:
+                "Change in EDORI compared with the previous recorded assessment."
 
         }
 
-    };
-
-
-    return states[title]
-
-        ?? states["Normal Operations"];
+    ];
 
 }
 
@@ -1315,67 +1806,6 @@ function mapTriggerPriority(
 
 }
 
-
-/**
- * Convert an intervention identifier into a
- * readable title.
- */
-
-
-
-/**
- * Create a unique assessment identifier.
- */
-function createOperationalAssessmentId(
-
-    generatedAt:Date
-
-):string {
-
-    return `operational-assessment-${generatedAt.getTime()}`;
-
-}
-
-
-/**
- * Clamp a score to 0–100.
- */
-function clampScore(
-
-    value:number
-
-):number {
-
-    if(!Number.isFinite(value)){
-
-        return 0;
-
-    }
-
-
-    return Math.round(
-
-        Math.min(
-
-            100,
-
-            Math.max(
-
-                0,
-
-                value
-
-            )
-
-        )
-
-        *
-
-        10
-
-    ) / 10;
-
-}
 
 /**
  * Return the higher of two recommendation
@@ -1510,13 +1940,28 @@ function createCombinedRationale(
     }
 
 
+    if(
+
+        existingRationale.includes(
+
+            additionalRationale
+
+        )
+
+    ){
+
+        return existingRationale;
+
+    }
+
+
     return `${existingRationale} ${additionalRationale}`;
 
 }
 
 
 /**
- * Sort recommendations by priority and then
+ * Sort recommendations by priority and then by
  * reassessment urgency.
  */
 function compareOperationalRecommendations(
@@ -1565,10 +2010,220 @@ function compareOperationalRecommendations(
         ?? Number.MAX_SAFE_INTEGER;
 
 
-    return firstInterval
+    if(firstInterval !== secondInterval){
 
-        -
+        return firstInterval
 
-        secondInterval;
+            -
+
+            secondInterval;
+
+    }
+
+
+    return first.title.localeCompare(
+
+        second.title
+
+    );
+
+}
+
+
+/**
+ * Create a unique assessment identifier.
+ */
+function createOperationalAssessmentId(
+
+    generatedAt:Date
+
+):string {
+
+    return `operational-assessment-${generatedAt.getTime()}`;
+
+}
+
+
+/**
+ * Safely calculate a percentage.
+ */
+function calculatePercentage(
+
+    numerator:number,
+
+    denominator:number
+
+):number {
+
+    if(
+
+        !Number.isFinite(
+
+            numerator
+
+        )
+
+        ||
+
+        !Number.isFinite(
+
+            denominator
+
+        )
+
+        ||
+
+        denominator <= 0
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return roundValue(
+
+        numerator
+
+        /
+
+        denominator
+
+        *
+
+        100
+
+    );
+
+}
+
+
+/**
+ * Clamp a score to 0–100.
+ */
+function clampScore(
+
+    value:number
+
+):number {
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+
+    return roundValue(
+
+        Math.min(
+
+            100,
+
+            Math.max(
+
+                0,
+
+                value
+
+            )
+
+        )
+
+    );
+
+}
+
+
+/**
+ * Normalize an unknown date-like value.
+ */
+function normalizeDate(
+
+    value:Date | string | number
+
+):Date {
+
+    const date = value instanceof Date
+
+        ? new Date(
+
+            value.getTime()
+
+        )
+
+        : new Date(
+
+            value
+
+        );
+
+
+    if(Number.isNaN(date.getTime())){
+
+        return new Date();
+
+    }
+
+
+    return date;
+
+}
+
+
+/**
+ * Round a number to one decimal place.
+ */
+function roundValue(
+
+    value:number
+
+):number {
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+
+    return Math.round(
+
+        value * 10
+
+    ) / 10;
+
+}
+
+
+/**
+ * Format a signed value for readable text.
+ */
+function formatSignedNumber(
+
+    value:number
+
+):string {
+
+    const rounded = roundValue(
+
+        value
+
+    );
+
+
+    if(rounded > 0){
+
+        return `+${rounded}`;
+
+    }
+
+
+    return String(
+
+        rounded
+
+    );
 
 }

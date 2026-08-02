@@ -102,7 +102,7 @@ EdoriScenario[] = [
         },
 
         expectedOperationalState:
-            "Elevated Activity",
+            "Bravo",
 
         rationale:
             "Demand and boarding are near baseline. Hospital occupancy and average acuity should contribute some score, but the environment should not be classified as surge."
@@ -188,7 +188,7 @@ EdoriScenario[] = [
         },
 
         expectedOperationalState:
-            "Elevated Activity",
+            "Bravo",
 
         rationale:
             "The department is above baseline but not experiencing marked crowding. EDORI should show increased awareness without triggering a high-level surge response."
@@ -274,7 +274,7 @@ EdoriScenario[] = [
         },
 
         expectedOperationalState:
-            "Busy",
+            "Charlie",
 
         rationale:
             "Multiple domains show strain, but the scenario remains below a severe boarding crisis. EDORI should identify an emerging or active surge environment."
@@ -360,7 +360,7 @@ EdoriScenario[] = [
         },
 
         expectedOperationalState:
-            "Surge",
+            "Delta",
 
         rationale:
             "ED demand, excess boarding, hospital occupancy, and forecast flow are all severely strained. A high-level surge classification is expected."
@@ -446,7 +446,7 @@ EdoriScenario[] = [
         },
 
         expectedOperationalState:
-            "Severe Surge",
+            "Echo",
 
         rationale:
             "Every active EDORI domain is severely strained. The score should trigger the highest operational response."

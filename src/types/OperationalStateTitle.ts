@@ -1,27 +1,19 @@
 /**
  * OperationalStateTitle
  *
- * Supports the current EDORI 1.0 labels and
- * the proposed EDORI 2.0 labels during the
- * transition period.
+ * Shared EDORI operational-state names.
+ *
+ * Severity increases from Alpha through Echo.
  */
 
 export type OperationalStateTitle =
 
-    | "Normal Operations"
+    | "Alpha"
 
-    | "Elevated Activity"
+    | "Bravo"
 
-    | "Busy"
+    | "Charlie"
 
-    | "Surge"
+    | "Delta"
 
-    | "Severe Surge"
-
-    | "Elevated Awareness"
-
-    | "Capacity Strain"
-
-    | "High Surge"
-
-    | "Critical Operations";
+    | "Echo";
