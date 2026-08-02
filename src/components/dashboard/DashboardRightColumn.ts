@@ -10,6 +10,14 @@
 
 import {
 
+    ShiftHandoffSummary
+
+}
+
+from "../ShiftHandoffSummary";
+
+import {
+
     OperationalForecast
 
 }
@@ -253,6 +261,22 @@ ${CollapsiblePanel({
 
 })}
 
+
+${CollapsiblePanel({
+
+    id:
+        "shift-handoff-panel",
+
+    title:
+        "Shift Handoff Summary",
+
+    description:
+        "Current status, active risks, actions, and near-term outlook",
+
+    content:
+        ShiftHandoffSummary()
+
+})}
 
             ${CollapsiblePanel({
 

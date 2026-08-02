@@ -9,6 +9,14 @@
 
 import {
 
+    initializeShiftHandoffSummary
+
+}
+
+from "../ShiftHandoffSummary";
+
+import {
+
     initializeOperationalForecast
 
 }
@@ -166,6 +174,8 @@ export function initializeDashboardComponents():void {
     initializeRecommendations();
 
     initializeOperationalForecast();
+
+    initializeShiftHandoffSummary();
 
     initializeTrendChart();
 
