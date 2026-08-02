@@ -2121,13 +2121,20 @@ h1,h2,h3{margin-top:0}
     height:130px;
     overflow:hidden;
     border-radius:260px 260px 0 0;
+
     background:conic-gradient(
         from 270deg at 50% 100%,
-        #dcfce7 0deg 36deg,
-        #dbeafe 36deg 72deg,
-        #fef9c3 72deg 108deg,
-        #ffedd5 108deg 144deg,
-        #fee2e2 144deg 180deg,
+
+        #16A34A 0deg 36deg,
+
+        #EAB308 36deg 72deg,
+
+        #F97316 72deg 108deg,
+
+        #DC2626 108deg 144deg,
+
+        #111827 144deg 180deg,
+
         transparent 180deg 360deg
     );
 }
@@ -3861,6 +3868,206 @@ h1,h2,h3{margin-top:0}
 
     .dashboard-panel-toolbar-button {
         width:100%;
+    }
+
+}
+
+/* =========================
+   Executive Command-Center Cards
+========================= */
+
+.command-center-cards {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:14px;
+    margin-bottom:22px;
+}
+
+.command-center-card {
+    --command-card-accent:#64748b;
+
+    position:relative;
+    min-width:0;
+    overflow:hidden;
+    padding:18px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-top:6px solid var(--command-card-accent);
+    border-radius:13px;
+    box-shadow:0 7px 18px rgba(15, 23, 42, .055);
+}
+
+.command-center-card::after {
+    content:"";
+    position:absolute;
+    top:0;
+    right:0;
+    width:80px;
+    height:80px;
+    background:var(--command-card-accent);
+    border-radius:0 0 0 80px;
+    opacity:.055;
+    pointer-events:none;
+}
+
+.command-center-card-alpha {
+    --command-card-accent:#16a34a;
+}
+
+.command-center-card-bravo {
+    --command-card-accent:#eab308;
+}
+
+.command-center-card-charlie {
+    --command-card-accent:#f97316;
+}
+
+.command-center-card-delta {
+    --command-card-accent:#dc2626;
+}
+
+.command-center-card-echo {
+    --command-card-accent:#111827;
+}
+
+.command-center-card-header {
+    position:relative;
+    z-index:1;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.command-center-card-title {
+    display:block;
+    color:#0f172a;
+    font-size:15px;
+    font-weight:800;
+    line-height:1.35;
+}
+
+.command-center-card-primary-label,
+.command-center-card-label {
+    display:block;
+    margin-top:4px;
+    color:#64748b;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.055em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.command-center-card-icon {
+    position:relative;
+    z-index:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:36px;
+    height:36px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+    font-size:18px;
+    line-height:1;
+}
+
+.command-center-card-value {
+    position:relative;
+    z-index:1;
+    display:block;
+    margin-top:15px;
+    color:#0f172a;
+    font-size:28px;
+    line-height:1.1;
+    overflow-wrap:anywhere;
+}
+
+.command-center-card-secondary {
+    position:relative;
+    z-index:1;
+    display:block;
+    margin-top:6px;
+    color:#475569;
+    font-size:13px;
+    font-weight:700;
+    line-height:1.45;
+}
+
+.command-center-card-comparison {
+    position:relative;
+    z-index:1;
+    display:inline-flex;
+    align-items:center;
+    margin-top:13px;
+    padding:6px 9px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    color:#334155;
+    font-size:11px;
+    font-weight:800;
+    line-height:1.35;
+}
+
+.command-center-card-description {
+    position:relative;
+    z-index:1;
+    margin:12px 0 0;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.55;
+}
+
+.command-center-card-placeholder {
+    background:#f8fafc;
+    border-top-color:#cbd5e1;
+}
+
+.command-center-card-placeholder
+.command-center-card-value {
+    color:#94a3b8;
+}
+
+.command-center-card-wide {
+    grid-column:1 / -1;
+}
+
+.command-center-card-recalculation {
+    background:#fff7ed;
+    border-color:#fdba74;
+    border-top-color:#f97316;
+}
+
+.command-center-card-error {
+    background:#fef2f2;
+    border-color:#fecaca;
+    border-top-color:#dc2626;
+}
+
+@media(max-width:1100px) {
+
+    .command-center-cards {
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+}
+
+@media(max-width:650px) {
+
+    .command-center-cards {
+        grid-template-columns:1fr;
+    }
+
+    .command-center-card {
+        padding:16px;
+    }
+
+    .command-center-card-value {
+        font-size:25px;
     }
 
 }
