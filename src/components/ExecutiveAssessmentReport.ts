@@ -1,0 +1,2407 @@
+/**
+ * ExecutiveAssessmentReport
+ *
+ * Creates a printable leadership report from the
+ * authoritative EDORI OperationalAssessment.
+ *
+ * The report uses the browser print dialog, which
+ * allows the user to print the report or save it as
+ * a PDF.
+ *
+ * This component does not:
+ *
+ * - Calculate EDORI
+ * - Modify application state
+ * - Save assessment history
+ * - Reevaluate operational triggers
+ */
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
+import {
+
+    HOSPITAL
+
+}
+
+from "../config/constants";
+
+
+import {
+
+    subscribe
+
+}
+
+from "../services/EventService";
+
+
+import {
+
+    createOperationalAssessment
+
+}
+
+from "../services/OperationalAssessmentService";
+
+
+import {
+
+    getLatestResult,
+
+    getResultInvalidationReason
+
+}
+
+from "../services/ResultService";
+
+
+import {
+
+    getSnapshots
+
+}
+
+from "../services/SnapshotService";
+
+
+import {
+
+    getState,
+
+    hasCommittedAssessment
+
+}
+
+from "../services/StateService";
+
+
+import type {
+
+    EdoriSnapshot
+
+}
+
+from "../types/EdoriSnapshot";
+
+
+import type {
+
+    OperationalAssessment
+
+}
+
+from "../types/OperationalAssessment";
+
+
+import type {
+
+    OperationalRecommendation
+
+}
+
+from "../types/OperationalRecommendation";
+
+
+/**
+ * Maximum number of condensed report items.
+ */
+const MAXIMUM_REPORT_DRIVERS = 5;
+
+const MAXIMUM_REPORT_TRIGGERS = 8;
+
+const MAXIMUM_REPORT_ACTIONS = 8;
+
+
+/**
+ * Render the Executive Assessment Report panel.
+ */
+export function ExecutiveAssessmentReport():string {
+
+    return `
+
+        <section class="executive-report-container">
+
+            <div class="panel-header executive-report-panel-header">
+
+                <div>
+
+                    <h3>
+                        Executive Assessment Report
+                    </h3>
+
+                    <p class="panel-description">
+                        Printable leadership summary of the current EDORI assessment
+                    </p>
+
+                </div>
+
+
+                <button
+                    id="printExecutiveReportButton"
+                    class="executive-report-print-button"
+                    type="button"
+                    disabled
+                >
+                    Print / Save as PDF
+                </button>
+
+            </div>
+
+
+            <div
+                id="executiveReportMessage"
+                class="executive-report-message"
+                aria-live="polite"
+            >
+            </div>
+
+
+            <div
+                id="executiveReportContent"
+                class="executive-report-content"
+                aria-live="polite"
+            >
+
+                ${createAwaitingAssessmentState()}
+
+            </div>
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Initialize executive-report behavior.
+ */
+export function initializeExecutiveAssessmentReport():void {
+
+    const printButton = document.getElementById(
+
+        "printExecutiveReportButton"
+
+    );
+
+
+    printButton?.addEventListener(
+
+        "click",
+
+        handlePrintExecutiveReport
+
+    );
+
+
+    updateExecutiveAssessmentReport();
+
+
+    subscribe(
+
+        APP_EVENTS.RESULT_CHANGED,
+
+        updateExecutiveAssessmentReport
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORY_CHANGED,
+
+        updateExecutiveAssessmentReport
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
+
+        updateExecutiveAssessmentReport
+
+    );
+
+}
+
+
+/**
+ * Refresh the report using authoritative services.
+ */
+function updateExecutiveAssessmentReport():void {
+
+    const container = document.getElementById(
+
+        "executiveReportContent"
+
+    );
+
+
+    if(!container){
+
+        return;
+
+    }
+
+
+    clearReportMessage();
+
+
+    const invalidationReason =
+
+        getResultInvalidationReason();
+
+
+    if(invalidationReason){
+
+        updatePrintButton(
+
+            false
+
+        );
+
+
+        container.innerHTML =
+
+            createRecalculationRequiredState(
+
+                invalidationReason
+
+            );
+
+
+        return;
+
+    }
+
+
+    if(!hasCommittedAssessment()){
+
+        updatePrintButton(
+
+            false
+
+        );
+
+
+        container.innerHTML =
+
+            createAwaitingAssessmentState();
+
+
+        return;
+
+    }
+
+
+    const result = getLatestResult();
+
+
+    if(!result){
+
+        updatePrintButton(
+
+            false
+
+        );
+
+
+        container.innerHTML =
+
+            createAwaitingAssessmentState();
+
+
+        return;
+
+    }
+
+
+    try {
+
+        const snapshots = getSnapshots();
+
+
+        const operationalAssessment =
+
+            createOperationalAssessment({
+
+                assessment:
+                    getState(),
+
+                result,
+
+                snapshots,
+
+                evaluatedAt:
+                    new Date()
+
+            });
+
+
+        container.innerHTML =
+
+            createExecutiveReportMarkup(
+
+                operationalAssessment,
+
+                snapshots
+
+            );
+
+
+        updatePrintButton(
+
+            true
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to create the executive assessment report:",
+
+            error
+
+        );
+
+
+        updatePrintButton(
+
+            false
+
+        );
+
+
+        container.innerHTML = `
+
+            <div class="executive-report-empty error">
+
+                <strong>
+                    Executive report unavailable
+                </strong>
+
+                <p>
+                    Review the browser console for additional details.
+                </p>
+
+            </div>
+
+        `;
+
+    }
+
+}
+
+
+/**
+ * Create the completed report markup.
+ */
+function createExecutiveReportMarkup(
+
+    operationalAssessment:OperationalAssessment,
+
+    snapshots:EdoriSnapshot[]
+
+):string {
+
+    const assessment =
+
+        operationalAssessment.assessment;
+
+
+    const finalState =
+
+        operationalAssessment.finalOperationalState;
+
+
+    const baseState =
+
+        operationalAssessment.baseOperationalState;
+
+
+    const score = Math.round(
+
+        operationalAssessment
+            .scoreResult
+            .score
+
+    );
+
+
+    const scoreChange = determineScoreChange(
+
+        snapshots,
+
+        score
+
+    );
+
+
+    const edCapacityPercent = calculatePercentage(
+
+        assessment.totalEDVolume,
+
+        HOSPITAL.ED_BEDS
+
+    );
+
+
+    const boardingShare = calculatePercentage(
+
+        assessment.boardedPatients,
+
+        assessment.totalEDVolume
+
+    );
+
+
+    const medicalOccupancy = calculatePercentage(
+
+        assessment.occupiedMedicalBeds,
+
+        HOSPITAL.MEDICAL_BEDS
+
+    );
+
+
+    const availableMedicalBeds = Math.max(
+
+        0,
+
+        HOSPITAL.MEDICAL_BEDS
+
+        -
+
+        assessment.occupiedMedicalBeds
+
+    );
+
+
+    const expectedNetFlow =
+
+        assessment.expectedArrivals
+
+        -
+
+        assessment.expectedDepartures;
+
+
+    const highAcuityCount =
+
+        assessment.esi1
+
+        +
+
+        assessment.esi2;
+
+
+    const highAcuityPercent = calculatePercentage(
+
+        highAcuityCount,
+
+        assessment.totalEDVolume
+
+    );
+
+
+    const leadingDrivers =
+
+        operationalAssessment.primaryDrivers
+
+            .slice()
+
+            .sort(
+
+                (
+
+                    first,
+
+                    second
+
+                ) =>
+
+                    second.severity
+
+                    -
+
+                    first.severity
+
+            )
+
+            .slice(
+
+                0,
+
+                MAXIMUM_REPORT_DRIVERS
+
+            );
+
+
+    const activeTriggers =
+
+        operationalAssessment.activeTriggers
+
+            .slice(
+
+                0,
+
+                MAXIMUM_REPORT_TRIGGERS
+
+            );
+
+
+    const recommendations =
+
+        operationalAssessment.recommendations
+
+            .slice()
+
+            .sort(
+
+                compareRecommendations
+
+            )
+
+            .slice(
+
+                0,
+
+                MAXIMUM_REPORT_ACTIONS
+
+            );
+
+
+    const levelWasEscalated =
+
+        finalState.title
+
+        !==
+
+        baseState.title;
+
+
+    return `
+
+        <article
+            id="executiveAssessmentPrintableReport"
+            class="executive-assessment-report"
+        >
+
+            <header class="executive-report-header">
+
+                <div>
+
+                    <span class="executive-report-eyebrow">
+                        ED Operational Readiness Index
+                    </span>
+
+                    <h2>
+                        Executive Assessment Report
+                    </h2>
+
+                    <p>
+
+                        Assessment completed
+
+                        ${escapeHtml(
+                            formatAssessmentTime(
+                                assessment.assessmentTime
+                            )
+                        )}
+
+                    </p>
+
+                </div>
+
+
+                <div class="executive-report-header-meta">
+
+                    <span>
+                        Report generated
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(
+                            formatAssessmentTime(
+                                new Date()
+                            )
+                        )}
+
+                    </strong>
+
+                </div>
+
+            </header>
+
+
+            <section
+                class="executive-report-status"
+                style="
+                    --executive-state-color:
+                    ${escapeAttribute(
+                        finalState.color
+                    )};
+                "
+            >
+
+                <div class="executive-report-status-main">
+
+                    <span
+                        class="executive-report-status-icon"
+                        aria-hidden="true"
+                    >
+
+                        ${escapeHtml(
+                            finalState.icon
+                        )}
+
+                    </span>
+
+
+                    <div>
+
+                        <span class="executive-report-label">
+                            Final Operational Level
+                        </span>
+
+                        <strong>
+
+                            ${escapeHtml(
+                                finalState.title
+                            )}
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="executive-report-score">
+
+                    <span>
+                        EDORI Score
+                    </span>
+
+                    <strong>
+                        ${score}
+                    </strong>
+
+                </div>
+
+
+                <div class="executive-report-status-detail">
+
+                    <span>
+                        Trend
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(
+                            operationalAssessment.riskDirection
+                        )}
+
+                    </strong>
+
+                </div>
+
+
+                <div class="executive-report-status-detail">
+
+                    <span>
+                        Confidence
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(
+                            operationalAssessment.confidence
+                        )}
+
+                    </strong>
+
+                </div>
+
+            </section>
+
+
+            <div class="executive-report-context-row">
+
+                <div>
+
+                    <span>
+                        Score-Derived Level
+                    </span>
+
+                    <strong>
+
+                        ${escapeHtml(
+                            baseState.title
+                        )}
+
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Score Change
+                    </span>
+
+                    <strong>
+
+                        ${scoreChange === null
+
+                            ? "No prior comparison"
+
+                            : formatSignedNumber(
+                                scoreChange
+                            )
+
+                        }
+
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Active Triggers
+                    </span>
+
+                    <strong>
+
+                        ${operationalAssessment
+                            .activeTriggers
+                            .length}
+
+                    </strong>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Priority Actions
+                    </span>
+
+                    <strong>
+
+                        ${operationalAssessment
+                            .recommendations
+                            .length}
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            ${levelWasEscalated
+
+                ? `
+
+                    <div class="executive-report-alert">
+
+                        <strong>
+                            Trigger-adjusted escalation
+                        </strong>
+
+                        <p>
+
+                            The numerical score corresponded to
+
+                            ${escapeHtml(
+                                baseState.title
+                            )},
+
+                            but active operational triggers elevated the final level to
+
+                            ${escapeHtml(
+                                finalState.title
+                            )}.
+
+                        </p>
+
+                    </div>
+
+                `
+
+                : ""
+
+            }
+
+
+            <section class="executive-report-section">
+
+                <div class="executive-report-section-heading">
+
+                    <span>
+                        Current Conditions
+                    </span>
+
+                    <h3>
+                        Operational Capacity and Demand
+                    </h3>
+
+                </div>
+
+
+                <div class="executive-report-metric-grid">
+
+                    ${createReportMetric({
+
+                        label:
+                            "Total ED Volume",
+
+                        value:
+                            formatNumber(
+                                assessment.totalEDVolume
+                            ),
+
+                        detail:
+                            `${formatNumber(
+                                edCapacityPercent
+                            )}% of ${HOSPITAL.ED_BEDS}-bed capacity`
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "Boarding Patients",
+
+                        value:
+                            formatNumber(
+                                assessment.boardedPatients
+                            ),
+
+                        detail:
+                            `${formatNumber(
+                                boardingShare
+                            )}% of ED census`
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "Occupied Medical Beds",
+
+                        value:
+                            `${formatNumber(
+                                assessment.occupiedMedicalBeds
+                            )} / ${HOSPITAL.MEDICAL_BEDS}`,
+
+                        detail:
+                            `${formatNumber(
+                                medicalOccupancy
+                            )}% occupied`
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "Available Medical Beds",
+
+                        value:
+                            formatNumber(
+                                availableMedicalBeds
+                            ),
+
+                        detail:
+                            "Calculated from configured medical capacity"
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "Expected Arrivals",
+
+                        value:
+                            formatNumber(
+                                assessment.expectedArrivals
+                            ),
+
+                        detail:
+                            "Historical expected hourly arrivals"
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "Expected Departures",
+
+                        value:
+                            formatNumber(
+                                assessment.expectedDepartures
+                            ),
+
+                        detail:
+                            "Historical expected hourly departures"
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "Expected Net Flow",
+
+                        value:
+                            formatSignedNumber(
+                                expectedNetFlow
+                            ),
+
+                        detail:
+                            createNetFlowDescription(
+                                expectedNetFlow
+                            )
+
+                    })}
+
+
+                    ${createReportMetric({
+
+                        label:
+                            "High-Acuity Patients",
+
+                        value:
+                            formatNumber(
+                                highAcuityCount
+                            ),
+
+                        detail:
+                            `${formatNumber(
+                                highAcuityPercent
+                            )}% ESI 1–2`
+
+                    })}
+
+                </div>
+
+            </section>
+
+
+            <section class="executive-report-section">
+
+                <div class="executive-report-section-heading">
+
+                    <span>
+                        Clinical Acuity
+                    </span>
+
+                    <h3>
+                        Emergency Severity Index Distribution
+                    </h3>
+
+                </div>
+
+
+                <div class="executive-report-esi-grid">
+
+                    ${createEsiMetric(
+                        1,
+                        assessment.esi1,
+                        assessment.totalEDVolume
+                    )}
+
+                    ${createEsiMetric(
+                        2,
+                        assessment.esi2,
+                        assessment.totalEDVolume
+                    )}
+
+                    ${createEsiMetric(
+                        3,
+                        assessment.esi3,
+                        assessment.totalEDVolume
+                    )}
+
+                    ${createEsiMetric(
+                        4,
+                        assessment.esi4,
+                        assessment.totalEDVolume
+                    )}
+
+                    ${createEsiMetric(
+                        5,
+                        assessment.esi5,
+                        assessment.totalEDVolume
+                    )}
+
+                </div>
+
+            </section>
+
+
+            <div class="executive-report-three-column">
+
+                ${createDriverReportSection(
+                    leadingDrivers
+                )}
+
+                ${createTriggerReportSection(
+                    activeTriggers
+                )}
+
+                ${createRecommendationReportSection(
+                    recommendations
+                )}
+
+            </div>
+
+
+            <section class="executive-report-section">
+
+                <div class="executive-report-section-heading">
+
+                    <span>
+                        Operational Interpretation
+                    </span>
+
+                    <h3>
+                        Near-Term Outlook
+                    </h3>
+
+                </div>
+
+
+                <div class="executive-report-outlook">
+
+                    <strong>
+
+                        ${escapeHtml(
+                            createOutlookHeading(
+                                expectedNetFlow,
+                                operationalAssessment.riskDirection
+                            )
+                        )}
+
+                    </strong>
+
+
+                    <p>
+
+                        ${escapeHtml(
+                            createOutlookDescription(
+                                expectedNetFlow,
+                                assessment.boardedPatients,
+                                assessment.expectedBoarders,
+                                operationalAssessment.riskDirection
+                            )
+                        )}
+
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <footer class="executive-report-footer">
+
+                <p>
+                    EDORI is an operational decision-support tool. Results should be interpreted with clinical and administrative judgment and local surge policies.
+                </p>
+
+            </footer>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create one executive report metric.
+ */
+function createReportMetric(
+
+    options:{
+
+        label:string;
+
+        value:string;
+
+        detail:string;
+
+    }
+
+):string {
+
+    return `
+
+        <article class="executive-report-metric">
+
+            <span>
+
+                ${escapeHtml(
+                    options.label
+                )}
+
+            </span>
+
+            <strong>
+
+                ${escapeHtml(
+                    options.value
+                )}
+
+            </strong>
+
+            <small>
+
+                ${escapeHtml(
+                    options.detail
+                )}
+
+            </small>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create one ESI metric.
+ */
+function createEsiMetric(
+
+    esiLevel:number,
+
+    patientCount:number,
+
+    totalEDVolume:number
+
+):string {
+
+    return `
+
+        <article class="executive-report-esi-item">
+
+            <span>
+                ESI ${esiLevel}
+            </span>
+
+            <strong>
+                ${formatNumber(patientCount)}
+            </strong>
+
+            <small>
+
+                ${formatNumber(
+                    calculatePercentage(
+                        patientCount,
+                        totalEDVolume
+                    )
+                )}%
+
+            </small>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create the driver report section.
+ */
+function createDriverReportSection(
+
+    drivers:OperationalAssessment["primaryDrivers"]
+
+):string {
+
+    return `
+
+        <section class="executive-report-list-section">
+
+            <div class="executive-report-section-heading">
+
+                <span>
+                    Contributors
+                </span>
+
+                <h3>
+                    Primary Drivers
+                </h3>
+
+            </div>
+
+
+            ${drivers.length === 0
+
+                ? createReportEmptyState(
+
+                    "No dominant EDORI drivers were identified."
+
+                )
+
+                : `
+
+                    <div class="executive-report-list">
+
+                        ${drivers
+
+                            .map(
+
+                                driver => `
+
+                                    <article class="executive-report-list-item">
+
+                                        <div>
+
+                                            <strong>
+
+                                                ${escapeHtml(
+                                                    driver.title
+                                                )}
+
+                                            </strong>
+
+                                            <p>
+
+                                                ${escapeHtml(
+                                                    driver.description
+                                                )}
+
+                                            </p>
+
+                                        </div>
+
+
+                                        <span>
+
+                                            Impact
+
+                                            ${Math.round(
+                                                driver.severity
+                                            )}
+
+                                        </span>
+
+                                    </article>
+
+                                `
+
+                            )
+
+                            .join("")}
+
+                    </div>
+
+                `
+
+            }
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Create the trigger report section.
+ */
+function createTriggerReportSection(
+
+    triggers:OperationalAssessment["activeTriggers"]
+
+):string {
+
+    return `
+
+        <section class="executive-report-list-section">
+
+            <div class="executive-report-section-heading">
+
+                <span>
+                    Active Conditions
+                </span>
+
+                <h3>
+                    Operational Triggers
+                </h3>
+
+            </div>
+
+
+            ${triggers.length === 0
+
+                ? createReportEmptyState(
+
+                    "No operational triggers are currently active."
+
+                )
+
+                : `
+
+                    <div class="executive-report-list">
+
+                        ${triggers
+
+                            .map(
+
+                                triggerResult => `
+
+                                    <article class="executive-report-list-item">
+
+                                        <div>
+
+                                            <strong>
+
+                                                ${escapeHtml(
+                                                    triggerResult
+                                                        .trigger
+                                                        .title
+                                                )}
+
+                                            </strong>
+
+                                            <p>
+
+                                                ${escapeHtml(
+                                                    triggerResult
+                                                        .activationReason
+                                                )}
+
+                                            </p>
+
+                                        </div>
+
+
+                                        <span>
+
+                                            ${escapeHtml(
+                                                triggerResult
+                                                    .trigger
+                                                    .priority
+                                            )}
+
+                                        </span>
+
+                                    </article>
+
+                                `
+
+                            )
+
+                            .join("")}
+
+                    </div>
+
+                `
+
+            }
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Create the recommendation report section.
+ */
+function createRecommendationReportSection(
+
+    recommendations:OperationalRecommendation[]
+
+):string {
+
+    return `
+
+        <section class="executive-report-list-section">
+
+            <div class="executive-report-section-heading">
+
+                <span>
+                    Response
+                </span>
+
+                <h3>
+                    Recommended Actions
+                </h3>
+
+            </div>
+
+
+            ${recommendations.length === 0
+
+                ? createReportEmptyState(
+
+                    "No operational intervention is currently recommended."
+
+                )
+
+                : `
+
+                    <div class="executive-report-list">
+
+                        ${recommendations
+
+                            .map(
+
+                                recommendation => `
+
+                                    <article class="executive-report-list-item">
+
+                                        <div>
+
+                                            <strong>
+
+                                                ${escapeHtml(
+                                                    recommendation.title
+                                                )}
+
+                                            </strong>
+
+                                            <p>
+
+                                                ${escapeHtml(
+                                                    recommendation.description
+                                                )}
+
+                                            </p>
+
+                                        </div>
+
+
+                                        <span>
+
+                                            ${escapeHtml(
+                                                recommendation.priority
+                                            )}
+
+                                        </span>
+
+                                    </article>
+
+                                `
+
+                            )
+
+                            .join("")}
+
+                    </div>
+
+                `
+
+            }
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Create one empty report state.
+ */
+function createReportEmptyState(
+
+    message:string
+
+):string {
+
+    return `
+
+        <div class="executive-report-list-empty">
+
+            ${escapeHtml(message)}
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Print only the executive report.
+ */
+function handlePrintExecutiveReport():void {
+
+    const invalidationReason =
+
+        getResultInvalidationReason();
+
+
+    if(
+
+        invalidationReason
+
+        ||
+
+        !hasCommittedAssessment()
+
+        ||
+
+        !getLatestResult()
+
+    ){
+
+        showReportMessage(
+
+            "A current calculated EDORI assessment is required before printing.",
+
+            "error"
+
+        );
+
+
+        return;
+
+    }
+
+
+    clearReportMessage();
+
+
+    document.body.classList.add(
+
+        "printing-executive-report"
+
+    );
+
+
+    const cleanup = ():void => {
+
+        document.body.classList.remove(
+
+            "printing-executive-report"
+
+        );
+
+
+        window.removeEventListener(
+
+            "afterprint",
+
+            cleanup
+
+        );
+
+    };
+
+
+    window.addEventListener(
+
+        "afterprint",
+
+        cleanup
+
+    );
+
+
+    window.print();
+
+
+    /*
+     * Some browsers do not consistently fire
+     * afterprint when printing is cancelled.
+     */
+    window.setTimeout(
+
+        cleanup,
+
+        1_500
+
+    );
+
+}
+
+
+/**
+ * Determine score change using snapshot history.
+ */
+function determineScoreChange(
+
+    snapshots:EdoriSnapshot[],
+
+    currentScore:number
+
+):number | null {
+
+    const validSnapshots = snapshots
+
+        .filter(
+
+            snapshot =>
+
+                Number.isFinite(
+
+                    snapshot.score
+
+                )
+
+                &&
+
+                !Number.isNaN(
+
+                    new Date(
+                        snapshot.timestamp
+                    ).getTime()
+
+                )
+
+        )
+
+        .slice()
+
+        .sort(
+
+            (
+
+                first,
+
+                second
+
+            ) =>
+
+                new Date(
+                    first.timestamp
+                ).getTime()
+
+                -
+
+                new Date(
+                    second.timestamp
+                ).getTime()
+
+        );
+
+
+    if(validSnapshots.length === 0){
+
+        return null;
+
+    }
+
+
+    const latestSnapshot = validSnapshots[
+
+        validSnapshots.length - 1
+
+    ];
+
+
+    if(
+
+        Math.abs(
+
+            latestSnapshot.score
+
+            -
+
+            currentScore
+
+        )
+
+        <
+
+        0.001
+
+    ){
+
+        if(validSnapshots.length < 2){
+
+            return null;
+
+        }
+
+
+        return currentScore
+
+            -
+
+            validSnapshots[
+                validSnapshots.length - 2
+            ].score;
+
+    }
+
+
+    return currentScore
+
+        -
+
+        latestSnapshot.score;
+
+}
+
+
+/**
+ * Sort recommendations by priority and interval.
+ */
+function compareRecommendations(
+
+    first:OperationalRecommendation,
+
+    second:OperationalRecommendation
+
+):number {
+
+    const priorityDifference =
+
+        getRecommendationPriorityRank(
+
+            second.priority
+
+        )
+
+        -
+
+        getRecommendationPriorityRank(
+
+            first.priority
+
+        );
+
+
+    if(priorityDifference !== 0){
+
+        return priorityDifference;
+
+    }
+
+
+    return normalizeReassessmentInterval(
+
+        first.reassessmentMinutes
+
+    )
+
+    -
+
+    normalizeReassessmentInterval(
+
+        second.reassessmentMinutes
+
+    );
+
+}
+
+
+/**
+ * Rank recommendation priorities.
+ */
+function getRecommendationPriorityRank(
+
+    priority:OperationalRecommendation["priority"]
+
+):number {
+
+    switch(priority){
+
+        case "Immediate":
+
+            return 4;
+
+
+        case "High":
+
+            return 3;
+
+
+        case "Moderate":
+
+            return 2;
+
+
+        case "Routine":
+
+            return 1;
+
+    }
+
+}
+
+
+/**
+ * Normalize reassessment intervals for sorting.
+ */
+function normalizeReassessmentInterval(
+
+    value:number | null
+
+):number {
+
+    if(
+
+        value === null
+
+        ||
+
+        !Number.isFinite(value)
+
+        ||
+
+        value <= 0
+
+    ){
+
+        return Number.MAX_SAFE_INTEGER;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Describe expected net flow.
+ */
+function createNetFlowDescription(
+
+    expectedNetFlow:number
+
+):string {
+
+    if(expectedNetFlow > 0){
+
+        return "Arrivals exceed departures";
+
+    }
+
+
+    if(expectedNetFlow < 0){
+
+        return "Departures exceed arrivals";
+
+    }
+
+
+    return "Expected flow is balanced";
+
+}
+
+
+/**
+ * Create the outlook heading.
+ */
+function createOutlookHeading(
+
+    expectedNetFlow:number,
+
+    riskDirection:OperationalAssessment["riskDirection"]
+
+):string {
+
+    if(
+
+        riskDirection === "Rapidly Worsening"
+
+        ||
+
+        expectedNetFlow >= 8
+
+    ){
+
+        return "Significant worsening pressure expected";
+
+    }
+
+
+    if(
+
+        riskDirection === "Increasing"
+
+        ||
+
+        expectedNetFlow > 0
+
+    ){
+
+        return "Continued operational pressure expected";
+
+    }
+
+
+    if(
+
+        riskDirection === "Improving"
+
+        &&
+
+        expectedNetFlow < 0
+
+    ){
+
+        return "Conditions may improve";
+
+    }
+
+
+    return "Conditions expected to remain relatively stable";
+
+}
+
+
+/**
+ * Create a transparent outlook explanation.
+ */
+function createOutlookDescription(
+
+    expectedNetFlow:number,
+
+    boardedPatients:number,
+
+    expectedBoarders:number,
+
+    riskDirection:OperationalAssessment["riskDirection"]
+
+):string {
+
+    const boardingDifference =
+
+        boardedPatients
+
+        -
+
+        expectedBoarders;
+
+
+    if(
+
+        expectedNetFlow > 0
+
+        &&
+
+        boardingDifference > 0
+
+    ){
+
+        return `Expected arrivals exceed departures by ${formatNumber(
+            expectedNetFlow
+        )} per hour while boarding remains ${formatNumber(
+            boardingDifference
+        )} patients above baseline. Continued census and throughput pressure is likely if conditions persist.`;
+
+    }
+
+
+    if(expectedNetFlow > 0){
+
+        return `Expected arrivals exceed departures by ${formatNumber(
+            expectedNetFlow
+        )} per hour. ED census may continue to increase if actual flow follows the historical expectation.`;
+
+    }
+
+
+    if(
+
+        expectedNetFlow < 0
+
+        &&
+
+        riskDirection === "Improving"
+
+    ){
+
+        return `Expected departures exceed arrivals by ${formatNumber(
+            Math.abs(expectedNetFlow)
+        )} per hour and the recent EDORI trend is improving. Operational pressure may decrease if departures occur as expected.`;
+
+    }
+
+
+    if(boardingDifference > 0){
+
+        return `Expected arrivals and departures are relatively balanced, but boarding remains ${formatNumber(
+            boardingDifference
+        )} patients above baseline. Inpatient flow remains an important operational constraint.`;
+
+    }
+
+
+    return "Expected arrivals and departures are relatively balanced. Continue monitoring census movement, boarding, and operational triggers.";
+
+}
+
+
+/**
+ * Format an assessment timestamp.
+ */
+function formatAssessmentTime(
+
+    value:Date | string
+
+):string {
+
+    const date = new Date(
+
+        value
+
+    );
+
+
+    if(Number.isNaN(date.getTime())){
+
+        return "Unavailable";
+
+    }
+
+
+    return date.toLocaleString(
+
+        [],
+
+        {
+
+            month:
+                "short",
+
+            day:
+                "numeric",
+
+            year:
+                "numeric",
+
+            hour:
+                "numeric",
+
+            minute:
+                "2-digit"
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Calculate a safe percentage.
+ */
+function calculatePercentage(
+
+    numerator:number,
+
+    denominator:number
+
+):number {
+
+    if(
+
+        !Number.isFinite(numerator)
+
+        ||
+
+        !Number.isFinite(denominator)
+
+        ||
+
+        denominator <= 0
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return Math.round(
+
+        numerator
+
+        /
+
+        denominator
+
+        *
+
+        1000
+
+    ) / 10;
+
+}
+
+
+/**
+ * Format a number.
+ */
+function formatNumber(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "--";
+
+    }
+
+
+    if(Number.isInteger(value)){
+
+        return String(value);
+
+    }
+
+
+    return value
+
+        .toFixed(1)
+
+        .replace(
+
+            /\.0$/,
+
+            ""
+
+        );
+
+}
+
+
+/**
+ * Format a signed number.
+ */
+function formatSignedNumber(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "--";
+
+    }
+
+
+    if(value > 0){
+
+        return `+${formatNumber(value)}`;
+
+    }
+
+
+    return formatNumber(value);
+
+}
+
+
+/**
+ * Enable or disable the print button.
+ */
+function updatePrintButton(
+
+    enabled:boolean
+
+):void {
+
+    const button = document.getElementById(
+
+        "printExecutiveReportButton"
+
+    ) as HTMLButtonElement | null;
+
+
+    if(!button){
+
+        return;
+
+    }
+
+
+    button.disabled = !enabled;
+
+}
+
+
+/**
+ * Clear the report message.
+ */
+function clearReportMessage():void {
+
+    const element = document.getElementById(
+
+        "executiveReportMessage"
+
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.className =
+
+        "executive-report-message";
+
+
+    element.textContent = "";
+
+}
+
+
+/**
+ * Display a report message.
+ */
+function showReportMessage(
+
+    message:string,
+
+    type:"success" | "error"
+
+):void {
+
+    const element = document.getElementById(
+
+        "executiveReportMessage"
+
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.className =
+
+        `executive-report-message executive-report-message-${type}`;
+
+
+    element.textContent = message;
+
+}
+
+
+/**
+ * Create the initial state.
+ */
+function createAwaitingAssessmentState():string {
+
+    return `
+
+        <div class="executive-report-empty">
+
+            <strong>
+                Awaiting assessment
+            </strong>
+
+            <p>
+                Calculate EDORI to generate the executive assessment report.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Create the recalculation-required state.
+ */
+function createRecalculationRequiredState(
+
+    reason:string
+
+):string {
+
+    return `
+
+        <div class="executive-report-empty warning">
+
+            <strong>
+                Recalculation required
+            </strong>
+
+            <p>
+
+                ${escapeHtml(reason)}
+
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
+ */
+function escapeHtml(
+
+    value:string
+
+):string {
+
+    return value
+
+        .replaceAll("&", "&amp;")
+
+        .replaceAll("<", "&lt;")
+
+        .replaceAll(">", "&gt;")
+
+        .replaceAll("\"", "&quot;")
+
+        .replaceAll("'", "&#039;");
+
+}
+
+
+/**
+ * Escape text inserted into HTML attributes.
+ */
+function escapeAttribute(
+
+    value:string
+
+):string {
+
+    return escapeHtml(value);
+
+}

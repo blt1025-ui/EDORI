@@ -10,6 +10,15 @@
 
 import {
 
+    ExecutiveAssessmentReport
+
+}
+
+from "../ExecutiveAssessmentReport";
+
+
+import {
+
     ShiftHandoffSummary
 
 }
@@ -277,6 +286,23 @@ ${CollapsiblePanel({
         ShiftHandoffSummary()
 
 })}
+
+${CollapsiblePanel({
+
+    id:
+        "executive-assessment-report-panel",
+
+    title:
+        "Executive Assessment Report",
+
+    description:
+        "Printable leadership summary and PDF-ready report",
+
+    content:
+        ExecutiveAssessmentReport()
+
+})}
+
 
             ${CollapsiblePanel({
 

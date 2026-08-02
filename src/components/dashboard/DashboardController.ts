@@ -9,6 +9,15 @@
 
 import {
 
+    initializeExecutiveAssessmentReport
+
+}
+
+from "../ExecutiveAssessmentReport";
+
+
+import {
+
     initializeShiftHandoffSummary
 
 }
@@ -176,6 +185,8 @@ export function initializeDashboardComponents():void {
     initializeOperationalForecast();
 
     initializeShiftHandoffSummary();
+
+    initializeExecutiveAssessmentReport();
 
     initializeTrendChart();
 
