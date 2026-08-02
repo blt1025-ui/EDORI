@@ -144,6 +144,33 @@ const CURRENT_VALUE_FIELDS:Array<
 
 
 /**
+ * Assessment fields monitored for completion.
+ *
+ * These IDs match the current Situation Assessment
+ * input element IDs.
+ */
+const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
+
+    "totalEDVolume",
+
+    "boardedPatients",
+
+    "occupiedMedicalBeds",
+
+    "esi1",
+
+    "esi2",
+
+    "esi3",
+
+    "esi4",
+
+    "esi5"
+
+];
+
+
+/**
  * Local draft maintained by this component.
  *
  * The committed StateService assessment is not
@@ -543,6 +570,8 @@ export function initializeSituationAssessment():void {
 
     subscribeToHistoricalDataChanges();
 
+    initializeAssessmentProgress();
+
 }
 
 
@@ -872,6 +901,8 @@ function submitAssessmentToEngine():void {
             "success"
 
         );
+
+        showAssessmentCalculatedStatus();
 
     }
     catch(error){
@@ -1763,6 +1794,9 @@ function setElementText(
 /**
  * Show that draft values changed.
  */
+/**
+ * Show that draft values changed.
+ */
 function showDraftChangedMessage():void {
 
     showAssessmentMessage(
@@ -1772,6 +1806,9 @@ function showDraftChangedMessage():void {
         "draft"
 
     );
+
+
+    showAssessmentDraftStatus();
 
 }
 
@@ -1833,6 +1870,431 @@ function showAssessmentMessage(
 
 }
 
+
+/**
+ * Initialize assessment-completion monitoring.
+ */
+function initializeAssessmentProgress():void {
+
+    REQUIRED_ASSESSMENT_FIELD_IDS.forEach(
+
+        fieldId => {
+
+            const field = document.getElementById(
+
+                fieldId
+
+            );
+
+
+            if(
+
+                !(field instanceof HTMLInputElement)
+
+            ){
+
+                return;
+
+            }
+
+
+            field.addEventListener(
+
+                "input",
+
+                updateAssessmentProgress
+
+            );
+
+
+            field.addEventListener(
+
+                "change",
+
+                updateAssessmentProgress
+
+            );
+
+        }
+
+    );
+
+
+    updateAssessmentProgress();
+
+}
+
+
+/**
+ * Update the assessment completion display and
+ * Calculate EDORI button state.
+ */
+function updateAssessmentProgress():void {
+
+    const completedFieldCount =
+
+        REQUIRED_ASSESSMENT_FIELD_IDS.filter(
+
+            fieldId =>
+
+                isAssessmentFieldComplete(
+
+                    fieldId
+
+                )
+
+        ).length;
+
+
+    const completionPercent = Math.round(
+
+        completedFieldCount
+
+        /
+
+        REQUIRED_ASSESSMENT_FIELD_IDS.length
+
+        *
+
+        100
+
+    );
+
+
+    const progressText = document.getElementById(
+
+        "assessmentProgressText"
+
+    );
+
+
+    const progressPercent = document.getElementById(
+
+        "assessmentProgressPercent"
+
+    );
+
+
+    const progressFill = document.getElementById(
+
+        "assessmentProgressFill"
+
+    );
+
+
+    if(progressText){
+
+        progressText.textContent =
+
+            completionPercent === 100
+
+                ? "Ready to calculate"
+
+                : `${completedFieldCount} of ${REQUIRED_ASSESSMENT_FIELD_IDS.length} required fields complete`;
+
+    }
+
+
+    if(progressPercent){
+
+        progressPercent.textContent =
+
+            `${completionPercent}%`;
+
+    }
+
+
+    if(progressFill){
+
+        progressFill.style.width =
+
+            `${completionPercent}%`;
+
+    }
+
+
+    updateAssessmentActionStatus(
+
+        completionPercent
+
+    );
+
+}
+
+
+/**
+ * Determine whether one assessment field contains
+ * a valid nonnegative number.
+ */
+function isAssessmentFieldComplete(
+
+    fieldId:string
+
+):boolean {
+
+    const field = document.getElementById(
+
+        fieldId
+
+    );
+
+
+    if(
+
+        !(field instanceof HTMLInputElement)
+
+    ){
+
+        return false;
+
+    }
+
+
+    if(field.value.trim().length === 0){
+
+        return false;
+
+    }
+
+
+    const value = Number(
+
+        field.value
+
+    );
+
+
+    return Number.isFinite(
+
+        value
+
+    )
+
+    &&
+
+    value >= 0;
+
+}
+
+
+/**
+ * Update the persistent assessment-action status.
+ */
+function updateAssessmentActionStatus(
+
+    completionPercent:number
+
+):void {
+
+    const icon = document.getElementById(
+
+        "assessmentActionStatusIcon"
+
+    );
+
+
+    const title = document.getElementById(
+
+        "assessmentActionStatusTitle"
+
+    );
+
+
+    const description = document.getElementById(
+
+        "assessmentActionStatusDescription"
+
+    );
+
+
+    const button = document.getElementById(
+
+        "calculateEdoriButton"
+
+    ) as HTMLButtonElement | null;
+
+
+    if(completionPercent === 100){
+
+        if(icon){
+
+            icon.textContent =
+
+                "✓";
+
+        }
+
+
+        if(title){
+
+            title.textContent =
+
+                "Assessment ready";
+
+        }
+
+
+        if(description){
+
+            description.textContent =
+
+                "Review the entered values, then calculate the current EDORI result.";
+
+        }
+
+
+        if(button){
+
+            button.disabled = false;
+
+        }
+
+
+        return;
+
+    }
+
+
+    if(icon){
+
+        icon.textContent =
+
+            "◯";
+
+    }
+
+
+    if(title){
+
+        title.textContent =
+
+            "Assessment incomplete";
+
+    }
+
+
+    if(description){
+
+        description.textContent =
+
+            "Complete all required operational inputs before calculating EDORI.";
+
+    }
+
+
+    if(button){
+
+        button.disabled = true;
+
+    }
+
+}
+
+
+/**
+ * Display a successful committed-assessment state.
+ */
+function showAssessmentCalculatedStatus():void {
+
+    const icon = document.getElementById(
+
+        "assessmentActionStatusIcon"
+
+    );
+
+
+    const title = document.getElementById(
+
+        "assessmentActionStatusTitle"
+
+    );
+
+
+    const description = document.getElementById(
+
+        "assessmentActionStatusDescription"
+
+    );
+
+
+    if(icon){
+
+        icon.textContent = "✓";
+
+    }
+
+
+    if(title){
+
+        title.textContent =
+
+            "Assessment calculated";
+
+    }
+
+
+    if(description){
+
+        description.textContent =
+
+            "The dashboard now reflects the committed operational assessment.";
+
+    }
+
+}
+
+
+/**
+ * Display a changed-draft state.
+ */
+function showAssessmentDraftStatus():void {
+
+    const icon = document.getElementById(
+
+        "assessmentActionStatusIcon"
+
+    );
+
+
+    const title = document.getElementById(
+
+        "assessmentActionStatusTitle"
+
+    );
+
+
+    const description = document.getElementById(
+
+        "assessmentActionStatusDescription"
+
+    );
+
+
+    if(icon){
+
+        icon.textContent = "↻";
+
+    }
+
+
+    if(title){
+
+        title.textContent =
+
+            "Changes not calculated";
+
+    }
+
+
+    if(description){
+
+        description.textContent =
+
+            "Select Calculate EDORI to update the dashboard with the current values.";
+
+    }
+
+}
 
 /**
  * Update Calculate button state.

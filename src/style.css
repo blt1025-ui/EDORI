@@ -6589,3 +6589,1390 @@ h1,h2,h3{margin-top:0}
     }
 
 }
+
+/* =========================
+   EDORI Data Export Center
+========================= */
+
+.data-export-container {
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 8px 22px rgba(15, 23, 42, .06);
+}
+
+.data-export-message {
+    display:none;
+    margin-bottom:14px;
+    padding:11px 13px;
+    border-radius:8px;
+    font-size:12px;
+    line-height:1.5;
+}
+
+.data-export-message-success {
+    display:block;
+    background:#f0fdf4;
+    border:1px solid #86efac;
+    color:#166534;
+}
+
+.data-export-message-error {
+    display:block;
+    background:#fef2f2;
+    border:1px solid #fecaca;
+    color:#991b1b;
+}
+
+.data-export-message-information {
+    display:block;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1e40af;
+}
+
+.data-export-grid {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:12px;
+}
+
+.data-export-card {
+    display:flex;
+    min-width:0;
+    flex-direction:column;
+    padding:16px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-top:5px solid #2563eb;
+    border-radius:11px;
+}
+
+.data-export-card-header {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.data-export-card-label {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.06em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.data-export-card h4 {
+    margin:4px 0 0;
+    color:#0f172a;
+    font-size:16px;
+    line-height:1.35;
+}
+
+.data-export-card-icon {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:36px;
+    height:36px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    border-radius:9px;
+    font-size:18px;
+}
+
+.data-export-card p {
+    flex:1;
+    margin:13px 0 15px;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.6;
+}
+
+.data-export-button {
+    width:100%;
+    min-height:38px;
+    padding:8px 11px;
+    background:#ffffff;
+    border:1px solid #2563eb;
+    border-radius:8px;
+    color:#1d4ed8;
+    cursor:pointer;
+    font-size:11px;
+    font-weight:800;
+    transition:
+        background .15s ease,
+        border-color .15s ease,
+        color .15s ease;
+}
+
+.data-export-button-primary {
+    background:#2563eb;
+    color:#ffffff;
+}
+
+.data-export-button:hover:not(:disabled) {
+    background:#eff6ff;
+}
+
+.data-export-button-primary:hover:not(:disabled) {
+    background:#1d4ed8;
+    border-color:#1d4ed8;
+    color:#ffffff;
+}
+
+.data-export-button:disabled {
+    cursor:not-allowed;
+    opacity:.4;
+}
+
+.data-export-status {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+    margin-top:14px;
+}
+
+.data-export-status > div {
+    min-width:0;
+    padding:11px 12px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:9px;
+}
+
+.data-export-status span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.data-export-status strong {
+    display:block;
+    margin-top:5px;
+    color:#0f172a;
+    font-size:13px;
+    line-height:1.4;
+    overflow-wrap:anywhere;
+}
+
+@media(max-width:850px) {
+
+    .data-export-grid {
+        grid-template-columns:1fr;
+    }
+
+}
+
+@media(max-width:550px) {
+
+    .data-export-container {
+        padding:16px;
+    }
+
+    .data-export-status {
+        grid-template-columns:1fr;
+    }
+
+}
+
+/* =========================
+   EDORI History Restore
+========================= */
+
+.history-restore-container {
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:22px;
+    box-shadow:0 8px 22px rgba(15, 23, 42, .06);
+}
+
+.history-restore-message {
+    display:none;
+    margin-bottom:14px;
+    padding:11px 13px;
+    border-radius:8px;
+    font-size:12px;
+    line-height:1.5;
+}
+
+.history-restore-message-success {
+    display:block;
+    background:#f0fdf4;
+    border:1px solid #86efac;
+    color:#166534;
+}
+
+.history-restore-message-warning {
+    display:block;
+    background:#fff7ed;
+    border:1px solid #fdba74;
+    color:#9a3412;
+}
+
+.history-restore-message-error {
+    display:block;
+    background:#fef2f2;
+    border:1px solid #fecaca;
+    color:#991b1b;
+}
+
+.history-restore-message-information {
+    display:block;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1e40af;
+}
+
+.history-restore-upload {
+    padding:16px;
+    background:#f8fafc;
+    border:1px dashed #94a3b8;
+    border-radius:10px;
+}
+
+.history-restore-file-label {
+    display:block;
+    margin-bottom:8px;
+    color:#334155;
+    font-size:13px;
+    font-weight:800;
+}
+
+.history-restore-file-input {
+    width:100%;
+}
+
+.history-restore-help {
+    margin:9px 0 0;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.55;
+}
+
+.history-restore-preview {
+    margin-top:14px;
+}
+
+.history-restore-empty-preview {
+    padding:20px;
+    background:#f8fafc;
+    border:1px dashed #cbd5e1;
+    border-radius:10px;
+    color:#64748b;
+    text-align:center;
+}
+
+.history-restore-empty-preview strong {
+    display:block;
+    color:#334155;
+    font-size:14px;
+}
+
+.history-restore-empty-preview p {
+    margin:5px 0 0;
+    font-size:12px;
+}
+
+.history-restore-preview-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    padding:13px 14px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px 10px 0 0;
+}
+
+.history-restore-preview-header span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.history-restore-preview-header strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:13px;
+    overflow-wrap:anywhere;
+}
+
+.history-restore-valid-badge {
+    padding:5px 9px;
+    background:#f0fdf4;
+    border:1px solid #86efac;
+    border-radius:999px;
+    color:#166534 !important;
+    white-space:nowrap;
+}
+
+.history-restore-preview-grid {
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:9px;
+    padding:14px;
+    border-right:1px solid #e2e8f0;
+    border-left:1px solid #e2e8f0;
+}
+
+.history-restore-preview-metric {
+    min-width:0;
+    padding:10px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+}
+
+.history-restore-preview-metric span {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.history-restore-preview-metric strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:13px;
+    overflow-wrap:anywhere;
+}
+
+.history-restore-export-date {
+    margin:0;
+    padding:0 14px 13px;
+    border-right:1px solid #e2e8f0;
+    border-left:1px solid #e2e8f0;
+    color:#64748b;
+    font-size:11px;
+}
+
+.history-restore-warning {
+    padding:11px 13px;
+    background:#fff7ed;
+    border:1px solid #fdba74;
+    border-radius:0 0 10px 10px;
+    color:#9a3412;
+    font-size:11px;
+    line-height:1.55;
+}
+
+.history-restore-actions {
+    display:flex;
+    gap:10px;
+    margin-top:14px;
+}
+
+.history-restore-apply-button,
+.history-restore-cancel-button {
+    min-height:38px;
+    padding:8px 13px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:11px;
+    font-weight:800;
+}
+
+.history-restore-apply-button {
+    background:#dc2626;
+    border:1px solid #dc2626;
+    color:#ffffff;
+}
+
+.history-restore-cancel-button {
+    background:#ffffff;
+    border:1px solid #cbd5e1;
+    color:#475569;
+}
+
+.history-restore-apply-button:disabled,
+.history-restore-cancel-button:disabled {
+    cursor:not-allowed;
+    opacity:.4;
+}
+
+.history-restore-current {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:14px;
+    padding:11px 13px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:9px;
+}
+
+.history-restore-current span {
+    color:#64748b;
+    font-size:11px;
+    font-weight:700;
+}
+
+.history-restore-current strong {
+    color:#0f172a;
+    font-size:16px;
+}
+
+@media(max-width:750px) {
+
+    .history-restore-preview-grid {
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+}
+
+@media(max-width:500px) {
+
+    .history-restore-container {
+        padding:16px;
+    }
+
+    .history-restore-preview-grid {
+        grid-template-columns:1fr;
+    }
+
+    .history-restore-actions {
+        flex-direction:column;
+    }
+
+    .history-restore-apply-button,
+    .history-restore-cancel-button {
+        width:100%;
+    }
+
+}
+
+/* =========================
+   EDORI Dashboard Command Bar
+========================= */
+
+.dashboard-command-bar {
+    --command-level-color:#64748b;
+
+    display:grid;
+    grid-template-columns:
+        minmax(220px, 1.35fr)
+        minmax(130px, .55fr)
+        minmax(310px, 1.25fr)
+        minmax(220px, 1fr);
+    gap:14px;
+    align-items:stretch;
+    margin-bottom:18px;
+    padding:16px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-top:7px solid var(--command-level-color);
+    border-radius:14px;
+    box-shadow:0 9px 24px rgba(15, 23, 42, .07);
+}
+
+.dashboard-command-bar-alpha {
+    --command-level-color:#16a34a;
+}
+
+.dashboard-command-bar-bravo {
+    --command-level-color:#eab308;
+}
+
+.dashboard-command-bar-charlie {
+    --command-level-color:#f97316;
+}
+
+.dashboard-command-bar-delta {
+    --command-level-color:#dc2626;
+}
+
+.dashboard-command-bar-echo {
+    --command-level-color:#111827;
+}
+
+.dashboard-command-primary {
+    display:flex;
+    align-items:center;
+    gap:13px;
+    min-width:0;
+}
+
+.dashboard-command-state-icon {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:52px;
+    height:52px;
+    background:#f8fafc;
+    border:2px solid var(--command-level-color);
+    border-radius:14px;
+    font-size:25px;
+    line-height:1;
+}
+
+.dashboard-command-state {
+    min-width:0;
+}
+
+.dashboard-command-eyebrow {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.07em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.dashboard-command-state > strong {
+    display:block;
+    margin-top:3px;
+    color:var(--command-level-color);
+    font-size:27px;
+    line-height:1.1;
+    text-transform:uppercase;
+}
+
+.dashboard-command-state small {
+    display:block;
+    margin-top:5px;
+    color:#64748b;
+    font-size:10px;
+    line-height:1.45;
+}
+
+.dashboard-command-score {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    min-width:0;
+    padding:9px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:11px;
+    text-align:center;
+}
+
+.dashboard-command-score > span {
+    color:#64748b;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
+
+.dashboard-command-score > strong {
+    margin-top:2px;
+    color:#0f172a;
+    font-size:40px;
+    line-height:1;
+}
+
+.dashboard-command-score small {
+    display:block;
+    margin-top:5px;
+    font-size:9px;
+    font-weight:800;
+    line-height:1.35;
+}
+
+.dashboard-command-score-neutral {
+    color:#64748b;
+}
+
+.dashboard-command-score-improving {
+    color:#166534;
+}
+
+.dashboard-command-score-worsening {
+    color:#991b1b;
+}
+
+.dashboard-command-metrics {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:9px;
+}
+
+.dashboard-command-metric {
+    display:flex;
+    justify-content:center;
+    flex-direction:column;
+    min-width:0;
+    padding:10px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+}
+
+.dashboard-command-metric span {
+    display:block;
+    color:#64748b;
+    font-size:8px;
+    font-weight:900;
+    letter-spacing:.06em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.dashboard-command-metric strong {
+    display:block;
+    margin-top:5px;
+    color:#0f172a;
+    font-size:13px;
+    line-height:1.4;
+    overflow-wrap:anywhere;
+}
+
+.dashboard-command-value-stable {
+    color:#166534 !important;
+}
+
+.dashboard-command-value-warning {
+    color:#9a3412 !important;
+}
+
+.dashboard-command-value-critical {
+    color:#991b1b !important;
+}
+
+.dashboard-command-value-neutral {
+    color:#475569 !important;
+}
+
+.dashboard-command-recommendation {
+    display:flex;
+    justify-content:center;
+    flex-direction:column;
+    min-width:0;
+    padding:11px 13px;
+    background:#f8fafc;
+    border-left:4px solid var(--command-level-color);
+    border-radius:9px;
+}
+
+.dashboard-command-recommendation span {
+    display:block;
+    color:#64748b;
+    font-size:8px;
+    font-weight:900;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+}
+
+.dashboard-command-recommendation p {
+    margin:5px 0 0;
+    color:#334155;
+    font-size:10px;
+    line-height:1.55;
+}
+
+.dashboard-command-message {
+    display:flex;
+    align-items:center;
+    gap:13px;
+    min-width:0;
+}
+
+.dashboard-command-message-icon {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:46px;
+    height:46px;
+    background:#f8fafc;
+    border:1px solid #cbd5e1;
+    border-radius:12px;
+    font-size:22px;
+}
+
+.dashboard-command-message strong {
+    display:block;
+    color:#0f172a;
+    font-size:17px;
+}
+
+.dashboard-command-message p {
+    margin:4px 0 0;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.5;
+}
+
+.dashboard-command-bar-awaiting {
+    grid-template-columns:minmax(240px, 1fr) minmax(380px, 1fr);
+    border-top-color:#94a3b8;
+}
+
+.dashboard-command-awaiting-metrics {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:9px;
+}
+
+.dashboard-command-awaiting-metrics > div {
+    padding:10px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:9px;
+}
+
+.dashboard-command-awaiting-metrics span {
+    display:block;
+    color:#64748b;
+    font-size:8px;
+    font-weight:900;
+    text-transform:uppercase;
+}
+
+.dashboard-command-awaiting-metrics strong {
+    display:block;
+    margin-top:5px;
+    color:#475569;
+    font-size:12px;
+}
+
+.dashboard-command-bar-recalculation {
+    grid-template-columns:minmax(260px, 1.2fr) minmax(260px, 1fr);
+    background:#fff7ed;
+    border-color:#fdba74;
+    border-top-color:#f97316;
+}
+
+.dashboard-command-bar-recalculation
+.dashboard-command-message-icon {
+    background:#ffedd5;
+    border-color:#fdba74;
+}
+
+.dashboard-command-bar-recalculation
+.dashboard-command-message strong,
+.dashboard-command-bar-recalculation
+.dashboard-command-message p {
+    color:#9a3412;
+}
+
+.dashboard-command-recalculation-action {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:11px 13px;
+    background:#ffffff;
+    border:1px solid #fdba74;
+    border-radius:9px;
+    color:#9a3412;
+    font-size:11px;
+    line-height:1.55;
+    text-align:center;
+}
+
+.dashboard-command-bar-error {
+    grid-template-columns:1fr;
+    border-top-color:#dc2626;
+    background:#fef2f2;
+}
+
+.dashboard-title-row {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:18px;
+    margin-bottom:18px;
+}
+
+.dashboard-title-eyebrow {
+    display:block;
+    color:#2563eb;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+}
+
+.dashboard-title-row h2 {
+    margin:4px 0 0;
+    color:#0f172a;
+    font-size:25px;
+    line-height:1.2;
+}
+
+.dashboard-title-row p {
+    margin:5px 0 0;
+    color:#64748b;
+    font-size:12px;
+}
+
+.dashboard-command-bar-delta
+.dashboard-command-state > strong,
+.dashboard-command-bar-echo
+.dashboard-command-state > strong {
+    animation:dashboard-command-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes dashboard-command-pulse {
+
+    0%,
+    100% {
+        opacity:1;
+    }
+
+    50% {
+        opacity:.65;
+    }
+
+}
+
+@media(max-width:1200px) {
+
+    .dashboard-command-bar {
+        grid-template-columns:
+            minmax(230px, 1fr)
+            minmax(120px, .55fr)
+            minmax(300px, 1.2fr);
+    }
+
+    .dashboard-command-recommendation {
+        grid-column:1 / -1;
+    }
+
+}
+
+@media(max-width:850px) {
+
+    .dashboard-command-bar {
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-command-primary {
+        grid-column:1 / -1;
+    }
+
+    .dashboard-command-metrics {
+        grid-column:1 / -1;
+    }
+
+    .dashboard-command-recommendation {
+        grid-column:1 / -1;
+    }
+
+    .dashboard-command-bar-awaiting,
+    .dashboard-command-bar-recalculation {
+        grid-template-columns:1fr;
+    }
+
+}
+
+@media(max-width:560px) {
+
+    .dashboard-command-bar {
+        grid-template-columns:1fr;
+        padding:13px;
+    }
+
+    .dashboard-command-primary,
+    .dashboard-command-metrics,
+    .dashboard-command-recommendation {
+        grid-column:auto;
+    }
+
+    .dashboard-command-metrics,
+    .dashboard-command-awaiting-metrics {
+        grid-template-columns:1fr;
+    }
+
+    .dashboard-command-state > strong {
+        font-size:23px;
+    }
+
+    .dashboard-command-score > strong {
+        font-size:35px;
+    }
+
+    .dashboard-title-row h2 {
+        font-size:21px;
+    }
+
+}
+
+/* =========================
+   Dashboard Panel Groups
+========================= */
+
+.dashboard-panel-group-heading {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:9px;
+    padding:8px 3px 2px;
+}
+
+.dashboard-panel-group-heading:first-of-type {
+    margin-top:0;
+}
+
+.dashboard-panel-group-heading span {
+    display:block;
+    color:#2563eb;
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.09em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.dashboard-panel-group-heading p {
+    margin:4px 0 0;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.45;
+}
+
+.dashboard-panel-group-heading::after {
+    content:"";
+    flex:1;
+    height:1px;
+    margin-bottom:4px;
+    background:#e2e8f0;
+}
+
+@media(max-width:600px) {
+
+    .dashboard-panel-group-heading {
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .dashboard-panel-group-heading::after {
+        width:100%;
+        margin:0;
+    }
+
+}
+
+/* =========================
+   Situation Assessment Workflow
+========================= */
+
+.left-column {
+    min-width:0;
+}
+
+@media(min-width:1050px) {
+
+    .left-column {
+        align-self:start;
+        position:sticky;
+        top:18px;
+        max-height:calc(100vh - 36px);
+        overflow:auto;
+        scrollbar-width:thin;
+    }
+
+}
+
+.assessment-progress {
+    margin:14px 0 18px;
+    padding:13px 14px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+}
+
+.assessment-progress-header {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:14px;
+}
+
+.assessment-progress-label {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.065em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.assessment-progress-header strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:12px;
+    line-height:1.4;
+}
+
+.assessment-progress-header > span {
+    flex:0 0 auto;
+    color:#334155;
+    font-size:13px;
+    font-weight:900;
+}
+
+.assessment-progress-track {
+    height:8px;
+    overflow:hidden;
+    margin-top:10px;
+    background:#e2e8f0;
+    border-radius:999px;
+}
+
+.assessment-progress-fill {
+    height:100%;
+    background:linear-gradient(
+        90deg,
+        #2563eb,
+        #16a34a
+    );
+    border-radius:999px;
+    transition:width .25s ease;
+}
+
+.assessment-action-footer {
+    position:sticky;
+    bottom:0;
+    z-index:12;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:20px;
+    padding:14px;
+    background:rgba(255, 255, 255, .97);
+    border:1px solid #cbd5e1;
+    border-radius:11px;
+    box-shadow:0 -6px 18px rgba(15, 23, 42, .08);
+    backdrop-filter:blur(8px);
+}
+
+.assessment-action-status {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0;
+}
+
+.assessment-action-status > span {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:31px;
+    height:31px;
+    background:#f1f5f9;
+    border:1px solid #cbd5e1;
+    border-radius:50%;
+    color:#475569;
+    font-size:13px;
+    font-weight:900;
+}
+
+.assessment-action-status strong {
+    display:block;
+    color:#0f172a;
+    font-size:12px;
+    line-height:1.35;
+}
+
+.assessment-action-status small {
+    display:block;
+    margin-top:3px;
+    color:#64748b;
+    font-size:9px;
+    line-height:1.45;
+}
+
+.assessment-calculate-button {
+    flex:0 0 auto;
+    min-height:42px;
+    padding:9px 17px;
+    background:#2563eb;
+    border:1px solid #2563eb;
+    border-radius:9px;
+    color:#ffffff;
+    cursor:pointer;
+    font-size:12px;
+    font-weight:900;
+    transition:
+        background .15s ease,
+        transform .15s ease,
+        opacity .15s ease;
+}
+
+.assessment-calculate-button:hover:not(:disabled) {
+    background:#1d4ed8;
+    transform:translateY(-1px);
+}
+
+.assessment-calculate-button:disabled {
+    cursor:not-allowed;
+    opacity:.42;
+}
+
+@media(max-width:650px) {
+
+    .assessment-action-footer {
+        align-items:stretch;
+        flex-direction:column;
+    }
+
+    .assessment-calculate-button {
+        width:100%;
+    }
+
+}
+
+/* =========================
+   Situation Assessment Workflow
+========================= */
+
+.left-column {
+    min-width:0;
+}
+
+
+/* Keep the assessment available while reviewing
+   dashboard results on larger screens. */
+
+@media(min-width:1050px) {
+
+    .left-column {
+        align-self:start;
+        position:sticky;
+        top:18px;
+        max-height:calc(100vh - 36px);
+        overflow:auto;
+        scrollbar-width:thin;
+    }
+
+}
+
+
+/* =========================
+   Assessment Progress
+========================= */
+
+.assessment-progress {
+    margin:14px 0 18px;
+    padding:13px 14px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:10px;
+}
+
+.assessment-progress-header {
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:14px;
+}
+
+.assessment-progress-label {
+    display:block;
+    color:#64748b;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.065em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.assessment-progress-header strong {
+    display:block;
+    margin-top:4px;
+    color:#0f172a;
+    font-size:12px;
+    line-height:1.4;
+}
+
+.assessment-progress-header > span {
+    flex:0 0 auto;
+    color:#334155;
+    font-size:13px;
+    font-weight:900;
+}
+
+.assessment-progress-track {
+    height:8px;
+    overflow:hidden;
+    margin-top:10px;
+    background:#e2e8f0;
+    border-radius:999px;
+}
+
+.assessment-progress-fill {
+    height:100%;
+    background:linear-gradient(
+        90deg,
+        #2563eb,
+        #16a34a
+    );
+    border-radius:999px;
+    transition:width .25s ease;
+}
+
+
+/* =========================
+   Persistent Assessment Action
+========================= */
+
+.assessment-action-footer {
+    position:sticky;
+    bottom:0;
+    z-index:12;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:20px;
+    padding:14px;
+    background:rgba(255, 255, 255, .97);
+    border:1px solid #cbd5e1;
+    border-radius:11px;
+    box-shadow:0 -6px 18px rgba(15, 23, 42, .08);
+    backdrop-filter:blur(8px);
+}
+
+.assessment-action-status {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0;
+}
+
+.assessment-action-status > span {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:31px;
+    height:31px;
+    background:#f1f5f9;
+    border:1px solid #cbd5e1;
+    border-radius:50%;
+    color:#475569;
+    font-size:13px;
+    font-weight:900;
+}
+
+.assessment-action-status strong {
+    display:block;
+    color:#0f172a;
+    font-size:12px;
+    line-height:1.35;
+}
+
+.assessment-action-status small {
+    display:block;
+    margin-top:3px;
+    color:#64748b;
+    font-size:9px;
+    line-height:1.45;
+}
+
+.assessment-calculate-button {
+    flex:0 0 auto;
+    min-height:42px;
+    padding:9px 17px;
+    background:#2563eb;
+    border:1px solid #2563eb;
+    border-radius:9px;
+    color:#ffffff;
+    cursor:pointer;
+    font-size:12px;
+    font-weight:900;
+    transition:
+        background .15s ease,
+        transform .15s ease,
+        opacity .15s ease;
+}
+
+.assessment-calculate-button:hover:not(:disabled) {
+    background:#1d4ed8;
+    transform:translateY(-1px);
+}
+
+.assessment-calculate-button:disabled {
+    cursor:not-allowed;
+    opacity:.42;
+    transform:none;
+}
+
+
+/* Maintain compatibility when the current button
+   still includes the older calculate-button class. */
+
+.assessment-action-footer .calculate-button {
+    flex:0 0 auto;
+    min-height:42px;
+    padding:9px 17px;
+    border-radius:9px;
+    font-size:12px;
+    font-weight:900;
+}
+
+
+/* =========================
+   Action Status States
+========================= */
+
+.assessment-action-status.status-ready > span,
+.assessment-action-status.status-calculated > span {
+    background:#f0fdf4;
+    border-color:#86efac;
+    color:#166534;
+}
+
+.assessment-action-status.status-draft > span {
+    background:#fff7ed;
+    border-color:#fdba74;
+    color:#9a3412;
+}
+
+.assessment-action-status.status-error > span {
+    background:#fef2f2;
+    border-color:#fecaca;
+    color:#991b1b;
+}
+
+
+/* =========================
+   Responsive Assessment Workflow
+========================= */
+
+@media(max-width:650px) {
+
+    .assessment-progress-header {
+        align-items:flex-start;
+    }
+
+    .assessment-action-footer {
+        align-items:stretch;
+        flex-direction:column;
+    }
+
+    .assessment-calculate-button,
+    .assessment-action-footer .calculate-button {
+        width:100%;
+    }
+
+}
