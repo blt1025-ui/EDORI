@@ -5,13 +5,13 @@
  *
  * Responsibilities:
  *
- * - Render dashboard components
- * - Initialize dashboard behavior
- * - Display the latest authoritative result
- * - Build the trigger-adjusted operational level
+ * - Render the primary dashboard structure
+ * - Initialize dashboard components
+ * - Display the trigger-adjusted status banner
  * - Display assessment freshness
  *
- * This component does not calculate EDORI.
+ * Detailed right-column layout and toolbar logic
+ * are delegated to focused dashboard components.
  */
 
 import {
@@ -25,31 +25,7 @@ from "../config/appEvents";
 
 import {
 
-    AssessmentHistory,
-
-    initializeAssessmentHistory
-
-}
-
-from "./AssessmentHistory";
-
-
-import {
-
-    Drivers,
-
-    initializeDrivers
-
-}
-
-from "./Drivers";
-
-
-import {
-
-    ExecutiveSummary,
-
-    initializeExecutiveSummary
+    ExecutiveSummary
 
 }
 
@@ -58,64 +34,7 @@ from "./ExecutiveSummary";
 
 import {
 
-    Gauge,
-
-    initializeGauge
-
-}
-
-from "./Gauge";
-
-
-import {
-
-    HistoricalDataManager,
-
-    initializeHistoricalDataManager
-
-}
-
-from "./HistoricalDataManager";
-
-
-import {
-
-    OperationalOverview,
-
-    initializeOperationalOverview
-
-}
-
-from "./OperationalOverview";
-
-
-import {
-
-    OperationalTimeline,
-
-    initializeOperationalTimeline
-
-}
-
-from "./OperationalTimeline";
-
-
-import {
-
-    Recommendations,
-
-    initializeRecommendations
-
-}
-
-from "./Recommendations";
-
-
-import {
-
-    SummaryCards,
-
-    initializeSummaryCards
+    SummaryCards
 
 }
 
@@ -124,24 +43,29 @@ from "./SummaryCards";
 
 import {
 
-    TrendChart,
-
-    initializeTrendChart
-
-}
-
-from "./TrendChart";
-
-
-import {
-
-    SituationAssessment,
-
-    initializeSituationAssessment
+    SituationAssessment
 
 }
 
 from "./assessment/SituationAssessment";
+
+
+import {
+
+    DashboardRightColumn
+
+}
+
+from "./dashboard/DashboardRightColumn";
+
+
+import {
+
+    initializeDashboardComponents
+
+}
+
+from "./dashboard/DashboardController";
 
 
 import {
@@ -277,25 +201,7 @@ export function Dashboard():string {
                 </div>
 
 
-                <div class="right-column">
-
-                    ${Gauge()}
-
-                    ${OperationalOverview()}
-
-                    ${Drivers()}
-
-                    ${Recommendations()}
-
-                    ${TrendChart()}
-
-                    ${OperationalTimeline()}
-
-                    ${AssessmentHistory()}
-
-                    ${HistoricalDataManager()}
-
-                </div>
+                ${DashboardRightColumn()}
 
             </div>
 
@@ -307,31 +213,12 @@ export function Dashboard():string {
 
 
 /**
- * Initialize all dashboard components.
+ * Initialize the dashboard after its markup has
+ * been inserted into the document.
  */
 export function initializeDashboard():void {
 
-    initializeSituationAssessment();
-
-    initializeExecutiveSummary();
-
-    initializeSummaryCards();
-
-    initializeGauge();
-
-    initializeOperationalOverview();
-
-    initializeDrivers();
-
-    initializeRecommendations();
-
-    initializeTrendChart();
-
-    initializeOperationalTimeline();
-
-    initializeAssessmentHistory();
-
-    initializeHistoricalDataManager();
+    initializeDashboardComponents();
 
 
     updateDashboard();
@@ -472,11 +359,6 @@ function updateDashboard():void {
         );
 
 
-        /*
-         * Fall back to the score-derived state so
-         * the dashboard remains usable.
-         */
-
         updateStatusBanner(
 
             result.score,
@@ -495,8 +377,7 @@ function updateDashboard():void {
 
 
 /**
- * Display the current trigger-adjusted
- * operational status banner.
+ * Display the trigger-adjusted operational status.
  */
 function updateStatusBanner(
 
@@ -532,11 +413,7 @@ function updateStatusBanner(
 
             0,
 
-            Math.round(
-
-                score
-
-            )
+            Math.round(score)
 
         )
 
@@ -552,20 +429,14 @@ function updateStatusBanner(
 
     const stateWasEscalated =
 
-        operationalState.title
-
-        !==
-
-        baseStateTitle;
+        operationalState.title !== baseStateTitle;
 
 
-    const triggerText =
+    const triggerText = activeTriggerCount === 1
 
-        activeTriggerCount === 1
+        ? "1 active operational trigger"
 
-            ? "1 active operational trigger"
-
-            : `${activeTriggerCount} active operational triggers`;
+        : `${activeTriggerCount} active operational triggers`;
 
 
     banner.className =
@@ -618,9 +489,7 @@ function updateStatusBanner(
                     EDORI Score:
 
                     <strong>
-
                         ${safeScore}
-
                     </strong>
 
                 </div>
@@ -728,32 +597,21 @@ function updateRecalculationRequiredBanner(
         <div class="status-header">
 
             <div
-                id="statusIcon"
                 class="status-icon"
                 aria-hidden="true"
             >
-
                 ⚠️
-
             </div>
 
 
             <div class="status-title-group">
 
-                <div
-                    id="statusTitle"
-                    class="status-title"
-                >
-
+                <div class="status-title">
                     Recalculation Required
-
                 </div>
 
-
                 <div class="status-score">
-
                     The previous EDORI result is no longer current.
-
                 </div>
 
             </div>
@@ -765,7 +623,7 @@ function updateRecalculationRequiredBanner(
 
             ${escapeHtml(reason)}
 
-            Review the current operational values and select
+            Review the current values and select
 
             <strong>
                 Calculate EDORI
@@ -781,7 +639,7 @@ function updateRecalculationRequiredBanner(
 
 
 /**
- * Display the initial awaiting-assessment banner.
+ * Display the awaiting-assessment banner.
  */
 function updateAwaitingAssessmentBanner():void {
 
@@ -828,32 +686,21 @@ function createAwaitingAssessmentBanner():string {
         <div class="status-header">
 
             <div
-                id="statusIcon"
                 class="status-icon"
                 aria-hidden="true"
             >
-
                 ◯
-
             </div>
 
 
             <div class="status-title-group">
 
-                <div
-                    id="statusTitle"
-                    class="status-title"
-                >
-
+                <div class="status-title">
                     Awaiting Assessment
-
                 </div>
 
-
                 <div class="status-score">
-
                     No current EDORI result is available.
-
                 </div>
 
             </div>
@@ -879,8 +726,7 @@ function createAwaitingAssessmentBanner():string {
 
 
 /**
- * Display the age of the most recently committed
- * assessment.
+ * Display the age of the committed assessment.
  */
 function updateAssessmentFreshness(
 
@@ -966,15 +812,7 @@ function updateAssessmentFreshness(
     );
 
 
-    if(
-
-        Number.isNaN(
-
-            assessmentDate.getTime()
-
-        )
-
-    ){
+    if(Number.isNaN(assessmentDate.getTime())){
 
         element.textContent =
 
@@ -997,35 +835,25 @@ function updateAssessmentFreshness(
 
         0,
 
-        new Date().getTime()
-
-        -
-
-        assessmentDate.getTime()
+        Date.now() - assessmentDate.getTime()
 
     );
 
 
     const minutes = Math.floor(
 
-        elapsedMilliseconds
-
-        /
-
-        60000
+        elapsedMilliseconds / 60000
 
     );
 
 
-    element.textContent =
+    element.textContent = createFreshnessMessage(
 
-        createFreshnessMessage(
+        minutes,
 
-            minutes,
+        assessmentDate
 
-            assessmentDate
-
-        );
+    );
 
 
     if(minutes < 30){
@@ -1121,9 +949,7 @@ function createFreshnessMessage(
     );
 
 
-    const remainingMinutes =
-
-        minutes % 60;
+    const remainingMinutes = minutes % 60;
 
 
     if(remainingMinutes === 0){
@@ -1157,7 +983,7 @@ function createFreshnessMessage(
 
 
 /**
- * Convert a state title into a valid CSS class.
+ * Convert a state title into a CSS class.
  */
 function createStateClassName(
 
@@ -1207,44 +1033,14 @@ function escapeHtml(
 
     return value
 
-        .replaceAll(
+        .replaceAll("&", "&amp;")
 
-            "&",
+        .replaceAll("<", "&lt;")
 
-            "&amp;"
+        .replaceAll(">", "&gt;")
 
-        )
+        .replaceAll("\"", "&quot;")
 
-        .replaceAll(
-
-            "<",
-
-            "&lt;"
-
-        )
-
-        .replaceAll(
-
-            ">",
-
-            "&gt;"
-
-        )
-
-        .replaceAll(
-
-            "\"",
-
-            "&quot;"
-
-        )
-
-        .replaceAll(
-
-            "'",
-
-            "&#039;"
-
-        );
+        .replaceAll("'", "&#039;");
 
 }
