@@ -1,11 +1,13 @@
 /**
  * ResultService
  *
+ * Version 2.1 Hospital Readiness Model
+ *
  * Persistent storage for the latest authoritative
- * EDORI calculation result.
+ * Hospital Readiness calculation result.
  *
  * ResultService is the single source of truth for
- * all current-result dashboard components.
+ * current-result dashboard components.
  *
  * Responsibilities:
  *
@@ -16,7 +18,7 @@
  * - Invalidate results when dependencies change
  * - Persist recalculation-required reasons
  *
- * This service does not calculate EDORI.
+ * This service does not calculate Hospital Readiness.
  */
 
 import type {
@@ -26,6 +28,7 @@ import type {
 }
 
 from "../types/OperationalStateTitle";
+
 
 import type {
 
@@ -54,6 +57,12 @@ import type {
 from "../types/EdoriResult";
 
 
+/*
+ * =====================================================
+ * Storage configuration
+ * =====================================================
+ */
+
 const RESULT_STORAGE_KEY =
 
     "edori_latest_result";
@@ -65,12 +74,15 @@ const INVALIDATION_STORAGE_KEY =
 
 
 /**
- * Version attached to persisted result data.
+ * Version 3 corresponds to the Version 2.1 Hospital
+ * Readiness EdoriResult structure.
  *
- * Increase this value if the stored result shape
- * changes incompatibly in a future release.
+ * Older result schemas are intentionally rejected
+ * because they do not contain the historical
+ * projected-capacity comparison fields required by
+ * Version 2.1.
  */
-const RESULT_STORAGE_VERSION = 1;
+const RESULT_STORAGE_VERSION = 3;
 
 
 /**
@@ -85,8 +97,14 @@ interface StoredResultEnvelope {
 }
 
 
+/*
+ * =====================================================
+ * In-memory state
+ * =====================================================
+ */
+
 /**
- * Current in-memory result.
+ * Current authoritative result.
  */
 let latestResult:EdoriResult | null = null;
 
@@ -103,8 +121,16 @@ let invalidationReason:string | null = null;
 restoreResultState();
 
 
+/*
+ * =====================================================
+ * Public API
+ * =====================================================
+ */
+
+
 /**
- * Store and persist the latest valid EDORI result.
+ * Store and persist the latest valid Hospital
+ * Readiness result.
  *
  * Saving a new valid result clears any previous
  * recalculation-required state.
@@ -115,39 +141,58 @@ export function setLatestResult(
 
 ):void {
 
-    const normalizedResult = normalizeResult(
+    const normalizedResult =
 
-        result
+        normalizeResult(
 
-    );
+            result
+
+        );
 
 
     if(!normalizedResult){
 
         throw new Error(
 
-            "The EDORI result is invalid and could not be stored."
+            "The Hospital Readiness result is invalid and could not be stored."
 
         );
 
     }
 
 
-    latestResult = cloneResult(
+    latestResult =
 
-        normalizedResult
+        cloneResult(
 
-    );
+            normalizedResult
+
+        );
 
 
     invalidationReason = null;
 
 
-    localStorage.removeItem(
+    try {
 
-        INVALIDATION_STORAGE_KEY
+        localStorage.removeItem(
 
-    );
+            INVALIDATION_STORAGE_KEY
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to clear the Hospital Readiness invalidation reason:",
+
+            error
+
+        );
+
+    }
 
 
     persistLatestResult();
@@ -181,7 +226,9 @@ EdoriResult | null {
 /**
  * Determine whether a valid result exists.
  */
-export function hasLatestResult():boolean {
+export function hasLatestResult():
+
+boolean {
 
     return latestResult !== null;
 
@@ -219,11 +266,26 @@ export function invalidateLatestResult(
     latestResult = null;
 
 
-    localStorage.removeItem(
+    try {
 
-        RESULT_STORAGE_KEY
+        localStorage.removeItem(
 
-    );
+            RESULT_STORAGE_KEY
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to remove the invalidated Hospital Readiness result:",
+
+            error
+
+        );
+
+    }
 
 
     invalidationReason =
@@ -232,7 +294,7 @@ export function invalidateLatestResult(
 
         ??
 
-        "The previous EDORI result is no longer current.";
+        "The previous Hospital Readiness result is no longer current.";
 
 
     persistInvalidationReason();
@@ -255,7 +317,9 @@ string | null {
 /**
  * Determine whether recalculation is required.
  */
-export function isResultInvalidated():boolean {
+export function isResultInvalidated():
+
+boolean {
 
     return invalidationReason !== null;
 
@@ -271,25 +335,42 @@ export function isResultInvalidated():boolean {
  * - clearLatestResult() returns the application to
  *   its initial awaiting-assessment state
  */
-export function clearLatestResult():void {
+export function clearLatestResult():
+
+void {
 
     latestResult = null;
 
     invalidationReason = null;
 
 
-    localStorage.removeItem(
+    try {
 
-        RESULT_STORAGE_KEY
+        localStorage.removeItem(
 
-    );
+            RESULT_STORAGE_KEY
+
+        );
 
 
-    localStorage.removeItem(
+        localStorage.removeItem(
 
-        INVALIDATION_STORAGE_KEY
+            INVALIDATION_STORAGE_KEY
 
-    );
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to clear Hospital Readiness result storage:",
+
+            error
+
+        );
+
+    }
 
 }
 
@@ -336,10 +417,19 @@ export function getResultServiceStatus():{
 }
 
 
+/*
+ * =====================================================
+ * Persistence
+ * =====================================================
+ */
+
+
 /**
  * Restore the result and invalidation state.
  */
-function restoreResultState():void {
+function restoreResultState():
+
+void {
 
     const restoredInvalidationReason =
 
@@ -349,25 +439,38 @@ function restoreResultState():void {
     /*
      * An invalidation state takes priority.
      *
-     * If both a result and invalidation reason are
+     * If both a result and an invalidation reason are
      * present because of an interrupted browser write,
      * the result must not be trusted.
      */
-
     if(restoredInvalidationReason){
 
         latestResult = null;
 
         invalidationReason =
-
             restoredInvalidationReason;
 
 
-        localStorage.removeItem(
+        try {
 
-            RESULT_STORAGE_KEY
+            localStorage.removeItem(
 
-        );
+                RESULT_STORAGE_KEY
+
+            );
+
+        }
+        catch(error){
+
+            console.error(
+
+                "Unable to remove a result superseded by an invalidation state:",
+
+                error
+
+            );
+
+        }
 
 
         return;
@@ -375,7 +478,8 @@ function restoreResultState():void {
     }
 
 
-    latestResult = loadStoredResult();
+    latestResult =
+        loadStoredResult();
 
     invalidationReason = null;
 
@@ -385,15 +489,32 @@ function restoreResultState():void {
 /**
  * Persist the latest result.
  */
-function persistLatestResult():void {
+function persistLatestResult():
+
+void {
 
     if(!latestResult){
 
-        localStorage.removeItem(
+        try {
 
-            RESULT_STORAGE_KEY
+            localStorage.removeItem(
 
-        );
+                RESULT_STORAGE_KEY
+
+            );
+
+        }
+        catch(error){
+
+            console.error(
+
+                "Unable to remove empty Hospital Readiness result storage:",
+
+                error
+
+            );
+
+        }
 
 
         return;
@@ -435,7 +556,7 @@ function persistLatestResult():void {
 
         console.error(
 
-            "Unable to save the latest EDORI result:",
+            "Unable to save the latest Hospital Readiness result:",
 
             error
 
@@ -444,7 +565,7 @@ function persistLatestResult():void {
 
         throw new Error(
 
-            "The latest EDORI result could not be saved to browser storage."
+            "The latest Hospital Readiness result could not be saved to browser storage."
 
         );
 
@@ -456,15 +577,32 @@ function persistLatestResult():void {
 /**
  * Persist the recalculation-required reason.
  */
-function persistInvalidationReason():void {
+function persistInvalidationReason():
+
+void {
 
     if(!invalidationReason){
 
-        localStorage.removeItem(
+        try {
 
-            INVALIDATION_STORAGE_KEY
+            localStorage.removeItem(
 
-        );
+                INVALIDATION_STORAGE_KEY
+
+            );
+
+        }
+        catch(error){
+
+            console.error(
+
+                "Unable to remove empty Hospital Readiness invalidation storage:",
+
+                error
+
+            );
+
+        }
 
 
         return;
@@ -487,7 +625,7 @@ function persistInvalidationReason():void {
 
         console.error(
 
-            "Unable to save the EDORI invalidation reason:",
+            "Unable to save the Hospital Readiness invalidation reason:",
 
             error
 
@@ -498,7 +636,6 @@ function persistInvalidationReason():void {
          * The in-memory invalidation remains active
          * even if browser persistence fails.
          */
-
     }
 
 }
@@ -513,11 +650,13 @@ EdoriResult | null {
 
     try {
 
-        const stored = localStorage.getItem(
+        const stored =
 
-            RESULT_STORAGE_KEY
+            localStorage.getItem(
 
-        );
+                RESULT_STORAGE_KEY
+
+            );
 
 
         if(!stored){
@@ -527,11 +666,13 @@ EdoriResult | null {
         }
 
 
-        const parsed = JSON.parse(
+        const parsed =
 
-            stored
+            JSON.parse(
 
-        ) as unknown;
+                stored
+
+            ) as unknown;
 
 
         const storedResult =
@@ -547,25 +688,27 @@ EdoriResult | null {
 
             throw new Error(
 
-                "Stored EDORI result has an unsupported format."
+                "Stored Hospital Readiness result has an unsupported format."
 
             );
 
         }
 
 
-        const normalizedResult = normalizeResult(
+        const normalizedResult =
 
-            storedResult
+            normalizeResult(
 
-        );
+                storedResult
+
+            );
 
 
         if(!normalizedResult){
 
             throw new Error(
 
-                "Stored EDORI result contains invalid values."
+                "Stored Hospital Readiness result contains invalid values."
 
             );
 
@@ -583,18 +726,33 @@ EdoriResult | null {
 
         console.error(
 
-            "Unable to restore the latest EDORI result:",
+            "Unable to restore the latest Hospital Readiness result:",
 
             error
 
         );
 
 
-        localStorage.removeItem(
+        try {
 
-            RESULT_STORAGE_KEY
+            localStorage.removeItem(
 
-        );
+                RESULT_STORAGE_KEY
+
+            );
+
+        }
+        catch(storageError){
+
+            console.error(
+
+                "Unable to remove invalid Hospital Readiness result storage:",
+
+                storageError
+
+            );
+
+        }
 
 
         return null;
@@ -605,15 +763,7 @@ EdoriResult | null {
 
 
 /**
- * Extract an EdoriResult from persisted data.
- *
- * Supports:
- *
- * - Current versioned envelope
- * - Legacy unwrapped EdoriResult objects
- *
- * Legacy support prevents existing development
- * browser data from breaking after this upgrade.
+ * Extract the current versioned stored result.
  */
 function extractStoredResult(
 
@@ -642,62 +792,25 @@ function extractStoredResult(
 
         result?:unknown;
 
-        score?:unknown;
-
     };
 
 
-    /*
-     * Current versioned format.
-     */
-
     if(
 
-        typeof candidate.version === "number"
+        candidate.version !== RESULT_STORAGE_VERSION
 
-        &&
+        ||
 
-        candidate.result !== undefined
+        candidate.result === undefined
 
     ){
 
-        if(
-
-            candidate.version
-
-            !==
-
-            RESULT_STORAGE_VERSION
-
-        ){
-
-            return null;
-
-        }
-
-
-        return candidate.result;
+        return null;
 
     }
 
 
-    /*
-     * Legacy format where the result itself was
-     * stored directly.
-     */
-
-    if(
-
-        typeof candidate.score === "number"
-
-    ){
-
-        return candidate;
-
-    }
-
-
-    return null;
+    return candidate.result;
 
 }
 
@@ -711,11 +824,13 @@ string | null {
 
     try {
 
-        const stored = localStorage.getItem(
+        const stored =
 
-            INVALIDATION_STORAGE_KEY
+            localStorage.getItem(
 
-        );
+                INVALIDATION_STORAGE_KEY
+
+            );
 
 
         return normalizeInvalidationReason(
@@ -729,18 +844,33 @@ string | null {
 
         console.error(
 
-            "Unable to restore the EDORI invalidation reason:",
+            "Unable to restore the Hospital Readiness invalidation reason:",
 
             error
 
         );
 
 
-        localStorage.removeItem(
+        try {
 
-            INVALIDATION_STORAGE_KEY
+            localStorage.removeItem(
 
-        );
+                INVALIDATION_STORAGE_KEY
+
+            );
+
+        }
+        catch(storageError){
+
+            console.error(
+
+                "Unable to remove invalid Hospital Readiness invalidation storage:",
+
+                storageError
+
+            );
+
+        }
 
 
         return null;
@@ -750,8 +880,16 @@ string | null {
 }
 
 
+/*
+ * =====================================================
+ * Result normalization
+ * =====================================================
+ */
+
+
 /**
- * Validate and normalize one unknown result.
+ * Validate and normalize one unknown Version 2.1
+ * Hospital Readiness result.
  */
 function normalizeResult(
 
@@ -776,21 +914,86 @@ function normalizeResult(
 
     const candidate = value as {
 
+        /*
+         * Overall result
+         */
+
         score?:unknown;
 
         status?:unknown;
 
         operationalState?:unknown;
 
-        demandScore?:unknown;
 
-        boardingScore?:unknown;
+        /*
+         * Primary Hospital Readiness domains
+         */
 
-        hospitalScore?:unknown;
+        edPressureScore?:unknown;
 
-        acuityScore?:unknown;
+        acuteCapacityScore?:unknown;
 
-        forecastScore?:unknown;
+        criticalCapacityScore?:unknown;
+
+        inflowScore?:unknown;
+
+        projectedCapacityScore?:unknown;
+
+
+        /*
+         * ED Operational Pressure subdomains
+         */
+
+        edVolumeScore?:unknown;
+
+        edBoardingScore?:unknown;
+
+        edAcuityScore?:unknown;
+
+
+        /*
+         * Version 2.1 hospital-flow calculations
+         */
+
+        knownNonEDInflow?:unknown;
+
+        expectedNonEDInflow?:unknown;
+
+        projectedDirectAdmissions?:unknown;
+
+        projectedSurgicalAdmissions?:unknown;
+
+        projectedNewAdmissions?:unknown;
+
+        projectedTotalBedDemand?:unknown;
+
+        historicalProjectedBedDemand?:unknown;
+
+        expectedInpatientDepartures?:unknown;
+
+        currentAvailableAcuteCareBeds?:unknown;
+
+        projectedAvailableAcuteCareBeds?:unknown;
+
+        historicalProjectedBedBalance?:unknown;
+
+        projectedCapacityVariance?:unknown;
+
+
+        /*
+         * Temporary compatibility aliases
+         */
+
+        currentHospitalInflow?:unknown;
+
+        expectedHospitalInflow?:unknown;
+
+        projectedHospitalInflow?:unknown;
+
+
+        /*
+         * Supporting output
+         */
 
         drivers?:unknown;
 
@@ -801,47 +1004,260 @@ function normalizeResult(
     };
 
 
-    const score = normalizeScore(
+    /*
+     * =================================================
+     * Overall score
+     * =================================================
+     */
 
-        candidate.score
+    const score =
 
-    );
+        normalizeScore(
 
+            candidate.score
 
-    const demandScore = normalizeScore(
-
-        candidate.demandScore
-
-    );
-
-
-    const boardingScore = normalizeScore(
-
-        candidate.boardingScore
-
-    );
+        );
 
 
-    const hospitalScore = normalizeScore(
+    /*
+     * =================================================
+     * Primary domain scores
+     * =================================================
+     */
 
-        candidate.hospitalScore
+    const edPressureScore =
 
-    );
+        normalizeScore(
 
+            candidate.edPressureScore
 
-    const acuityScore = normalizeScore(
-
-        candidate.acuityScore
-
-    );
+        );
 
 
-    const forecastScore = normalizeScore(
+    const acuteCapacityScore =
 
-        candidate.forecastScore
+        normalizeScore(
 
-    );
+            candidate.acuteCapacityScore
 
+        );
+
+
+    const criticalCapacityScore =
+
+        normalizeScore(
+
+            candidate.criticalCapacityScore
+
+        );
+
+
+    const inflowScore =
+
+        normalizeScore(
+
+            candidate.inflowScore
+
+        );
+
+
+    const projectedCapacityScore =
+
+        normalizeScore(
+
+            candidate.projectedCapacityScore
+
+        );
+
+
+    /*
+     * =================================================
+     * ED Operational Pressure subdomain scores
+     * =================================================
+     */
+
+    const edVolumeScore =
+
+        normalizeScore(
+
+            candidate.edVolumeScore
+
+        );
+
+
+    const edBoardingScore =
+
+        normalizeScore(
+
+            candidate.edBoardingScore
+
+        );
+
+
+    const edAcuityScore =
+
+        normalizeScore(
+
+            candidate.edAcuityScore
+
+        );
+
+
+    /*
+     * =================================================
+     * Version 2.1 hospital-flow calculations
+     * =================================================
+     */
+
+    const knownNonEDInflow =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.knownNonEDInflow
+
+        );
+
+
+    const expectedNonEDInflow =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.expectedNonEDInflow
+
+        );
+
+
+    const projectedDirectAdmissions =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.projectedDirectAdmissions
+
+        );
+
+
+    const projectedSurgicalAdmissions =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.projectedSurgicalAdmissions
+
+        );
+
+
+    const projectedNewAdmissions =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.projectedNewAdmissions
+
+        );
+
+
+    const projectedTotalBedDemand =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.projectedTotalBedDemand
+
+        );
+
+
+    const historicalProjectedBedDemand =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.historicalProjectedBedDemand
+
+        );
+
+
+    const expectedInpatientDepartures =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.expectedInpatientDepartures
+
+        );
+
+
+    /*
+     * Bed balances are signed values.
+     */
+    const currentAvailableAcuteCareBeds =
+
+        normalizeFiniteNumber(
+
+            candidate.currentAvailableAcuteCareBeds
+
+        );
+
+
+    const projectedAvailableAcuteCareBeds =
+
+        normalizeFiniteNumber(
+
+            candidate.projectedAvailableAcuteCareBeds
+
+        );
+
+
+    const historicalProjectedBedBalance =
+
+        normalizeFiniteNumber(
+
+            candidate.historicalProjectedBedBalance
+
+        );
+
+
+    const projectedCapacityVariance =
+
+        normalizeFiniteNumber(
+
+            candidate.projectedCapacityVariance
+
+        );
+
+
+    /*
+     * =================================================
+     * Temporary compatibility aliases
+     * =================================================
+     */
+
+    const currentHospitalInflow =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.currentHospitalInflow
+
+        );
+
+
+    const expectedHospitalInflow =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.expectedHospitalInflow
+
+        );
+
+
+    const projectedHospitalInflow =
+
+        normalizeNonNegativeFiniteNumber(
+
+            candidate.projectedHospitalInflow
+
+        );
+
+
+    /*
+     * =================================================
+     * Reject invalid numeric output
+     * =================================================
+     */
 
     if(
 
@@ -849,23 +1265,95 @@ function normalizeResult(
 
         ||
 
-        demandScore === null
+        edPressureScore === null
 
         ||
 
-        boardingScore === null
+        acuteCapacityScore === null
 
         ||
 
-        hospitalScore === null
+        criticalCapacityScore === null
 
         ||
 
-        acuityScore === null
+        inflowScore === null
 
         ||
 
-        forecastScore === null
+        projectedCapacityScore === null
+
+        ||
+
+        edVolumeScore === null
+
+        ||
+
+        edBoardingScore === null
+
+        ||
+
+        edAcuityScore === null
+
+        ||
+
+        knownNonEDInflow === null
+
+        ||
+
+        expectedNonEDInflow === null
+
+        ||
+
+        projectedDirectAdmissions === null
+
+        ||
+
+        projectedSurgicalAdmissions === null
+
+        ||
+
+        projectedNewAdmissions === null
+
+        ||
+
+        projectedTotalBedDemand === null
+
+        ||
+
+        historicalProjectedBedDemand === null
+
+        ||
+
+        expectedInpatientDepartures === null
+
+        ||
+
+        currentAvailableAcuteCareBeds === null
+
+        ||
+
+        projectedAvailableAcuteCareBeds === null
+
+        ||
+
+        historicalProjectedBedBalance === null
+
+        ||
+
+        projectedCapacityVariance === null
+
+        ||
+
+        currentHospitalInflow === null
+
+        ||
+
+        expectedHospitalInflow === null
+
+        ||
+
+        projectedHospitalInflow === null
 
     ){
 
@@ -873,6 +1361,119 @@ function normalizeResult(
 
     }
 
+
+    /*
+     * =================================================
+     * Cross-field consistency
+     * =================================================
+     */
+
+    if(
+
+        Math.abs(
+
+            currentHospitalInflow
+
+            -
+
+            knownNonEDInflow
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    if(
+
+        Math.abs(
+
+            expectedHospitalInflow
+
+            -
+
+            expectedNonEDInflow
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    if(
+
+        Math.abs(
+
+            projectedHospitalInflow
+
+            -
+
+            projectedNewAdmissions
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    const calculatedCapacityVariance =
+
+        projectedAvailableAcuteCareBeds
+
+        -
+
+        historicalProjectedBedBalance;
+
+
+    if(
+
+        Math.abs(
+
+            calculatedCapacityVariance
+
+            -
+
+            projectedCapacityVariance
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    /*
+     * =================================================
+     * Status
+     * =================================================
+     */
 
     if(
 
@@ -888,6 +1489,12 @@ function normalizeResult(
 
     }
 
+
+    /*
+     * =================================================
+     * Operational state
+     * =================================================
+     */
 
     const operationalState =
 
@@ -905,11 +1512,38 @@ function normalizeResult(
     }
 
 
-    const drivers = normalizeDrivers(
+    /*
+     * The status should describe the same operational
+     * state contained in operationalState.
+     */
+    if(
 
-        candidate.drivers
+        candidate.status.trim()
 
-    );
+        !==
+
+        operationalState.title
+
+    ){
+
+        return null;
+
+    }
+
+
+    /*
+     * =================================================
+     * Drivers
+     * =================================================
+     */
+
+    const drivers =
+
+        normalizeDrivers(
+
+            candidate.drivers
+
+        );
 
 
     if(!drivers){
@@ -918,6 +1552,12 @@ function normalizeResult(
 
     }
 
+
+    /*
+     * =================================================
+     * Recommendations
+     * =================================================
+     */
 
     const recommendations =
 
@@ -935,11 +1575,19 @@ function normalizeResult(
     }
 
 
-    const timestamp = normalizeTimestamp(
+    /*
+     * =================================================
+     * Timestamp
+     * =================================================
+     */
 
-        candidate.timestamp
+    const timestamp =
 
-    );
+        normalizeTimestamp(
+
+            candidate.timestamp
+
+        );
 
 
     if(!timestamp){
@@ -948,6 +1596,12 @@ function normalizeResult(
 
     }
 
+
+    /*
+     * =================================================
+     * Return normalized Version 2.1 result
+     * =================================================
+     */
 
     return {
 
@@ -958,15 +1612,55 @@ function normalizeResult(
 
         operationalState,
 
-        demandScore,
+        edPressureScore,
 
-        boardingScore,
+        acuteCapacityScore,
 
-        hospitalScore,
+        criticalCapacityScore,
 
-        acuityScore,
+        inflowScore,
 
-        forecastScore,
+        projectedCapacityScore,
+
+        edVolumeScore,
+
+        edBoardingScore,
+
+        edAcuityScore,
+
+        knownNonEDInflow,
+
+        expectedNonEDInflow,
+
+        projectedDirectAdmissions,
+
+        projectedSurgicalAdmissions,
+
+        projectedNewAdmissions,
+
+        projectedTotalBedDemand,
+
+        historicalProjectedBedDemand,
+
+        expectedInpatientDepartures,
+
+        currentAvailableAcuteCareBeds,
+
+        projectedAvailableAcuteCareBeds,
+
+        historicalProjectedBedBalance,
+
+        projectedCapacityVariance,
+
+        /*
+         * Temporary compatibility aliases
+         */
+
+        currentHospitalInflow,
+
+        expectedHospitalInflow,
+
+        projectedHospitalInflow,
 
         drivers,
 
@@ -979,8 +1673,18 @@ function normalizeResult(
 }
 
 
+/*
+ * =====================================================
+ * Primitive normalization
+ * =====================================================
+ */
+
+
 /**
- * Normalize a score to a whole number from 0–100.
+ * Normalize a Hospital Readiness score from
+ * 0 through 100.
+ *
+ * Scores are retained to one decimal place.
  */
 function normalizeScore(
 
@@ -1017,16 +1721,87 @@ function normalizeScore(
 
     return Math.round(
 
-        value
+        value * 10
 
-    );
+    )
+
+    /
+
+    10;
 
 }
 
 
 /**
- * Validate and normalize an operational state.
+ * Normalize a nonnegative finite number.
  */
+function normalizeNonNegativeFiniteNumber(
+
+    value:unknown
+
+):number | null {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+        ||
+
+        value < 0
+
+    ){
+
+        return null;
+
+    }
+
+
+    return value;
+
+}
+
+
+/**
+ * Normalize any finite signed number.
+ */
+function normalizeFiniteNumber(
+
+    value:unknown
+
+):number | null {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+    ){
+
+        return null;
+
+    }
+
+
+    return value;
+
+}
+
+
 /**
  * Validate and normalize an operational state.
  */
@@ -1121,6 +1896,7 @@ function normalizeOperationalState(
 
 }
 
+
 /**
  * Validate and normalize all drivers.
  */
@@ -1137,9 +1913,9 @@ function normalizeDrivers(
     }
 
 
-    const normalizedDrivers = value
+    const normalizedDrivers =
 
-        .map(
+        value.map(
 
             normalizeDriver
 
@@ -1228,11 +2004,13 @@ function normalizeDriver(
     }
 
 
-    const severity = normalizeScore(
+    const severity =
 
-        candidate.severity
+        normalizeScore(
 
-    );
+            candidate.severity
+
+        );
 
 
     if(
@@ -1340,15 +2118,19 @@ function normalizeTimestamp(
 
 ):Date | null {
 
-    const timestamp = value instanceof Date
+    const timestamp =
 
-        ? new Date(
+        value instanceof Date
 
-            value.getTime()
+            ? new Date(
 
-        )
+                value.getTime()
 
-        : typeof value === "string"
+            )
+
+            :
+
+            typeof value === "string"
 
             ||
 
@@ -1443,8 +2225,15 @@ function isFiniteNumber(
 }
 
 
+/*
+ * =====================================================
+ * Defensive cloning
+ * =====================================================
+ */
+
+
 /**
- * Return a defensive result copy.
+ * Return a defensive Version 2.1 result copy.
  */
 function cloneResult(
 
@@ -1453,6 +2242,10 @@ function cloneResult(
 ):EdoriResult {
 
     return {
+
+        /*
+         * Overall Hospital Readiness
+         */
 
         score:
             result.score,
@@ -1466,30 +2259,110 @@ function cloneResult(
 
         },
 
-        demandScore:
-            result.demandScore,
 
-        boardingScore:
-            result.boardingScore,
+        /*
+         * Primary scoring domains
+         */
 
-        hospitalScore:
-            result.hospitalScore,
+        edPressureScore:
+            result.edPressureScore,
 
-        acuityScore:
-            result.acuityScore,
+        acuteCapacityScore:
+            result.acuteCapacityScore,
 
-        forecastScore:
-            result.forecastScore,
+        criticalCapacityScore:
+            result.criticalCapacityScore,
 
-        drivers:result.drivers.map(
+        inflowScore:
+            result.inflowScore,
 
-            driver => ({
+        projectedCapacityScore:
+            result.projectedCapacityScore,
 
-                ...driver
 
-            })
+        /*
+         * ED Operational Pressure subdomains
+         */
 
-        ),
+        edVolumeScore:
+            result.edVolumeScore,
+
+        edBoardingScore:
+            result.edBoardingScore,
+
+        edAcuityScore:
+            result.edAcuityScore,
+
+
+        /*
+         * Version 2.1 hospital-flow detail
+         */
+
+        knownNonEDInflow:
+            result.knownNonEDInflow,
+
+        expectedNonEDInflow:
+            result.expectedNonEDInflow,
+
+        projectedDirectAdmissions:
+            result.projectedDirectAdmissions,
+
+        projectedSurgicalAdmissions:
+            result.projectedSurgicalAdmissions,
+
+        projectedNewAdmissions:
+            result.projectedNewAdmissions,
+
+        projectedTotalBedDemand:
+            result.projectedTotalBedDemand,
+
+        historicalProjectedBedDemand:
+            result.historicalProjectedBedDemand,
+
+        expectedInpatientDepartures:
+            result.expectedInpatientDepartures,
+
+        currentAvailableAcuteCareBeds:
+            result.currentAvailableAcuteCareBeds,
+
+        projectedAvailableAcuteCareBeds:
+            result.projectedAvailableAcuteCareBeds,
+
+        historicalProjectedBedBalance:
+            result.historicalProjectedBedBalance,
+
+        projectedCapacityVariance:
+            result.projectedCapacityVariance,
+
+
+        /*
+         * Temporary compatibility aliases
+         */
+
+        currentHospitalInflow:
+            result.currentHospitalInflow,
+
+        expectedHospitalInflow:
+            result.expectedHospitalInflow,
+
+        projectedHospitalInflow:
+            result.projectedHospitalInflow,
+
+
+        /*
+         * Supporting output
+         */
+
+        drivers:
+            result.drivers.map(
+
+                driver => ({
+
+                    ...driver
+
+                })
+
+            ),
 
         recommendations:[
 
@@ -1497,19 +2370,28 @@ function cloneResult(
 
         ],
 
-        timestamp:new Date(
+        timestamp:
+            new Date(
 
-            result.timestamp
+                result.timestamp
 
-        )
+            )
 
     };
 
 }
 
+
+/*
+ * =====================================================
+ * Shared helpers
+ * =====================================================
+ */
+
+
 /**
- * Determine whether a value is a supported
- * operational-state title.
+ * Determine whether a value is a valid
+ * Alpha–Echo operational state title.
  */
 function isOperationalStateTitle(
 
@@ -1517,32 +2399,22 @@ function isOperationalStateTitle(
 
 ):value is OperationalStateTitle {
 
-    if(typeof value !== "string"){
+    return value === "Alpha"
 
-        return false;
+        ||
 
-    }
+        value === "Bravo"
 
+        ||
 
-    const titles:OperationalStateTitle[] = [
+        value === "Charlie"
 
-    "Alpha",
+        ||
 
-    "Bravo",
+        value === "Delta"
 
-    "Charlie",
+        ||
 
-    "Delta",
-
-    "Echo"
-
-];
-
-
-    return titles.includes(
-
-        value as OperationalStateTitle
-
-    );
+        value === "Echo";
 
 }

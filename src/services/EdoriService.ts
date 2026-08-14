@@ -1,29 +1,35 @@
 /**
  * EdoriService
  *
- * Pure EDORI calculation service.
+ * Version 2.1 Hospital Readiness Model
  *
- * Input:
- * A complete validated SituationAssessment.
+ * Pure calculation engine for one completed
+ * hospital operational assessment.
  *
- * Output:
- * One EdoriResult.
+ * Overall Hospital Readiness:
  *
- * This service does not:
+ * HRI =
  *
- * - Read application state
- * - Modify application state
- * - Save browser data
- * - Save snapshots
- * - Emit events
- * - Update the dashboard
+ * 0.35 × ED Operational Pressure
+ * +
+ * 0.20 × Acute-Care Capacity Pressure
+ * +
+ * 0.15 × Critical-Care Capacity Pressure
+ * +
+ * 0.15 × Hospital Inflow Pressure
+ * +
+ * 0.15 × Projected Capacity Pressure
+ *
+ * No application state is read or modified here.
  */
 
 import {
 
-    areWeightsValid,
+    ED_PRESSURE_WEIGHTS,
 
-    WEIGHTS
+    WEIGHTS,
+
+    areWeightsValid
 
 }
 
@@ -32,20 +38,11 @@ from "../config/weights";
 
 import {
 
-    getThreshold
+    getOperationalState
 
 }
 
-from "../config/thresholds";
-
-
-import {
-
-    calculateForecast
-
-}
-
-from "./ForecastService";
+from "../config/operationalStates";
 
 
 import type {
@@ -75,44 +72,61 @@ import type {
 from "../types/SituationAssessment";
 
 
-/**
- * Maximum positive variance used to normalize
- * demand and boarding scores.
- *
- * These values can be recalibrated later during
- * operational scenario testing.
+/*
+ * =====================================================
+ * Calibration constants
+ * =====================================================
  */
-const DEMAND_VARIANCE_AT_MAXIMUM_SCORE = 25;
-
-const BOARDING_VARIANCE_AT_MAXIMUM_SCORE = 25;
 
 
 /**
- * Hospital occupancy below this level does not
- * generate a primary driver.
+ * Current ED census reaching 50% above its historical
+ * expectation produces maximum ED volume pressure.
  */
-const HOSPITAL_DRIVER_THRESHOLD = 85;
+const ED_VOLUME_EXCESS_AT_MAXIMUM_SCORE =
+
+    0.50;
 
 
 /**
- * Acuity scores below this level do not generate
- * a primary driver.
+ * Current ED boarding reaching 50% above its
+ * historical expectation produces maximum
+ * boarding pressure.
  */
-const ACUITY_DRIVER_THRESHOLD = 60;
+const ED_BOARDING_EXCESS_AT_MAXIMUM_SCORE =
+
+    0.50;
 
 
 /**
- * Forecast scores at or below this level do not
- * generate a primary driver.
+ * ESI 1 + ESI 2 patients representing 30% of
+ * the current ED population produces maximum
+ * acuity pressure.
  */
-const FORECAST_DRIVER_THRESHOLD = 50;
+const HIGH_ACUITY_SHARE_AT_MAXIMUM_SCORE =
+
+    0.30;
 
 
 /**
- * Calculate one authoritative EDORI result.
- *
- * The caller is responsible for validating the
- * assessment before invoking this function.
+ * Known non-ED inflow eight patients above its
+ * historical four-hour expectation produces maximum
+ * inflow pressure.
+ */
+const INFLOW_EXCESS_AT_MAXIMUM_SCORE =
+
+    8;
+
+
+/*
+ * =====================================================
+ * Public calculation
+ * =====================================================
+ */
+
+
+/**
+ * Calculate one Hospital Readiness assessment.
  */
 export function calculateEdori(
 
@@ -120,128 +134,538 @@ export function calculateEdori(
 
 ):EdoriResult {
 
-    assertValidWeights();
+    if(!areWeightsValid()){
+
+        throw new Error(
+
+            "Hospital Readiness scoring weights are invalid."
+
+        );
+
+    }
 
 
-    const demandScore = calculateDemandScore(
+    /*
+     * Emergency Department subdomains.
+     */
 
-        assessment
+    const edVolumeScore =
 
-    );
+        calculateRelativeExcessScore(
 
+            assessment.totalEDVolume,
 
-    const boardingScore = calculateBoardingScore(
+            assessment.expectedEDVolume,
 
-        assessment
+            ED_VOLUME_EXCESS_AT_MAXIMUM_SCORE
 
-    );
-
-
-    const hospitalScore = calculateHospitalScore(
-
-        assessment
-
-    );
+        );
 
 
-    const acuityScore = calculateAcuityScore(
+    const edBoardingScore =
 
-        assessment
+        calculateRelativeExcessScore(
 
-    );
+            assessment.boardedPatients,
 
+            assessment.expectedEDBoarders,
 
-    const forecastResult = calculateForecast(
+            ED_BOARDING_EXCESS_AT_MAXIMUM_SCORE
 
-        assessment
-
-    );
-
-
-    const forecastScore = clampScore(
-
-        forecastResult.forecastScore
-
-    );
+        );
 
 
-    const weightedScore =
+    const edAcuityScore =
 
-        demandScore * WEIGHTS.demand
+        calculateEDAcuityScore(
 
-        +
+            assessment
 
-        boardingScore * WEIGHTS.boarding
-
-        +
-
-        hospitalScore * WEIGHTS.hospital
-
-        +
-
-        acuityScore * WEIGHTS.acuity
-
-        +
-
-        forecastScore * WEIGHTS.forecast;
+        );
 
 
-    const score = Math.round(
+    const edPressureScore =
 
-        clampScore(
+        roundScore(
 
-            weightedScore
+            (
 
-        )
+                edVolumeScore
 
-    );
+                *
 
+                ED_PRESSURE_WEIGHTS.volume
 
-    const threshold = getThreshold(
+            )
 
-        score
+            +
 
-    );
+            (
 
+                edBoardingScore
 
-    const operationalState = {
+                *
 
-        ...threshold.operationalState
+                ED_PRESSURE_WEIGHTS.boarding
 
-    };
+            )
 
+            +
 
-    const drivers = generateDrivers(
+            (
 
-        assessment,
+                edAcuityScore
 
-        {
+                *
 
-            demandScore,
+                ED_PRESSURE_WEIGHTS.acuity
 
-            boardingScore,
+            )
 
-            hospitalScore,
-
-            acuityScore,
-
-            forecastScore
-
-        }
-
-    );
+        );
 
 
-    const recommendations =
+    /*
+     * Acute-care capacity.
+     */
 
-        generateScoreRecommendations(
+    const acuteOccupancy =
+
+        calculateOccupancyRatio(
+
+            assessment.occupiedAcuteCareBeds,
+
+            assessment.staffedAcuteCareBeds
+
+        );
+
+
+    const acuteCapacityScore =
+
+        calculateAcuteCapacityScore(
+
+            acuteOccupancy
+
+        );
+
+
+    /*
+     * Critical-care capacity.
+     */
+
+    const criticalOccupancy =
+
+        calculateOccupancyRatio(
+
+            assessment.occupiedCriticalCareBeds,
+
+            assessment.staffedCriticalCareBeds
+
+        );
+
+
+    const criticalCapacityScore =
+
+        calculateCriticalCapacityScore(
+
+            criticalOccupancy
+
+        );
+
+
+    /*
+     * =================================================
+     * Known non-ED hospital inflow
+     * =================================================
+     *
+     * Current ED boarders are NOT counted here.
+     *
+     * They are an existing inpatient-bed backlog and
+     * are handled directly in the projected bed-demand
+     * calculation below.
+     */
+
+    const knownNonEDInflow =
+
+        roundValue(
+
+            normalizeNonNegative(
+                assessment.currentDirectAdmissions
+            )
+
+            +
+
+            normalizeNonNegative(
+                assessment.currentSurgicalAdmissions
+            )
+
+        );
+
+
+    const expectedNonEDInflow =
+
+        roundValue(
+
+            normalizeNonNegative(
+                assessment.expectedDirectAdmissions4h
+            )
+
+            +
+
+            normalizeNonNegative(
+                assessment.expectedSurgicalAdmissions4h
+            )
+
+        );
+
+
+    const inflowScore =
+
+        calculateInflowScore(
+
+            knownNonEDInflow,
+
+            expectedNonEDInflow
+
+        );
+
+
+    /*
+     * =================================================
+     * Four-hour acute-care capacity projection
+     * =================================================
+     */
+
+    const currentAvailableAcuteCareBeds =
+
+        roundValue(
+
+            assessment.staffedAcuteCareBeds
+
+            -
+
+            assessment.occupiedAcuteCareBeds
+
+        );
+
+
+    const expectedInpatientDepartures =
+
+        normalizeNonNegative(
+
+            assessment.expectedInpatientDepartures4h
+
+        );
+
+
+    /*
+     * Direct and surgical/procedural admissions use
+     * the greater of currently known demand and the
+     * historical four-hour expectation.
+     */
+
+    const projectedDirectAdmissions =
+
+        roundValue(
+
+            Math.max(
+
+                normalizeNonNegative(
+                    assessment.currentDirectAdmissions
+                ),
+
+                normalizeNonNegative(
+                    assessment.expectedDirectAdmissions4h
+                )
+
+            )
+
+        );
+
+
+    const projectedSurgicalAdmissions =
+
+        roundValue(
+
+            Math.max(
+
+                normalizeNonNegative(
+                    assessment.currentSurgicalAdmissions
+                ),
+
+                normalizeNonNegative(
+                    assessment.expectedSurgicalAdmissions4h
+                )
+
+            )
+
+        );
+
+
+    /*
+     * expectedEDAdmissions4h represents NEW ED-origin
+     * inpatient admissions expected to occur during
+     * the four-hour horizon.
+     *
+     * It explicitly excludes patients who are already
+     * boarders at the beginning of the assessment.
+     */
+
+    const projectedNewAdmissions =
+
+        roundValue(
+
+            normalizeNonNegative(
+                assessment.expectedEDAdmissions4h
+            )
+
+            +
+
+            projectedDirectAdmissions
+
+            +
+
+            projectedSurgicalAdmissions
+
+        );
+
+
+    /*
+     * Existing ED boarders are the current unresolved
+     * ED-origin inpatient backlog.
+     *
+     * They are added exactly once here.
+     */
+
+    const projectedTotalBedDemand =
+
+        roundValue(
+
+            normalizeNonNegative(
+                assessment.boardedPatients
+            )
+
+            +
+
+            projectedNewAdmissions
+
+        );
+
+
+    const projectedAvailableAcuteCareBeds =
+
+        roundValue(
+
+            currentAvailableAcuteCareBeds
+
+            +
+
+            expectedInpatientDepartures
+
+            -
+
+            projectedTotalBedDemand
+
+        );
+
+
+    const historicalProjectedBedDemand =
+
+        normalizeNonNegative(
+
+            assessment.historicalProjectedBedDemand4h
+
+        );
+
+
+    /*
+     * Historical projected balance may legitimately be
+     * negative because a bed deficit may be normal for
+     * this hospital at this weekday/hour.
+     */
+
+    const historicalProjectedBedBalance =
+
+        normalizeFinite(
+
+            assessment.historicalProjectedBedBalance4h
+
+        );
+
+
+    /*
+     * Negative variance means today's projected bed
+     * balance is WORSE than historical normal.
+     *
+     * Positive variance means today's projection is
+     * BETTER than historical normal.
+     */
+
+    const projectedCapacityVariance =
+
+        roundValue(
+
+            projectedAvailableAcuteCareBeds
+
+            -
+
+            historicalProjectedBedBalance
+
+        );
+
+
+    const projectedCapacityScore =
+
+        calculateProjectedCapacityScore(
+
+            projectedCapacityVariance
+
+        );
+
+
+    /*
+     * Temporary compatibility aliases.
+     *
+     * They allow existing dashboard/report components
+     * to compile while those components are migrated to
+     * the clearer Version 2.1 field names.
+     */
+
+    const currentHospitalInflow =
+
+        knownNonEDInflow;
+
+
+    const expectedHospitalInflow =
+
+        expectedNonEDInflow;
+
+
+    const projectedHospitalInflow =
+
+        projectedNewAdmissions;
+
+
+    /*
+     * Overall Hospital Readiness Index.
+     */
+
+    const score =
+
+        roundScore(
+
+            (
+
+                edPressureScore
+
+                *
+
+                WEIGHTS.edPressure
+
+            )
+
+            +
+
+            (
+
+                acuteCapacityScore
+
+                *
+
+                WEIGHTS.acuteCapacity
+
+            )
+
+            +
+
+            (
+
+                criticalCapacityScore
+
+                *
+
+                WEIGHTS.criticalCapacity
+
+            )
+
+            +
+
+            (
+
+                inflowScore
+
+                *
+
+                WEIGHTS.inflow
+
+            )
+
+            +
+
+            (
+
+                projectedCapacityScore
+
+                *
+
+                WEIGHTS.projectedCapacity
+
+            )
+
+        );
+
+
+    const operationalState =
+
+        getOperationalState(
 
             score
 
         );
 
 
-    return {
+    const drivers =
+
+        buildDrivers(
+
+            assessment,
+
+            {
+
+                edPressureScore,
+
+                edVolumeScore,
+
+                edBoardingScore,
+
+                edAcuityScore,
+
+                acuteCapacityScore,
+
+                criticalCapacityScore,
+
+                inflowScore,
+
+                projectedCapacityScore,
+
+                currentHospitalInflow,
+
+                projectedAvailableAcuteCareBeds,
+
+                historicalProjectedBedBalance,
+
+                projectedCapacityVariance,
+
+                acuteOccupancy,
+
+                criticalOccupancy
+
+            }
+
+        );
+
+
+        return {
 
         score,
 
@@ -250,158 +674,175 @@ export function calculateEdori(
 
         operationalState,
 
-        demandScore:
-            roundDomainScore(
 
-                demandScore
+        /*
+         * =================================================
+         * Hospital Readiness domain scores
+         * =================================================
+         */
 
-            ),
+        edPressureScore,
 
-        boardingScore:
-            roundDomainScore(
+        acuteCapacityScore,
 
-                boardingScore
+        criticalCapacityScore,
 
-            ),
+        inflowScore,
 
-        hospitalScore:
-            roundDomainScore(
+        projectedCapacityScore,
 
-                hospitalScore
 
-            ),
+        /*
+         * =================================================
+         * ED Operational Pressure subdomains
+         * =================================================
+         */
 
-        acuityScore:
-            roundDomainScore(
+        edVolumeScore,
 
-                acuityScore
+        edBoardingScore,
 
-            ),
+        edAcuityScore,
 
-        forecastScore:
-            roundDomainScore(
 
-                forecastScore
+        /*
+         * =================================================
+         * Version 2.1 hospital-flow detail
+         * =================================================
+         */
 
-            ),
+        knownNonEDInflow,
+
+        expectedNonEDInflow,
+
+        projectedDirectAdmissions,
+
+        projectedSurgicalAdmissions,
+
+        projectedNewAdmissions,
+
+        projectedTotalBedDemand,
+
+        historicalProjectedBedDemand,
+
+        expectedInpatientDepartures,
+
+        currentAvailableAcuteCareBeds,
+
+        projectedAvailableAcuteCareBeds,
+
+        historicalProjectedBedBalance,
+
+        projectedCapacityVariance,
+
+
+        /*
+         * =================================================
+         * Temporary compatibility aliases
+         * =================================================
+         *
+         * These allow existing dashboard/report
+         * components to continue compiling while they
+         * are migrated to the Version 2.1 terminology.
+         */
+
+        currentHospitalInflow,
+
+        expectedHospitalInflow,
+
+        projectedHospitalInflow,
+
+
+        /*
+         * =================================================
+         * Operational interpretation
+         * =================================================
+         */
 
         drivers,
 
-        recommendations,
+        recommendations:
+            buildRecommendations(
+
+                operationalState.recommendation,
+
+                               acuteOccupancy,
+
+                criticalOccupancy,
+
+                inflowScore,
+
+                edPressureScore
+
+            ),
+
 
         timestamp:
-            new Date()
+            new Date(
+
+                assessment.assessmentTime
+
+            )
 
     };
 
 }
 
 
-/**
- * Calculate current ED demand relative to
- * historical expected ED volume.
- *
- * Conditions at or below expected volume
- * contribute no demand-strain score.
+/*
+ * =====================================================
+ * ED Operational Pressure
+ * =====================================================
  */
-function calculateDemandScore(
-
-    assessment:SituationAssessment
-
-):number {
-
-    if(assessment.expectedVolume <= 0){
-
-        return 0;
-
-    }
-
-
-    const positiveVariance = Math.max(
-
-        0,
-
-        assessment.totalEDVolume
-
-        -
-
-        assessment.expectedVolume
-
-    );
-
-
-    return normalizePositiveVariance(
-
-        positiveVariance,
-
-        DEMAND_VARIANCE_AT_MAXIMUM_SCORE
-
-    );
-
-}
 
 
 /**
- * Calculate boarding strain relative to the
- * historical boarding expectation.
+ * Calculate pressure based on the percentage by
+ * which a current value exceeds its historical norm.
  *
- * Boarding at or below the expected baseline
- * contributes no excess-boarding score.
+ * At or below historical expectation = 0.
+ *
+ * Example with maximumExcess = 0.50:
+ *
+ * Historical       -> 0
+ * 25% above         -> 50
+ * 50% above         -> 100
  */
-function calculateBoardingScore(
+function calculateRelativeExcessScore(
 
-    assessment:SituationAssessment
+    current:number,
+
+    expected:number,
+
+    maximumExcess:number
 
 ):number {
 
-    const positiveVariance = Math.max(
+    const safeCurrent =
 
-        0,
+        normalizeNonNegative(
 
-        assessment.boardedPatients
+            current
 
-        -
-
-        assessment.expectedBoarders
-
-    );
+        );
 
 
-    return normalizePositiveVariance(
+    const safeExpected =
 
-        positiveVariance,
+        normalizeNonNegative(
 
-        BOARDING_VARIANCE_AT_MAXIMUM_SCORE
+            expected
 
-    );
+        );
 
-}
-
-
-/**
- * Calculate medical-bed occupancy.
- *
- * The configured denominator is expected to
- * represent usable medical beds rather than
- * total licensed hospital beds.
- */
-function calculateHospitalScore(
-
-    assessment:SituationAssessment
-
-):number {
 
     if(
 
-        !Number.isFinite(
-
-            assessment.staffedMedicalBeds
-
-        )
+        safeExpected <= 0
 
         ||
 
-        assessment.staffedMedicalBeds <= 0
+        safeCurrent <= safeExpected
 
     ){
 
@@ -410,22 +851,38 @@ function calculateHospitalScore(
     }
 
 
-    const occupancyPercentage =
+    const relativeExcess =
 
-        assessment.occupiedMedicalBeds
+        (
+
+            safeCurrent
+
+            -
+
+            safeExpected
+
+        )
 
         /
 
-        assessment.staffedMedicalBeds
-
-        *
-
-        100;
+        safeExpected;
 
 
-    return clampScore(
+    return roundScore(
 
-        occupancyPercentage
+        clampScore(
+
+            relativeExcess
+
+            /
+
+            maximumExcess
+
+            *
+
+            100
+
+        )
 
     );
 
@@ -433,283 +890,935 @@ function calculateHospitalScore(
 
 
 /**
- * Calculate the current patient-acuity score.
+ * Calculate ED high-acuity pressure.
  *
- * ESI weighting:
+ * Only ESI 1 and ESI 2 are entered.
  *
- * ESI 1 = 5
- * ESI 2 = 4
- * ESI 3 = 3
- * ESI 4 = 2
- * ESI 5 = 1
+ * All remaining ED patients are implicitly
+ * considered ESI 3 through ESI 5.
  *
- * The weighted acuity burden is divided by
- * total ED volume and converted to 0–100.
+ * A combined ESI 1 + ESI 2 share of 30% or more
+ * produces the maximum acuity score.
  */
-function calculateAcuityScore(
+function calculateEDAcuityScore(
 
     assessment:SituationAssessment
 
 ):number {
 
-    const assignedEsiCount =
+    const totalEDVolume =
 
-        assessment.esi1
+        normalizeNonNegative(
 
-        +
+            assessment.totalEDVolume
 
-        assessment.esi2
-
-        +
-
-        assessment.esi3
-
-        +
-
-        assessment.esi4
-
-        +
-
-        assessment.esi5;
+        );
 
 
-    /*
-     * Acuity cannot be calculated when no patients
-     * currently have an assigned ESI.
-     */
-
-    if(assignedEsiCount <= 0){
+    if(totalEDVolume <= 0){
 
         return 0;
 
     }
 
 
-    const weightedAcuityBurden =
+    const highAcuityPatients =
 
-        assessment.esi1 * 5
+        Math.min(
 
-        +
+            totalEDVolume,
 
-        assessment.esi2 * 4
+            normalizeNonNegative(
 
-        +
+                assessment.esi1
 
-        assessment.esi3 * 3
+            )
 
-        +
+            +
 
-        assessment.esi4 * 2
+            normalizeNonNegative(
 
-        +
+                assessment.esi2
 
-        assessment.esi5;
+            )
+
+        );
 
 
-    /*
-     * Calculate acuity using only patients with an
-     * assigned ESI.
-     *
-     * Patients without an assigned ESI continue to
-     * contribute to total ED demand but do not receive
-     * an artificial acuity weight of zero.
-     */
+    const highAcuityShare =
 
-    const averageAcuityWeight =
-
-        weightedAcuityBurden
+        highAcuityPatients
 
         /
 
-        assignedEsiCount;
+        totalEDVolume;
 
 
-    /*
-     * Maximum possible average weight is 5.
-     *
-     * Multiplying by 20 converts:
-     *
-     * 1.0 → 20
-     * 2.0 → 40
-     * 3.0 → 60
-     * 4.0 → 80
-     * 5.0 → 100
-     */
+    return roundScore(
 
-    return clampScore(
+        clampScore(
 
-        averageAcuityWeight * 20
+            highAcuityShare
+
+            /
+
+            HIGH_ACUITY_SHARE_AT_MAXIMUM_SCORE
+
+            *
+
+            100
+
+        )
 
     );
 
 }
 
 
-/**
- * Normalize a positive variance to 0–100.
+/*
+ * =====================================================
+ * Acute-Care Capacity
+ * =====================================================
  */
-function normalizePositiveVariance(
 
-    variance:number,
 
-    varianceAtMaximumScore:number
+/**
+ * Convert acute-care occupancy into pressure.
+ *
+ * The curve intentionally accelerates as the
+ * hospital approaches staffed capacity.
+ *
+ * <= 80% occupancy -> 0
+ * 90% occupancy    -> 35
+ * 95% occupancy    -> 65
+ * 100% occupancy   -> 100
+ *
+ * Values between anchors are linearly interpolated.
+ */
+function calculateAcuteCapacityScore(
+
+    occupancy:number
 
 ):number {
 
-    if(
+    return interpolatePressureCurve(
 
-        !Number.isFinite(
+        occupancy,
 
-            variance
+        [
 
-        )
+            {
 
-        ||
+                x:0.80,
 
-        !Number.isFinite(
+                y:0
 
-            varianceAtMaximumScore
+            },
 
-        )
+            {
 
-        ||
+                x:0.90,
 
-        variance <= 0
+                y:35
 
-        ||
+            },
 
-        varianceAtMaximumScore <= 0
+            {
 
-    ){
+                x:0.95,
 
-        return 0;
+                y:65
 
-    }
+            },
 
+            {
 
-    return clampScore(
+                x:1.00,
 
-        variance
+                y:100
 
-        /
+            }
 
-        varianceAtMaximumScore
-
-        *
-
-        100
+        ]
 
     );
 
 }
 
 
-/**
- * Create primary operational drivers.
+/*
+ * =====================================================
+ * Critical-Care Capacity
+ * =====================================================
  */
-function generateDrivers(
+
+
+/**
+ * Critical-care capacity begins generating pressure
+ * earlier and accelerates more quickly than acute
+ * care.
+ *
+ * <= 70% occupancy -> 0
+ * 80% occupancy    -> 30
+ * 90% occupancy    -> 65
+ * 100% occupancy   -> 100
+ */
+function calculateCriticalCapacityScore(
+
+    occupancy:number
+
+):number {
+
+    return interpolatePressureCurve(
+
+        occupancy,
+
+        [
+
+            {
+
+                x:0.70,
+
+                y:0
+
+            },
+
+            {
+
+                x:0.80,
+
+                y:30
+
+            },
+
+            {
+
+                x:0.90,
+
+                y:65
+
+            },
+
+            {
+
+                x:1.00,
+
+                y:100
+
+            }
+
+        ]
+
+    );
+
+}
+
+
+/*
+ * =====================================================
+ * Hospital Inflow
+ * =====================================================
+ */
+
+
+/**
+ * Compare currently known hospital inflow with the
+ * historical four-hour norm.
+ *
+ * At or below historical expectation = 0.
+ *
+ * Eight admissions above historical expectation
+ * produces the maximum score.
+ */
+function calculateInflowScore(
+
+    currentHospitalInflow:number,
+
+    expectedHospitalInflow:number
+
+):number {
+
+    const excessInflow =
+
+        currentHospitalInflow
+
+        -
+
+        expectedHospitalInflow;
+
+
+    if(excessInflow <= 0){
+
+        return 0;
+
+    }
+
+
+    return roundScore(
+
+        clampScore(
+
+            excessInflow
+
+            /
+
+            INFLOW_EXCESS_AT_MAXIMUM_SCORE
+
+            *
+
+            100
+
+        )
+
+    );
+
+}
+
+
+/*
+ * =====================================================
+ * Projected Capacity
+ * =====================================================
+ */
+
+
+/**
+ * Convert projected-capacity variance into pressure.
+ *
+ * The score is based on how much WORSE today's
+ * projected bed balance is than the historical
+ * projected balance for the same weekday/hour.
+ *
+ * At or better than historical expectation -> 0
+ * 5 beds worse                          -> 25
+ * 10 beds worse                         -> 50
+ * 20 beds worse                         -> 80
+ * 30 beds worse                         -> 100
+ *
+ * A negative absolute bed balance does NOT
+ * automatically create a high score.
+ */
+function calculateProjectedCapacityScore(
+
+    projectedCapacityVariance:number
+
+):number {
+
+    if(!Number.isFinite(projectedCapacityVariance)){
+
+        return 100;
+
+    }
+
+
+    const bedsWorseThanHistorical = Math.max(
+
+        0,
+
+        -projectedCapacityVariance
+
+    );
+
+
+    return interpolatePressureCurve(
+
+        bedsWorseThanHistorical,
+
+        [
+
+            {
+                x:0,
+                y:0
+            },
+
+            {
+                x:5,
+                y:25
+            },
+
+            {
+                x:10,
+                y:50
+            },
+
+            {
+                x:20,
+                y:80
+            },
+
+            {
+                x:30,
+                y:100
+            }
+
+        ]
+
+    );
+
+}
+
+
+/*
+ * =====================================================
+ * Driver generation
+ * =====================================================
+ */
+
+
+interface CalculatedDomains {
+
+    edPressureScore:number;
+
+    edVolumeScore:number;
+
+    edBoardingScore:number;
+
+    edAcuityScore:number;
+
+    acuteCapacityScore:number;
+
+    criticalCapacityScore:number;
+
+    inflowScore:number;
+
+    projectedCapacityScore:number;
+
+    currentHospitalInflow:number;
+
+    projectedAvailableAcuteCareBeds:number;
+
+    historicalProjectedBedBalance:number;
+
+    projectedCapacityVariance:number;
+
+    acuteOccupancy:number;
+
+    criticalOccupancy:number;
+
+}
+
+
+/**
+ * Build the major operational drivers.
+ */
+function buildDrivers(
 
     assessment:SituationAssessment,
 
-    scores:{
-
-        demandScore:number;
-
-        boardingScore:number;
-
-        hospitalScore:number;
-
-        acuityScore:number;
-
-        forecastScore:number;
-
-    }
+    domains:CalculatedDomains
 
 ):Driver[] {
 
     const drivers:Driver[] = [];
 
 
-    addDemandDriver(
+    if(domains.edPressureScore >= 20){
 
-        drivers,
+        drivers.push({
 
-        assessment,
+            title:
+                "Emergency Department Pressure",
 
-        scores.demandScore
+            description:
+                "Emergency Department volume, boarding, or high-acuity demand is above normal operating conditions.",
+
+            severity:
+                domains.edPressureScore,
+
+            currentValue:
+                assessment.totalEDVolume,
+
+            expectedValue:
+                assessment.expectedEDVolume
+
+        });
+
+    }
+
+
+    if(domains.edBoardingScore >= 20){
+
+        drivers.push({
+
+            title:
+                "ED Boarding",
+
+            description:
+                "The current ED boarding population is above the historical expectation for this period.",
+
+            severity:
+                domains.edBoardingScore,
+
+            currentValue:
+                assessment.boardedPatients,
+
+            expectedValue:
+                assessment.expectedEDBoarders
+
+        });
+
+    }
+
+
+    if(domains.acuteCapacityScore >= 20){
+
+        drivers.push({
+
+            title:
+                "Acute-Care Capacity",
+
+            description:
+                "Staffed acute-care inpatient capacity is becoming constrained.",
+
+            severity:
+                domains.acuteCapacityScore,
+
+            currentValue:
+                roundValue(
+
+                    domains.acuteOccupancy
+
+                    *
+
+                    100
+
+                ),
+
+            expectedValue:
+                80
+
+        });
+
+    }
+
+
+    if(domains.criticalCapacityScore >= 20){
+
+        drivers.push({
+
+            title:
+                "Critical-Care Capacity",
+
+            description:
+                "Staffed critical-care capacity is becoming constrained.",
+
+            severity:
+                domains.criticalCapacityScore,
+
+            currentValue:
+                roundValue(
+
+                    domains.criticalOccupancy
+
+                    *
+
+                    100
+
+                ),
+
+            expectedValue:
+                70
+
+        });
+
+    }
+
+
+    if(domains.inflowScore >= 20){
+
+        drivers.push({
+
+            title:
+                "Hospital Inflow",
+
+            description:
+                "Known hospital admissions exceed the historical four-hour inflow expectation.",
+
+            severity:
+                domains.inflowScore,
+
+            currentValue:
+                domains.currentHospitalInflow,
+
+            expectedValue:
+                assessment.expectedHospitalInflow4h
+
+        });
+
+    }
+
+
+    if(domains.projectedCapacityScore >= 20){
+
+        drivers.push({
+
+            title:
+                "Projected Acute-Care Capacity",
+
+            description:
+                domains.projectedCapacityVariance < 0
+
+                    ? `Projected acute-care bed balance is ${formatAbsoluteBedCount(domains.projectedCapacityVariance)} beds worse than the historical expectation for this weekday/hour.`
+
+                    : "Projected acute-care bed balance is at or better than the historical expectation.",
+
+            severity:
+                domains.projectedCapacityScore,
+
+            currentValue:
+                domains.projectedAvailableAcuteCareBeds,
+
+            expectedValue:
+                domains.historicalProjectedBedBalance
+
+        });
+
+    }
+
+
+    return drivers.sort(
+
+        (
+
+            first,
+
+            second
+
+        ) =>
+
+            second.severity
+
+            -
+
+            first.severity
 
     );
 
-
-    addBoardingDriver(
-
-        drivers,
-
-        assessment,
-
-        scores.boardingScore
-
-    );
+}
 
 
-    addHospitalDriver(
-
-        drivers,
-
-        assessment,
-
-        scores.hospitalScore
-
-    );
+/*
+ * =====================================================
+ * Initial recommendations
+ * =====================================================
+ */
 
 
-    addAcuityDriver(
+/**
+ * Generate basic recommendations.
+ *
+ * This is intentionally simple because Version 2
+ * will later replace these hard-coded statements
+ * with administrator-configurable surge-plan
+ * recommendations.
+ */
+function buildRecommendations(
 
-        drivers,
+    stateRecommendation:string,
 
-        assessment,
+      acuteOccupancy:number,
 
-        scores.acuityScore
+    criticalOccupancy:number,
 
-    );
+    inflowScore:number,
+
+    edPressureScore:number
+
+):string[] {
+
+    const recommendations:string[] = [
+
+        stateRecommendation
+
+    ];
 
 
-    addForecastDriver(
+    /*
+     * A negative absolute bed balance is not itself an
+     * escalation criterion in Version 2.1 because a
+     * deficit may be historically normal.
+     *
+     * Projected-capacity recommendations are driven
+     * through the scored domain and operational
+     * triggers rather than this absolute value.
+     */
 
-        drivers,
 
-        scores.forecastScore
+    if(criticalOccupancy >= 1){
 
-    );
+        recommendations.push(
+
+            "Critical-care occupancy has reached or exceeded staffed capacity. Review critical-care capacity and escalation actions."
+
+        );
+
+    }
 
 
-    return drivers
+    if(acuteOccupancy >= 0.95){
 
-        .sort(
+        recommendations.push(
 
-            (
+            "Acute-care occupancy is at or above 95% of staffed capacity. Review inpatient throughput and surge-capacity actions."
 
-                first,
+        );
 
-                second
+    }
 
-            ) =>
 
-                second.severity
+    if(inflowScore >= 60){
 
-                -
+        recommendations.push(
 
-                first.severity
+            "Hospital inflow is substantially above the historical expectation for the current four-hour period."
+
+        );
+
+    }
+
+
+    if(edPressureScore >= 60){
+
+        recommendations.push(
+
+            "Emergency Department operational pressure is elevated. Review ED throughput, boarding, and hospital support actions."
+
+        );
+
+    }
+
+
+    return Array.from(
+
+        new Set(
+
+            recommendations
 
         )
 
-        .map(
+    );
 
-            driver => ({
+}
 
-                ...driver
 
-            })
+/*
+ * =====================================================
+ * Shared mathematical helpers
+ * =====================================================
+ */
+
+
+/**
+ * Calculate occupancy as occupied / staffed.
+ *
+ * Occupancy above 100% is intentionally preserved.
+ */
+function calculateOccupancyRatio(
+
+    occupied:number,
+
+    staffed:number
+
+):number {
+
+    const safeOccupied =
+
+        normalizeNonNegative(
+
+            occupied
+
+        );
+
+
+    const safeStaffed =
+
+        normalizeNonNegative(
+
+            staffed
+
+        );
+
+
+    if(safeStaffed <= 0){
+
+        return safeOccupied > 0
+
+            ? 1
+
+            : 0;
+
+    }
+
+
+    return safeOccupied
+
+        /
+
+        safeStaffed;
+
+}
+
+
+/**
+ * Interpolate an ascending pressure curve.
+ */
+function interpolatePressureCurve(
+
+    value:number,
+
+    points:Array<{
+
+        x:number;
+
+        y:number;
+
+    }>
+
+):number {
+
+    if(points.length === 0){
+
+        return 0;
+
+    }
+
+
+    if(value <= points[0].x){
+
+        return roundScore(
+
+            points[0].y
+
+        );
+
+    }
+
+
+    for(
+
+        let index = 1;
+
+        index < points.length;
+
+        index += 1
+
+    ){
+
+        const previous =
+
+            points[index - 1];
+
+
+        const current =
+
+            points[index];
+
+
+        if(value <= current.x){
+
+            return roundScore(
+
+                interpolate(
+
+                    value,
+
+                    previous.x,
+
+                    current.x,
+
+                    previous.y,
+
+                    current.y
+
+                )
+
+            );
+
+        }
+
+    }
+
+
+    return roundScore(
+
+        points[
+
+            points.length - 1
+
+        ].y
+
+    );
+
+}
+
+
+
+
+
+/**
+ * Linear interpolation.
+ */
+function interpolate(
+
+    value:number,
+
+    startX:number,
+
+    endX:number,
+
+    startY:number,
+
+    endY:number
+
+):number {
+
+    if(startX === endX){
+
+        return endY;
+
+    }
+
+
+    const position =
+
+        (
+
+            value
+
+            -
+
+            startX
+
+        )
+
+        /
+
+        (
+
+            endX
+
+            -
+
+            startX
+
+        );
+
+
+    return startY
+
+        +
+
+        position
+
+        *
+
+        (
+
+            endY
+
+            -
+
+            startY
 
         );
 
@@ -717,430 +1826,61 @@ function generateDrivers(
 
 
 /**
- * Add an ED-volume driver.
+ * Normalize a value to a nonnegative number.
  */
-function addDemandDriver(
+function normalizeNonNegative(
 
-    drivers:Driver[],
+    value:number
 
-    assessment:SituationAssessment,
-
-    severity:number
-
-):void {
+):number {
 
     if(
 
-        assessment.totalEDVolume
+        !Number.isFinite(
 
-        <=
+            value
 
-        assessment.expectedVolume
+        )
 
-    ){
+        ||
 
-        return;
-
-    }
-
-
-    const variance = roundDisplayNumber(
-
-        assessment.totalEDVolume
-
-        -
-
-        assessment.expectedVolume
-
-    );
-
-
-    drivers.push({
-
-        title:
-            "ED Volume",
-
-        description:
-            `Total ED volume is ${variance} patients above the historical expectation.`,
-
-        severity:
-            roundDomainScore(
-
-                severity
-
-            ),
-
-        currentValue:
-            assessment.totalEDVolume,
-
-        expectedValue:
-            assessment.expectedVolume
-
-    });
-
-}
-
-
-/**
- * Add an excess-boarding driver.
- */
-function addBoardingDriver(
-
-    drivers:Driver[],
-
-    assessment:SituationAssessment,
-
-    severity:number
-
-):void {
-
-    if(
-
-        assessment.boardedPatients
-
-        <=
-
-        assessment.expectedBoarders
+        value < 0
 
     ){
 
-        return;
+        return 0;
 
     }
 
 
-    const variance = roundDisplayNumber(
-
-        assessment.boardedPatients
-
-        -
-
-        assessment.expectedBoarders
-
-    );
-
-
-    drivers.push({
-
-        title:
-            "Boarding",
-
-        description:
-            `Boarding is ${variance} patients above the historical expectation.`,
-
-        severity:
-            roundDomainScore(
-
-                severity
-
-            ),
-
-        currentValue:
-            assessment.boardedPatients,
-
-        expectedValue:
-            assessment.expectedBoarders
-
-    });
+    return value;
 
 }
 
 
 /**
- * Add a hospital-capacity driver.
+ * Normalize a finite signed value.
  */
-function addHospitalDriver(
+function normalizeFinite(
 
-    drivers:Driver[],
+    value:number
 
-    assessment:SituationAssessment,
+):number {
 
-    severity:number
+    if(!Number.isFinite(value)){
 
-):void {
-
-    if(severity < HOSPITAL_DRIVER_THRESHOLD){
-
-        return;
+        return 0;
 
     }
 
 
-    drivers.push({
-
-        title:
-            "Hospital Capacity",
-
-        description:
-            `Medical-bed occupancy is ${Math.round(severity)}%.`,
-
-        severity:
-            roundDomainScore(
-
-                severity
-
-            ),
-
-        currentValue:
-            assessment.occupiedMedicalBeds,
-
-        expectedValue:
-            Math.round(
-
-                assessment.staffedMedicalBeds
-
-                *
-
-                HOSPITAL_DRIVER_THRESHOLD
-
-                /
-
-                100
-
-            )
-
-    });
+    return value;
 
 }
 
 
 /**
- * Add a patient-acuity driver.
- */
-function addAcuityDriver(
-
-    drivers:Driver[],
-
-    assessment:SituationAssessment,
-
-    severity:number
-
-):void {
-
-    if(severity < ACUITY_DRIVER_THRESHOLD){
-
-        return;
-
-    }
-
-
-    const highAcuityCount =
-
-        assessment.esi1
-
-        +
-
-        assessment.esi2;
-
-
-    drivers.push({
-
-        title:
-            "Patient Acuity",
-
-        description:
-            `${highAcuityCount} current ED patients are categorized as ESI 1 or ESI 2.`,
-
-        severity:
-            roundDomainScore(
-
-                severity
-
-            ),
-
-        currentValue:
-            highAcuityCount,
-
-        expectedValue:
-            roundDisplayNumber(
-
-                assessment.totalEDVolume
-
-                *
-
-                0.20
-
-            )
-
-    });
-
-}
-
-
-/**
- * Add a forecast driver.
- */
-/**
- * Add a near-term forecast driver.
- */
-function addForecastDriver(
-
-    drivers:Driver[],
-
-    severity:number
-
-):void {
-
-    if(severity <= FORECAST_DRIVER_THRESHOLD){
-
-        return;
-
-    }
-
-
-    drivers.push({
-
-        title:
-            "Near-Term Flow",
-
-        description:
-            "Expected arrivals exceed expected departures, indicating likely near-term growth in ED census.",
-
-        severity:
-            roundDomainScore(
-
-                severity
-
-            ),
-
-        currentValue:
-            roundDomainScore(
-
-                severity
-
-            ),
-
-        expectedValue:
-            FORECAST_DRIVER_THRESHOLD
-
-    });
-
-}
-
-
-/**
- * Create broad score-level recommendations.
- *
- * Driver-specific recommendations remain the
- * responsibility of RecommendationService.
- */
-function generateScoreRecommendations(
-
-    score:number
-
-):string[] {
-
-    if(score >= 85){
-
-        return [
-
-            "Activate the highest-level hospital surge response.",
-
-            "Escalate inpatient throughput barriers to executive leadership.",
-
-            "Prepare immediate additional treatment and boarding capacity.",
-
-            "Reassess EDORI conditions at frequent intervals."
-
-        ];
-
-    }
-
-
-    if(score >= 70){
-
-        return [
-
-            "Escalate inpatient throughput review.",
-
-            "Prepare additional surge capacity.",
-
-            "Notify operational leadership.",
-
-            "Increase EDORI assessment frequency."
-
-        ];
-
-    }
-
-
-    if(score >= 55){
-
-        return [
-
-            "Review hospital throughput barriers.",
-
-            "Evaluate additional ED and inpatient capacity options.",
-
-            "Monitor expected arrivals and departures closely."
-
-        ];
-
-    }
-
-
-    if(score >= 40){
-
-        return [
-
-            "Increase operational monitoring.",
-
-            "Review discharge and admission barriers.",
-
-            "Prepare for possible escalation."
-
-        ];
-
-    }
-
-
-    if(score >= 25){
-
-        return [
-
-            "Increase operational awareness.",
-
-            "Monitor ED volume, boarding, acuity, and hospital occupancy."
-
-        ];
-
-    }
-
-
-    return [
-
-        "Continue routine operations.",
-
-        "Maintain standard operational monitoring."
-
-    ];
-
-}
-
-
-/**
- * Confirm domain weights total 1.00.
- */
-function assertValidWeights():void {
-
-    if(areWeightsValid()){
-
-        return;
-
-    }
-
-
-    throw new Error(
-
-        "EDORI domain weights must total 1.00."
-
-    );
-
-}
-
-
-/**
- * Keep a score between 0 and 100.
+ * Clamp a score from 0 through 100.
  */
 function clampScore(
 
@@ -1173,9 +1913,9 @@ function clampScore(
 
 
 /**
- * Round a domain score for storage and display.
+ * Round scores to one decimal place.
  */
-function roundDomainScore(
+function roundScore(
 
     value:number
 
@@ -1193,15 +1933,19 @@ function roundDomainScore(
 
         10
 
-    ) / 10;
+    )
+
+    /
+
+    10;
 
 }
 
 
 /**
- * Round values used in driver descriptions.
+ * Round operational values to two decimals.
  */
-function roundDisplayNumber(
+function roundValue(
 
     value:number
 
@@ -1209,8 +1953,55 @@ function roundDisplayNumber(
 
     return Math.round(
 
-        value * 10
+        value
 
-    ) / 10;
+        *
+
+        100
+
+    )
+
+    /
+
+    100;
+
+}
+
+
+/**
+ * Format the magnitude of a projected bed deficit.
+ */
+function formatAbsoluteBedCount(
+
+    value:number
+
+):string {
+
+    const absoluteValue =
+
+        Math.abs(
+
+            value
+
+        );
+
+
+    return Number.isInteger(
+
+        absoluteValue
+
+    )
+
+        ? String(
+
+            absoluteValue
+
+        )
+
+        : absoluteValue.toFixed(
+
+            1
+
+        );
 
 }

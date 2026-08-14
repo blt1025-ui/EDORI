@@ -1,18 +1,24 @@
 /**
  * Operational Trigger Configuration
  *
- * Initial EDORI operational trigger library.
+ * Version 2 Hospital Readiness Model
+ *
+ * Initial hospital-wide operational trigger
+ * library.
  *
  * Operational level hierarchy:
  *
- * Alpha   → Lowest
+ * Alpha   -> Lowest
  * Bravo
  * Charlie
  * Delta
- * Echo    → Highest
+ * Echo    -> Highest
  *
- * These thresholds are configurable design defaults
- * and have not yet been clinically validated.
+ * IMPORTANT:
+ *
+ * These thresholds are configurable design
+ * defaults and have not yet been clinically
+ * validated.
  */
 
 import type {
@@ -30,7 +36,7 @@ OperationalTrigger[] = [
 
     /*
      * =====================================================
-     * ED DEMAND TRIGGERS
+     * ED OPERATIONAL PRESSURE
      * =====================================================
      */
 
@@ -49,7 +55,7 @@ OperationalTrigger[] = [
             true,
 
         category:
-            "Demand",
+            "ED Operational Pressure",
 
         priority:
             "Moderate",
@@ -86,7 +92,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Census above physical treatment capacity reduces operational reserve and may increase reliance on nontraditional care spaces."
+            "Census above physical ED treatment capacity reduces operational reserve and may increase reliance on nontraditional care spaces."
 
     },
 
@@ -100,13 +106,13 @@ OperationalTrigger[] = [
             "High ED Occupancy",
 
         description:
-            "Emergency department census is at least 120% of treatment-bed capacity.",
+            "Emergency department census is at least 120% of configured treatment-bed capacity.",
 
         enabled:
             true,
 
         category:
-            "Demand",
+            "ED Operational Pressure",
 
         priority:
             "High",
@@ -145,7 +151,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Sustained census well above treatment capacity indicates substantial crowding and reduced ability to absorb new demand."
+            "Census substantially above ED treatment capacity indicates crowding and reduced ability to absorb additional emergency demand."
 
     },
 
@@ -165,7 +171,7 @@ OperationalTrigger[] = [
             true,
 
         category:
-            "Demand",
+            "ED Operational Pressure",
 
         priority:
             "Moderate",
@@ -202,16 +208,10 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Historical comparison identifies demand that is unusually high for the selected weekday and hour."
+            "Historical comparison identifies ED demand that is unusually high for the current weekday and hour."
 
     },
 
-
-    /*
-     * =====================================================
-     * BOARDING TRIGGERS
-     * =====================================================
-     */
 
     {
 
@@ -219,7 +219,7 @@ OperationalTrigger[] = [
             "significant-boarding",
 
         title:
-            "Significant Boarding",
+            "Significant ED Boarding",
 
         description:
             "At least 30 admitted patients are boarding in the emergency department.",
@@ -228,7 +228,7 @@ OperationalTrigger[] = [
             true,
 
         category:
-            "Boarding",
+            "ED Operational Pressure",
 
         priority:
             "Moderate",
@@ -265,7 +265,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Thirty boarders represent substantial loss of functional ED treatment capacity, even when this burden is frequently experienced."
+            "A large ED boarding population reduces functional emergency treatment capacity and reflects hospital throughput pressure."
 
     },
 
@@ -276,7 +276,7 @@ OperationalTrigger[] = [
             "boarding-crisis",
 
         title:
-            "Boarding Crisis",
+            "Severe ED Boarding",
 
         description:
             "At least 40 admitted patients are boarding in the emergency department.",
@@ -285,7 +285,7 @@ OperationalTrigger[] = [
             true,
 
         category:
-            "Boarding",
+            "ED Operational Pressure",
 
         priority:
             "Critical",
@@ -326,7 +326,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Boarding at this level consumes a large percentage of ED capacity and requires coordinated hospital intervention."
+            "Boarding at this level consumes a substantial portion of ED capacity and warrants coordinated hospital intervention."
 
     },
 
@@ -340,13 +340,13 @@ OperationalTrigger[] = [
             "Boarding Significantly Above Expected",
 
         description:
-            "Boarding is at least 10 patients above the expected weekday and hour baseline.",
+            "ED boarding is at least 10 patients above the historical weekday and hour expectation.",
 
         enabled:
             true,
 
         category:
-            "Boarding",
+            "ED Operational Pressure",
 
         priority:
             "High",
@@ -383,7 +383,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Historical normalization distinguishes routine baseline boarding from an unusual boarding burden."
+            "Historical normalization distinguishes expected baseline boarding from an unusually high boarding burden."
 
     },
 
@@ -397,13 +397,13 @@ OperationalTrigger[] = [
             "Boarders Occupy Majority of ED Census",
 
         description:
-            "Boarding patients represent at least 50% of the total emergency department census.",
+            "Boarding patients represent at least 50% of total emergency department census.",
 
         enabled:
             true,
 
         category:
-            "Boarding",
+            "ED Operational Pressure",
 
         priority:
             "High",
@@ -447,223 +447,22 @@ OperationalTrigger[] = [
     },
 
 
-    /*
-     * =====================================================
-     * HOSPITAL THROUGHPUT TRIGGERS
-     * =====================================================
-     */
-
-    {
-
-        id:
-            "hospital-near-capacity",
-
-        title:
-            "Hospital Near Capacity",
-
-        description:
-            "Medical-bed occupancy is at least 95%.",
-
-        enabled:
-            true,
-
-        category:
-            "Hospital Throughput",
-
-        priority:
-            "Moderate",
-
-        conditions:[
-
-            {
-
-                metric:
-                    "hospitalOccupancyPercent",
-
-                operator:
-                    "greaterThanOrEqual",
-
-                threshold:
-                    95
-
-            }
-
-        ],
-
-        minimumOperationalState:
-            null,
-
-        reassessmentMinutes:
-            60,
-
-        interventionIds:[
-
-            "review-pending-discharges",
-
-            "notify-bed-management"
-
-        ],
-
-        rationale:
-            "Near-complete hospital occupancy reduces the ability to move admitted patients out of the ED."
-
-    },
-
-
-    {
-
-        id:
-            "hospital-capacity-and-boarding-crisis",
-
-        title:
-            "Hospital Capacity With Significant Boarding",
-
-        description:
-            "Medical-bed occupancy is at least 95% while at least 30 patients are boarding in the ED.",
-
-        enabled:
-            true,
-
-        category:
-            "Hospital Throughput",
-
-        priority:
-            "Critical",
-
-        conditions:[
-
-            {
-
-                metric:
-                    "hospitalOccupancyPercent",
-
-                operator:
-                    "greaterThanOrEqual",
-
-                threshold:
-                    95
-
-            },
-
-
-            {
-
-                metric:
-                    "boardedPatients",
-
-                operator:
-                    "greaterThanOrEqual",
-
-                threshold:
-                    30
-
-            }
-
-        ],
-
-        minimumOperationalState:
-            "Delta",
-
-        reassessmentMinutes:
-            30,
-
-        interventionIds:[
-
-            "activate-hospital-surge",
-
-            "escalate-inpatient-throughput",
-
-            "notify-hospital-operations",
-
-            "review-pending-discharges"
-
-        ],
-
-        rationale:
-            "High hospital occupancy combined with substantial ED boarding indicates a hospital-wide throughput constraint."
-
-    },
-
-
-    {
-
-        id:
-            "worsening-expected-flow",
-
-        title:
-            "Worsening Expected Flow",
-
-        description:
-            "Expected arrivals exceed expected departures by at least five patients during the current hourly period.",
-
-        enabled:
-            true,
-
-        category:
-            "Hospital Throughput",
-
-        priority:
-            "Moderate",
-
-        conditions:[
-
-            {
-
-                metric:
-                    "expectedNetFlow",
-
-                operator:
-                    "greaterThanOrEqual",
-
-                threshold:
-                    5
-
-            }
-
-        ],
-
-        minimumOperationalState:
-            null,
-
-        reassessmentMinutes:
-            60,
-
-        interventionIds:[
-
-            "review-ed-flow",
-
-            "prepare-for-demand-growth"
-
-        ],
-
-        rationale:
-            "Positive expected net flow suggests that ED census may increase if no countervailing operational changes occur."
-
-    },
-
-
-    /*
-     * =====================================================
-     * CLINICAL COMPLEXITY TRIGGERS
-     * =====================================================
-     */
-
     {
 
         id:
             "high-acuity-burden",
 
         title:
-            "High-Acuity Burden",
+            "High-Acuity ED Burden",
 
         description:
-            "At least 25% of the current ED census consists of ESI 1 or ESI 2 patients.",
+            "At least 30% of the current ED census consists of ESI 1 or ESI 2 patients.",
 
         enabled:
             true,
 
         category:
-            "Clinical Complexity",
+            "ED Operational Pressure",
 
         priority:
             "High",
@@ -679,7 +478,7 @@ OperationalTrigger[] = [
                     "greaterThanOrEqual",
 
                 threshold:
-                    25
+                    30
 
             }
 
@@ -700,14 +499,630 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "A high proportion of ESI 1 and ESI 2 patients may substantially increase workload and reduce operational reserve."
+            "A high proportion of ESI 1 and ESI 2 patients increases clinical workload and reduces ED operational reserve."
 
     },
 
 
     /*
      * =====================================================
-     * OPERATIONAL MOMENTUM TRIGGERS
+     * ACUTE-CARE CAPACITY
+     * =====================================================
+     */
+
+    {
+
+        id:
+            "acute-care-near-capacity",
+
+        title:
+            "Acute-Care Capacity Constrained",
+
+        description:
+            "Staffed acute-care occupancy is at least 95%.",
+
+        enabled:
+            true,
+
+        category:
+            "Acute-Care Capacity",
+
+        priority:
+            "High",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "acuteCareOccupancyPercent",
+
+                operator:
+                    "greaterThanOrEqual",
+
+                threshold:
+                    95
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Charlie",
+
+        reassessmentMinutes:
+            60,
+
+        interventionIds:[
+
+            "review-pending-discharges",
+
+            "notify-bed-management"
+
+        ],
+
+        rationale:
+            "Very high staffed acute-care occupancy leaves limited reserve for new inpatient demand."
+
+    },
+
+
+    {
+
+        id:
+            "acute-care-no-available-beds",
+
+        title:
+            "No Available Acute-Care Beds",
+
+        description:
+            "No currently staffed acute-care beds remain available.",
+
+        enabled:
+            true,
+
+        category:
+            "Acute-Care Capacity",
+
+        priority:
+            "Critical",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "availableAcuteCareBeds",
+
+                operator:
+                    "lessThanOrEqual",
+
+                threshold:
+                    0
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Delta",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "activate-hospital-surge",
+
+            "notify-bed-management",
+
+            "escalate-inpatient-throughput",
+
+            "notify-hospital-operations"
+
+        ],
+
+        rationale:
+            "Absence of currently available staffed acute-care beds substantially limits the hospital's ability to absorb new admissions."
+
+    },
+
+
+    /*
+     * =====================================================
+     * CRITICAL-CARE CAPACITY
+     * =====================================================
+     */
+
+    {
+
+        id:
+            "critical-care-near-capacity",
+
+        title:
+            "Critical-Care Capacity Constrained",
+
+        description:
+            "Staffed critical-care occupancy is at least 90%.",
+
+        enabled:
+            true,
+
+        category:
+            "Critical-Care Capacity",
+
+        priority:
+            "High",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "criticalCareOccupancyPercent",
+
+                operator:
+                    "greaterThanOrEqual",
+
+                threshold:
+                    90
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Charlie",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "notify-bed-management",
+
+            "notify-hospital-operations"
+
+        ],
+
+        rationale:
+            "Limited staffed critical-care reserve may constrain placement of high-acuity patients and downstream hospital flow."
+
+    },
+
+
+    {
+
+        id:
+            "critical-care-no-available-beds",
+
+        title:
+            "No Available Critical-Care Beds",
+
+        description:
+            "No currently staffed critical-care beds remain available.",
+
+        enabled:
+            true,
+
+        category:
+            "Critical-Care Capacity",
+
+        priority:
+            "Critical",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "availableCriticalCareBeds",
+
+                operator:
+                    "lessThanOrEqual",
+
+                threshold:
+                    0
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Delta",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "notify-bed-management",
+
+            "notify-hospital-operations",
+
+            "activate-hospital-surge"
+
+        ],
+
+        rationale:
+            "Loss of all staffed critical-care reserve creates an immediate hospital-wide capacity constraint."
+
+    },
+
+
+    /*
+     * =====================================================
+     * HOSPITAL FLOW
+     * =====================================================
+     */
+
+    {
+
+        id:
+            "hospital-inflow-above-expected",
+
+        title:
+            "Hospital Inflow Above Historical Expectation",
+
+        description:
+            "Known hospital inflow is at least five patients above the historical four-hour expectation.",
+
+        enabled:
+            true,
+
+        category:
+            "Hospital Flow",
+
+        priority:
+            "Moderate",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "hospitalInflowAboveExpected",
+
+                operator:
+                    "greaterThanOrEqual",
+
+                threshold:
+                    5
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            null,
+
+        reassessmentMinutes:
+            60,
+
+        interventionIds:[
+
+            "notify-bed-management",
+
+            "prepare-for-demand-growth"
+
+        ],
+
+        rationale:
+            "Known ED, direct, and surgical/procedural admissions above historical expectation may consume inpatient capacity faster than normally anticipated."
+
+    },
+
+
+    {
+
+        id:
+            "hospital-inflow-substantially-above-expected",
+
+        title:
+            "Hospital Inflow Substantially Above Expected",
+
+        description:
+            "Known hospital inflow is at least 150% of the historical four-hour expectation.",
+
+        enabled:
+            true,
+
+        category:
+            "Hospital Flow",
+
+        priority:
+            "High",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "hospitalInflowPercentOfExpected",
+
+                operator:
+                    "greaterThanOrEqual",
+
+                threshold:
+                    150
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Charlie",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "notify-bed-management",
+
+            "prepare-for-demand-growth",
+
+            "notify-hospital-operations"
+
+        ],
+
+        rationale:
+            "Hospital inflow substantially above historical norms may rapidly consume available inpatient capacity."
+
+    },
+
+
+    /*
+     * =====================================================
+     * PROJECTED CAPACITY
+     * =====================================================
+     */
+
+    {
+
+        id:
+            "projected-acute-capacity-low",
+
+        title:
+            "Projected Acute-Care Capacity Low",
+
+        description:
+            "The four-hour forecast projects five or fewer staffed acute-care beds remaining available.",
+
+        enabled:
+            true,
+
+        category:
+            "Projected Capacity",
+
+        priority:
+            "High",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "projectedAvailableAcuteCareBeds",
+
+                operator:
+                    "lessThanOrEqual",
+
+                threshold:
+                    5
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Charlie",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "review-pending-discharges",
+
+            "notify-bed-management",
+
+            "prepare-for-demand-growth"
+
+        ],
+
+        rationale:
+            "Very limited projected acute-care reserve indicates that expected hospital flow may soon create a capacity constraint."
+
+    },
+
+
+    {
+
+        id:
+            "projected-acute-capacity-exhausted",
+
+        title:
+            "Projected Acute-Care Capacity Exhausted",
+
+        description:
+            "The four-hour forecast projects no staffed acute-care beds remaining available.",
+
+        enabled:
+            true,
+
+        category:
+            "Projected Capacity",
+
+        priority:
+            "Critical",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "projectedAvailableAcuteCareBeds",
+
+                operator:
+                    "equal",
+
+                threshold:
+                    0
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Delta",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "activate-hospital-surge",
+
+            "notify-bed-management",
+
+            "escalate-inpatient-throughput",
+
+            "notify-hospital-operations"
+
+        ],
+
+        rationale:
+            "The four-hour forecast indicates that expected demand will consume all currently available staffed acute-care capacity."
+
+    },
+
+
+    {
+
+        id:
+            "projected-acute-capacity-deficit",
+
+        title:
+            "Projected Acute-Care Capacity Deficit",
+
+        description:
+            "The four-hour forecast projects hospital demand exceeding staffed acute-care capacity.",
+
+        enabled:
+            true,
+
+        category:
+            "Projected Capacity",
+
+        priority:
+            "Critical",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "projectedAvailableAcuteCareBeds",
+
+                operator:
+                    "lessThan",
+
+                threshold:
+                    0
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Delta",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "activate-hospital-surge",
+
+            "notify-bed-management",
+
+            "escalate-inpatient-throughput",
+
+            "notify-hospital-operations"
+
+        ],
+
+        rationale:
+            "Negative projected bed availability indicates that expected four-hour demand exceeds staffed acute-care capacity."
+
+    },
+
+
+    {
+
+        id:
+            "severe-projected-acute-capacity-deficit",
+
+        title:
+            "Severe Projected Acute-Care Capacity Deficit",
+
+        description:
+            "The four-hour forecast projects demand exceeding staffed acute-care capacity by at least 10 beds.",
+
+        enabled:
+            true,
+
+        category:
+            "Projected Capacity",
+
+        priority:
+            "Critical",
+
+        conditions:[
+
+            {
+
+                metric:
+                    "projectedAvailableAcuteCareBeds",
+
+                operator:
+                    "lessThanOrEqual",
+
+                threshold:
+                    -10
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Echo",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "activate-hospital-surge",
+
+            "notify-bed-management",
+
+            "escalate-inpatient-throughput",
+
+            "notify-hospital-operations"
+
+        ],
+
+        rationale:
+            "A projected deficit of at least 10 staffed acute-care beds represents severe near-term capacity risk."
+
+    },
+
+
+    /*
+     * =====================================================
+     * OPERATIONAL MOMENTUM
      * =====================================================
      */
 
@@ -720,7 +1135,7 @@ OperationalTrigger[] = [
             "Sustained Operational Deterioration",
 
         description:
-            "EDORI has increased across at least three consecutive assessment transitions.",
+            "Hospital Readiness pressure has increased across at least three consecutive assessment transitions.",
 
         enabled:
             true,
@@ -756,7 +1171,7 @@ OperationalTrigger[] = [
 
         interventionIds:[
 
-            "notify-ed-leadership",
+            "notify-hospital-operations",
 
             "increase-reassessment-frequency",
 
@@ -765,7 +1180,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "Sustained worsening may require escalation even before any single absolute threshold becomes critical."
+            "Sustained deterioration may warrant escalation even before a single absolute capacity threshold becomes critical."
 
     },
 
@@ -776,10 +1191,10 @@ OperationalTrigger[] = [
             "rapid-score-increase",
 
         title:
-            "Rapid EDORI Increase",
+            "Rapid Hospital Readiness Deterioration",
 
         description:
-            "The current EDORI score is at least 10 points higher than the previous stored assessment.",
+            "The current Hospital Readiness score is at least 10 points higher than the previous stored assessment.",
 
         enabled:
             true,
@@ -815,7 +1230,7 @@ OperationalTrigger[] = [
 
         interventionIds:[
 
-            "notify-ed-leadership",
+            "notify-hospital-operations",
 
             "increase-reassessment-frequency",
 
@@ -824,7 +1239,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "A rapid change may indicate acute deterioration that is not fully represented by the current absolute score."
+            "Rapid deterioration may represent an acute operational change not fully conveyed by the absolute Hospital Readiness score alone."
 
     }
 

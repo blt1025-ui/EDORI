@@ -1,5 +1,5 @@
 /**
- * EDORI Scenario Runner
+ * Hospital Readiness Scenario Runner
  *
  * Evaluates development scenarios against the
  * pure EdoriService calculation.
@@ -68,15 +68,15 @@ export interface EdoriScenarioCalibrationRow {
 
     expectedOperationalState:string | null;
 
-    demandScore:number;
+    edPressureScore:number;
 
-    boardingScore:number;
+    acuteCapacityScore:number;
 
-    hospitalScore:number;
+    criticalCapacityScore:number;
 
-    acuityScore:number;
+    inflowScore:number;
 
-    forecastScore:number;
+    projectedCapacityScore:number;
 
     scorePassed:boolean;
 
@@ -91,7 +91,7 @@ export interface EdoriScenarioCalibrationRow {
 }
 
 /**
- * Run all configured EDORI scenarios.
+ * Run all configured Hospital Readiness scenarios.
  */
 export function runAllEdoriScenarios():
 
@@ -172,20 +172,20 @@ EdoriScenarioCalibrationRow[] {
 
                 ?? null,
 
-            demandScore:
-                scenarioResult.result.demandScore,
+            edPressureScore:
+                scenarioResult.result.edPressureScore,
 
-            boardingScore:
-                scenarioResult.result.boardingScore,
+            acuteCapacityScore:
+                scenarioResult.result.acuteCapacityScore,
 
-            hospitalScore:
-                scenarioResult.result.hospitalScore,
+            criticalCapacityScore:
+                scenarioResult.result.criticalCapacityScore,
 
-            acuityScore:
-                scenarioResult.result.acuityScore,
+            inflowScore:
+                scenarioResult.result.inflowScore,
 
-            forecastScore:
-                scenarioResult.result.forecastScore,
+            projectedCapacityScore:
+                scenarioResult.result.projectedCapacityScore,
 
             scorePassed:
                 scenarioResult.scorePassed,
@@ -247,7 +247,7 @@ Promise<void> {
 
         console.log(
 
-            "EDORI scenario results were copied to the clipboard."
+            "Hospital Readiness scenario results were copied to the clipboard."
 
         );
 
@@ -307,20 +307,20 @@ export function printEdoriCalibrationTable():void {
 
                     ?? "Not specified",
 
-                Demand:
-                    row.demandScore,
+                "ED Pressure":
+                    row.edPressureScore,
 
-                Boarding:
-                    row.boardingScore,
+                "Acute Capacity":
+                    row.acuteCapacityScore,
 
-                Hospital:
-                    row.hospitalScore,
+                "Critical Capacity":
+                    row.criticalCapacityScore,
 
-                Acuity:
-                    row.acuityScore,
+                Inflow:
+                    row.inflowScore,
 
-                Forecast:
-                    row.forecastScore,
+                "Projected Capacity":
+                    row.projectedCapacityScore,
 
                 Deviation:
                     row.scoreDeviation,
@@ -341,7 +341,7 @@ export function printEdoriCalibrationTable():void {
 }
 
 /**
- * Evaluate one EDORI scenario.
+ * Evaluate one Hospital Readiness scenario.
  */
 export function runSingleEdoriScenario(
 
@@ -454,7 +454,7 @@ export function printEdoriScenarioReport():void {
 
     console.group(
 
-        `EDORI Scenario Report — ${passedCount}/${results.length} Passed`
+        `Hospital Readiness Scenario Report — ${passedCount}/${results.length} Passed`
 
     );
 
@@ -504,20 +504,20 @@ export function printEdoriScenarioReport():void {
 
                         : "FAIL",
 
-                Demand:
-                    scenarioResult.result.demandScore,
+                "ED Pressure":
+                    scenarioResult.result.edPressureScore,
 
-                Boarding:
-                    scenarioResult.result.boardingScore,
+                "Acute Capacity":
+                    scenarioResult.result.acuteCapacityScore,
 
-                Hospital:
-                    scenarioResult.result.hospitalScore,
+                "Critical Capacity":
+                    scenarioResult.result.criticalCapacityScore,
 
-                Acuity:
-                    scenarioResult.result.acuityScore,
+                Inflow:
+                    scenarioResult.result.inflowScore,
 
-                Forecast:
-                    scenarioResult.result.forecastScore
+                "Projected Capacity":
+                    scenarioResult.result.projectedCapacityScore
 
             })
 
@@ -630,20 +630,20 @@ function printScenarioResult(
 
         {
 
-            demand:
-                result.demandScore,
+            edPressure:
+                result.edPressureScore,
 
-            boarding:
-                result.boardingScore,
+            acuteCapacity:
+                result.acuteCapacityScore,
 
-            hospital:
-                result.hospitalScore,
+            criticalCapacity:
+                result.criticalCapacityScore,
 
-            acuity:
-                result.acuityScore,
+            inflow:
+                result.inflowScore,
 
-            forecast:
-                result.forecastScore
+            projectedCapacity:
+                result.projectedCapacityScore
 
         }
 

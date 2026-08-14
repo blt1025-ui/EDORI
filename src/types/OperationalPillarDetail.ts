@@ -1,10 +1,18 @@
 /**
  * OperationalPillarDetail
  *
- * Provides the explanation behind one
- * operational pillar score.
+ * Version 2 Hospital Readiness Model
+ *
+ * Provides the explanation behind each authoritative
+ * Hospital Readiness domain and the separate
+ * Operational Momentum trend measure.
  */
 
+
+/**
+ * One measurable factor contributing to a Hospital
+ * Readiness domain or momentum assessment.
+ */
 export interface OperationalPillarFactor {
 
     /**
@@ -26,21 +34,24 @@ export interface OperationalPillarFactor {
 
 
     /**
-     * Baseline, expected, or threshold value
-     * used for comparison.
+     * Baseline, expected, or threshold value used for
+     * comparison.
+     *
+     * Null is permitted when no meaningful comparison
+     * value exists.
      */
     comparisonValue:number | null;
 
 
     /**
-     * Difference between current and comparison
-     * values when available.
+     * Difference between current and comparison values
+     * when available.
      */
     difference:number | null;
 
 
     /**
-     * Normalized factor severity from 0–100.
+     * Normalized factor severity from 0 through 100.
      */
     severity:number;
 
@@ -53,45 +64,52 @@ export interface OperationalPillarFactor {
 }
 
 
+/**
+ * One Hospital Readiness domain explanation.
+ */
 export interface OperationalPillarDetail {
 
     /**
-     * Machine-readable pillar identifier.
+     * Machine-readable domain identifier.
      */
     id:
 
-        | "operationalDemand"
+        | "edOperationalPressure"
 
-        | "clinicalComplexity"
+        | "acuteCareCapacity"
 
-        | "hospitalThroughput"
+        | "criticalCareCapacity"
+
+        | "hospitalInflow"
+
+        | "projectedCapacity"
 
         | "operationalMomentum";
 
 
     /**
-     * User-facing pillar title.
+     * User-facing domain title.
      */
     title:string;
 
 
     /**
-     * Final normalized pillar score.
+     * Final normalized domain score.
      *
-     * Null is permitted when the pillar cannot
-     * be calculated due to insufficient data.
+     * Operational Momentum may be null when there is
+     * insufficient historical assessment data.
      */
     score:number | null;
 
 
     /**
-     * Summary of the pillar's current meaning.
+     * Summary of the domain's current meaning.
      */
     summary:string;
 
 
     /**
-     * Factors contributing to the pillar.
+     * Factors contributing to the domain.
      */
     factors:OperationalPillarFactor[];
 

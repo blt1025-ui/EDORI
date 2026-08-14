@@ -1,2051 +1,1169 @@
 /**
  * SnapshotService
  *
- * Stores and restores persistent EDORI assessment
- * history.
+ * Version 2.1 Hospital Readiness Model
  *
- * Responsibilities:
- *
- * - Validate incoming snapshots
- * - Preserve expanded assessment fields
- * - Prevent accidental duplicate snapshots
- * - Persist history in localStorage
- * - Restore valid history on application startup
- * - Return defensive copies
- * - Clear history
- * - Notify subscribed components when history changes
+ * Stores and restores persistent Hospital Readiness assessment history.
+ * Schema 3 records preserve the complete Version 2.1 projected-demand
+ * and projected-capacity model, including signed bed-balance values.
  */
 
+import { APP_EVENTS } from "../config/appEvents";
+import { emit } from "./EventService";
+import type { OperationalState } from "../config/operationalStates";
+import type { OperationalStateTitle } from "../types/OperationalStateTitle";
 import {
+    EDORI_SNAPSHOT_SCHEMA_VERSION
+} from "../types/EdoriSnapshot";
+import type { EdoriSnapshot } from "../types/EdoriSnapshot";
 
-    APP_EVENTS
-
-}
-
-from "../config/appEvents";
-
-
-import {
-
-    emit
-
-}
-
-from "./EventService";
-
-
-import type {
-
-    OperationalState
-
-}
-
-from "../config/operationalStates";
-
-
-import type {
-
-    OperationalStateTitle
-
-}
-
-from "../types/OperationalStateTitle";
-
-
-import type {
-
-    EdoriSnapshot
-
-}
-
-from "../types/EdoriSnapshot";
-
-
-/**
- * Browser-storage key.
- */
-const SNAPSHOT_STORAGE_KEY =
-
-    "edori_snapshots";
-
-
-/**
- * Maximum number of snapshots retained locally.
- *
- * This prevents localStorage from growing without
- * limit during development and extended use.
- */
+const SNAPSHOT_STORAGE_KEY = "edori_snapshots_v2";
 const MAXIMUM_SNAPSHOT_COUNT = 500;
+const DUPLICATE_TIME_WINDOW_MILLISECONDS = 5_000;
 
+let snapshots:EdoriSnapshot[] = restoreSnapshots();
 
-/**
- * Snapshots created within this time window with
- * the same score and assessment values are treated
- * as duplicates.
- */
-const DUPLICATE_TIME_WINDOW_MILLISECONDS =
-
-    5_000;
-
-
-/**
- * In-memory authoritative history.
- */
-let snapshots:EdoriSnapshot[] =
-
-    restoreSnapshots();
-
-
-/**
- * Return a defensive copy of all snapshots in
- * chronological order.
- */
 export function getSnapshots():EdoriSnapshot[] {
-
     return snapshots
-
         .slice()
-
-        .sort(
-
-            compareSnapshotsChronologically
-
-        )
-
-        .map(
-
-            snapshot =>
-
-                cloneSnapshot(
-
-                    snapshot
-
-                )
-
-        );
-
+        .sort(compareSnapshotsChronologically)
+        .map(cloneSnapshot);
 }
 
-
-/**
- * Return the newest saved snapshot.
- */
-export function getLatestSnapshot():
-
-EdoriSnapshot | null {
-
+export function getLatestSnapshot():EdoriSnapshot | null {
     if(snapshots.length === 0){
-
         return null;
-
     }
 
-
-    const latestSnapshot = snapshots
-
+    const sorted = snapshots
         .slice()
+        .sort(compareSnapshotsChronologically);
 
-        .sort(
+    const latest = sorted[sorted.length - 1];
 
-            compareSnapshotsChronologically
-
-        )[
-
-            snapshots.length - 1
-
-        ];
-
-
-    return latestSnapshot
-
-        ? cloneSnapshot(
-
-            latestSnapshot
-
-        )
-
+    return latest
+        ? cloneSnapshot(latest)
         : null;
-
 }
 
-
-/**
- * Save one completed EDORI snapshot.
- *
- * Returns true when the snapshot was saved.
- * Returns false when it was invalid or duplicated.
- */
 export function saveSnapshot(
-
     candidate:EdoriSnapshot
-
 ):boolean {
-
-    const normalizedSnapshot = normalizeSnapshot(
-
-        candidate
-
-    );
-
+    const normalizedSnapshot = normalizeSnapshot(candidate);
 
     if(!normalizedSnapshot){
-
         console.warn(
-
-            "SnapshotService rejected an invalid EDORI snapshot.",
-
+            "SnapshotService rejected an invalid Version 2.1 Hospital Readiness snapshot.",
             candidate
-
         );
-
-
         return false;
-
     }
 
-
-    if(
-
-        isDuplicateSnapshot(
-
-            normalizedSnapshot
-
-        )
-
-    ){
-
+    if(isDuplicateSnapshot(normalizedSnapshot)){
         return false;
-
     }
 
-
-    snapshots.push(
-
-        cloneSnapshot(
-
-            normalizedSnapshot
-
-        )
-
-    );
-
-
-    snapshots.sort(
-
-        compareSnapshotsChronologically
-
-    );
-
+    snapshots.push(cloneSnapshot(normalizedSnapshot));
+    snapshots.sort(compareSnapshotsChronologically);
 
     trimSnapshotHistory();
-
-
     persistSnapshots();
-
-
     publishHistoryChanged();
-
 
     return true;
-
 }
 
-
-/**
- * Compatibility alias for code that uses
- * addSnapshot().
- */
 export function addSnapshot(
-
     candidate:EdoriSnapshot
-
 ):boolean {
-
-    return saveSnapshot(
-
-        candidate
-
-    );
-
+    return saveSnapshot(candidate);
 }
 
-
-/**
- * Compatibility alias for code that uses
- * recordSnapshot().
- */
 export function recordSnapshot(
-
     candidate:EdoriSnapshot
-
 ):boolean {
-
-    return saveSnapshot(
-
-        candidate
-
-    );
-
+    return saveSnapshot(candidate);
 }
 
-
-/**
- * Determine whether an incoming snapshot should be
- * stored.
- *
- * This function does not mutate history.
- */
 export function shouldSaveSnapshot(
-
     candidate:EdoriSnapshot
-
 ):boolean {
-
-    const normalizedSnapshot = normalizeSnapshot(
-
-        candidate
-
-    );
-
+    const normalizedSnapshot = normalizeSnapshot(candidate);
 
     if(!normalizedSnapshot){
-
         return false;
-
     }
 
-
-    return !isDuplicateSnapshot(
-
-        normalizedSnapshot
-
-    );
-
+    return !isDuplicateSnapshot(normalizedSnapshot);
 }
 
-/**
- * Compatibility alias used by EdoriEngine.
- */
 export function shouldCreateSnapshot(
-
     candidate:EdoriSnapshot
-
 ):boolean {
-
-    return shouldSaveSnapshot(
-
-        candidate
-
-    );
-
+    return shouldSaveSnapshot(candidate);
 }
 
-/**
- * Replace the complete snapshot history.
- *
- * Useful for import, restoration, and testing.
- */
 export function replaceSnapshots(
-
     candidates:EdoriSnapshot[]
-
 ):void {
-
     const normalizedSnapshots = candidates
-
-        .map(
-
-            candidate =>
-
-                normalizeSnapshot(
-
-                    candidate
-
-                )
-
-        )
-
+        .map(normalizeSnapshot)
         .filter(
-
-            (
-
-                snapshot
-
-            ):snapshot is EdoriSnapshot =>
-
+            (snapshot):snapshot is EdoriSnapshot =>
                 snapshot !== null
-
         )
+        .sort(compareSnapshotsChronologically);
 
-        .sort(
-
-            compareSnapshotsChronologically
-
-        );
-
-
-    snapshots = removeDuplicateSnapshots(
-
-        normalizedSnapshots
-
-    );
-
+    snapshots = removeDuplicateSnapshots(normalizedSnapshots);
 
     trimSnapshotHistory();
-
-
     persistSnapshots();
-
-
     publishHistoryChanged();
-
 }
 
-
-/**
- * Clear all persistent assessment history.
- */
 export function clearSnapshots():void {
-
     snapshots = [];
 
-
     try {
-
-        localStorage.removeItem(
-
-            SNAPSHOT_STORAGE_KEY
-
-        );
-
+        localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
     }
     catch(error){
-
         console.error(
-
-            "SnapshotService could not remove saved history.",
-
+            "SnapshotService could not remove saved Hospital Readiness history.",
             error
-
         );
-
     }
-
 
     publishHistoryChanged();
-
 }
 
-
-/**
- * Return the number of stored snapshots.
- */
 export function getSnapshotCount():number {
-
     return snapshots.length;
-
 }
 
-
-/**
- * Restore persistent snapshots from localStorage.
- */
 function restoreSnapshots():EdoriSnapshot[] {
-
     let storedValue:string | null = null;
 
-
     try {
-
-        storedValue = localStorage.getItem(
-
-            SNAPSHOT_STORAGE_KEY
-
-        );
-
+        storedValue = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
     }
     catch(error){
-
         console.error(
-
-            "SnapshotService could not read saved history.",
-
+            "SnapshotService could not read saved Hospital Readiness history.",
             error
-
         );
-
-
         return [];
-
     }
-
 
     if(!storedValue){
-
         return [];
-
     }
 
-
     try {
-
-        const parsed:unknown = JSON.parse(
-
-            storedValue
-
-        );
-
+        const parsed:unknown = JSON.parse(storedValue);
 
         if(!Array.isArray(parsed)){
-
             removeCorruptedStorage();
-
-
             return [];
-
         }
 
-
         const restoredSnapshots = parsed
-
-            .map(
-
-                candidate =>
-
-                    normalizeSnapshot(
-
-                        candidate
-
-                    )
-
-            )
-
+            .map(normalizeSnapshot)
             .filter(
-
-                (
-
-                    snapshot
-
-                ):snapshot is EdoriSnapshot =>
-
+                (snapshot):snapshot is EdoriSnapshot =>
                     snapshot !== null
-
             )
+            .sort(compareSnapshotsChronologically);
 
-            .sort(
-
-                compareSnapshotsChronologically
-
-            );
-
-
-        const uniqueSnapshots =
-
-            removeDuplicateSnapshots(
-
-                restoredSnapshots
-
-            );
-
-
-        return uniqueSnapshots.slice(
-
-            -MAXIMUM_SNAPSHOT_COUNT
-
-        );
-
+        return removeDuplicateSnapshots(restoredSnapshots)
+            .slice(-MAXIMUM_SNAPSHOT_COUNT);
     }
     catch(error){
-
         console.warn(
-
-            "SnapshotService discarded corrupted saved history.",
-
+            "SnapshotService discarded corrupted Hospital Readiness history.",
             error
-
         );
-
-
         removeCorruptedStorage();
-
-
         return [];
-
     }
-
 }
 
-
-/**
- * Persist the complete expanded snapshot objects.
- */
 function persistSnapshots():void {
-
     try {
-
-        const serializedSnapshots = snapshots.map(
-
-            snapshot =>
-
-                serializeSnapshot(
-
-                    snapshot
-
-                )
-
-        );
-
-
         localStorage.setItem(
-
             SNAPSHOT_STORAGE_KEY,
-
             JSON.stringify(
-
-                serializedSnapshots
-
+                snapshots.map(serializeSnapshot)
             )
-
         );
-
     }
     catch(error){
-
         console.error(
-
-            "SnapshotService could not persist assessment history.",
-
+            "SnapshotService could not persist Hospital Readiness history.",
             error
-
         );
-
     }
-
 }
 
-
-/**
- * Convert one snapshot into a JSON-safe object.
- *
- * All expanded fields are intentionally retained.
- */
 function serializeSnapshot(
-
     snapshot:EdoriSnapshot
-
 ):Record<string, unknown> {
-
     return {
+        schemaVersion: EDORI_SNAPSHOT_SCHEMA_VERSION,
+        id: snapshot.id,
+        timestamp: new Date(snapshot.timestamp).toISOString(),
 
-        score:
-            snapshot.score,
-
-        status:
-            snapshot.status,
-
+        score: snapshot.score,
+        status: snapshot.status,
         operationalState:{
-
-            title:
-                snapshot.operationalState.title,
-
-            icon:
-                snapshot.operationalState.icon,
-
-            color:
-                snapshot.operationalState.color,
-
-            recommendation:
-                snapshot.operationalState
-                    .recommendation
-
+            title: snapshot.operationalState.title,
+            icon: snapshot.operationalState.icon,
+            color: snapshot.operationalState.color,
+            recommendation: snapshot.operationalState.recommendation
         },
 
-        timestamp:
-            new Date(
+        day: snapshot.day,
+        hour: snapshot.hour,
+        forecastHours: snapshot.forecastHours,
 
-                snapshot.timestamp
+        totalEDVolume: snapshot.totalEDVolume,
+        boardedPatients: snapshot.boardedPatients,
+        esi1: snapshot.esi1,
+        esi2: snapshot.esi2,
 
-            ).toISOString(),
+        staffedAcuteCareBeds: snapshot.staffedAcuteCareBeds,
+        occupiedAcuteCareBeds: snapshot.occupiedAcuteCareBeds,
+        staffedCriticalCareBeds: snapshot.staffedCriticalCareBeds,
+        occupiedCriticalCareBeds: snapshot.occupiedCriticalCareBeds,
 
-        id:
-            snapshot.id,
+        currentDirectAdmissions: snapshot.currentDirectAdmissions,
+        currentSurgicalAdmissions: snapshot.currentSurgicalAdmissions,
+        knownNonEDInflow: snapshot.knownNonEDInflow,
+        expectedNonEDInflow: snapshot.expectedNonEDInflow,
 
-        totalEDVolume:
-            snapshot.totalEDVolume,
+        expectedEDVolume: snapshot.expectedEDVolume,
+        expectedEDBoarders: snapshot.expectedEDBoarders,
 
-        boardedPatients:
-            snapshot.boardedPatients,
+        expectedStaffedAcuteCareBeds:
+            snapshot.expectedStaffedAcuteCareBeds,
+        expectedOccupiedAcuteCareBeds:
+            snapshot.expectedOccupiedAcuteCareBeds,
+        expectedAvailableAcuteCareBeds:
+            snapshot.expectedAvailableAcuteCareBeds,
 
-        occupiedMedicalBeds:
-            snapshot.occupiedMedicalBeds,
+        expectedEDAdmissions4h: snapshot.expectedEDAdmissions4h,
+        expectedDirectAdmissions4h:
+            snapshot.expectedDirectAdmissions4h,
+        expectedSurgicalAdmissions4h:
+            snapshot.expectedSurgicalAdmissions4h,
+        expectedHospitalInflow4h:
+            snapshot.expectedHospitalInflow4h,
+        expectedInpatientDepartures4h:
+            snapshot.expectedInpatientDepartures4h,
 
-        staffedMedicalBeds:
-            snapshot.staffedMedicalBeds,
+        projectedDirectAdmissions:
+            snapshot.projectedDirectAdmissions,
+        projectedSurgicalAdmissions:
+            snapshot.projectedSurgicalAdmissions,
+        projectedNewAdmissions:
+            snapshot.projectedNewAdmissions,
+        projectedTotalBedDemand:
+            snapshot.projectedTotalBedDemand,
+        historicalProjectedBedDemand4h:
+            snapshot.historicalProjectedBedDemand4h,
 
-        esi1:
-            snapshot.esi1,
+        currentAvailableAcuteCareBeds:
+            snapshot.currentAvailableAcuteCareBeds,
+        projectedAvailableAcuteCareBeds:
+            snapshot.projectedAvailableAcuteCareBeds,
+        historicalProjectedBedBalance4h:
+            snapshot.historicalProjectedBedBalance4h,
+        projectedCapacityVariance:
+            snapshot.projectedCapacityVariance,
 
-        esi2:
-            snapshot.esi2,
+        edPressureScore: snapshot.edPressureScore,
+        acuteCapacityScore: snapshot.acuteCapacityScore,
+        criticalCapacityScore: snapshot.criticalCapacityScore,
+        inflowScore: snapshot.inflowScore,
+        projectedCapacityScore: snapshot.projectedCapacityScore,
 
-        esi3:
-            snapshot.esi3,
+        edVolumeScore: snapshot.edVolumeScore,
+        edBoardingScore: snapshot.edBoardingScore,
+        edAcuityScore: snapshot.edAcuityScore,
 
-        esi4:
-            snapshot.esi4,
+        /*
+         * Temporary compatibility fields.
+         *
+         * currentEDAdmissions is always zero in Version 2.1.
+         * currentHospitalInflow aliases knownNonEDInflow.
+         * projectedHospitalInflow aliases projectedNewAdmissions.
+         */
+        currentEDAdmissions: snapshot.currentEDAdmissions,
+        currentHospitalInflow: snapshot.currentHospitalInflow,
+        projectedHospitalInflow: snapshot.projectedHospitalInflow,
 
-        esi5:
-            snapshot.esi5,
-
-        expectedVolume:
-            snapshot.expectedVolume,
-
-        expectedBoarders:
-            snapshot.expectedBoarders,
-
-        expectedArrivals:
-            snapshot.expectedArrivals,
-
-        expectedDepartures:
-            snapshot.expectedDepartures,
-
-        demandScore:
-            snapshot.demandScore,
-
-        boardingScore:
-            snapshot.boardingScore,
-
-        hospitalScore:
-            snapshot.hospitalScore,
-
-        acuityScore:
-            snapshot.acuityScore,
-
-        forecastScore:
-            snapshot.forecastScore,
-
-        day:
-            snapshot.day,
-
-        hour:
-            snapshot.hour
-
+        scoreChange: snapshot.scoreChange,
+        trendDirection: snapshot.trendDirection,
+        activeTriggerIds: snapshot.activeTriggerIds,
+        activeTriggerTitles: snapshot.activeTriggerTitles
     };
-
 }
 
-
-/**
- * Validate and normalize an unknown snapshot.
- *
- * The four legacy fields remain required:
- *
- * - score
- * - status
- * - operationalState
- * - timestamp
- *
- * Expanded assessment fields remain optional for
- * compatibility with older history records.
- */
 function normalizeSnapshot(
-
     value:unknown
-
 ):EdoriSnapshot | null {
-
     if(
-
         typeof value !== "object"
-
         ||
-
         value === null
-
     ){
-
         return null;
-
     }
 
+    const candidate = value as Record<string, unknown>;
 
-    const candidate = value as {
+    const schemaVersion =
+        normalizeInteger(candidate.schemaVersion);
 
-        score?:unknown;
+    /*
+     * Version 2.1 history is schema 3. Do not silently rebuild
+     * schema 1/2 records using obsolete projected-flow formulas.
+     */
+    if(
+        schemaVersion !== EDORI_SNAPSHOT_SCHEMA_VERSION
+    ){
+        return null;
+    }
 
-        status?:unknown;
-
-        operationalState?:unknown;
-
-        timestamp?:unknown;
-
-        id?:unknown;
-
-        totalEDVolume?:unknown;
-
-        boardedPatients?:unknown;
-
-        occupiedMedicalBeds?:unknown;
-
-        staffedMedicalBeds?:unknown;
-
-        esi1?:unknown;
-
-        esi2?:unknown;
-
-        esi3?:unknown;
-
-        esi4?:unknown;
-
-        esi5?:unknown;
-
-        expectedVolume?:unknown;
-
-        expectedBoarders?:unknown;
-
-        expectedArrivals?:unknown;
-
-        expectedDepartures?:unknown;
-
-        demandScore?:unknown;
-
-        boardingScore?:unknown;
-
-        hospitalScore?:unknown;
-
-        acuityScore?:unknown;
-
-        forecastScore?:unknown;
-
-        day?:unknown;
-
-        hour?:unknown;
-
-    };
-
-
-    const score = normalizeRequiredNumber(
-
-        candidate.score
-
-    );
-
-
-    const timestamp = normalizeDate(
-
-        candidate.timestamp
-
-    );
-
-
+    const timestamp = normalizeDate(candidate.timestamp);
     const operationalState =
+        normalizeOperationalState(candidate.operationalState);
+    const score = normalizeScore(candidate.score);
 
-        normalizeOperationalState(
+    if(
+        !timestamp
+        ||
+        !operationalState
+        ||
+        score === null
+    ){
+        return null;
+    }
 
-            candidate.operationalState
+    const currentDirectAdmissions =
+        normalizeNonNegativeNumber(
+            candidate.currentDirectAdmissions
+        ) ?? 0;
 
+    const currentSurgicalAdmissions =
+        normalizeNonNegativeNumber(
+            candidate.currentSurgicalAdmissions
+        ) ?? 0;
+
+    const knownNonEDInflow =
+        normalizeNonNegativeNumber(
+            candidate.knownNonEDInflow
+        )
+        ??
+        (
+            currentDirectAdmissions
+            +
+            currentSurgicalAdmissions
         );
 
+    const expectedDirectAdmissions4h =
+        normalizeNonNegativeNumber(
+            candidate.expectedDirectAdmissions4h
+        ) ?? 0;
 
-    if(
+    const expectedSurgicalAdmissions4h =
+        normalizeNonNegativeNumber(
+            candidate.expectedSurgicalAdmissions4h
+        ) ?? 0;
 
-        score === null
+    const expectedNonEDInflow =
+        normalizeNonNegativeNumber(
+            candidate.expectedNonEDInflow
+        )
+        ??
+        (
+            expectedDirectAdmissions4h
+            +
+            expectedSurgicalAdmissions4h
+        );
 
-        ||
+    const staffedAcuteCareBeds =
+        normalizePositiveNumber(
+            candidate.staffedAcuteCareBeds
+        ) ?? 1;
 
-        timestamp === null
+    const occupiedAcuteCareBeds =
+        normalizeNonNegativeNumber(
+            candidate.occupiedAcuteCareBeds
+        ) ?? 0;
 
-        ||
+    const currentAvailableAcuteCareBeds =
+        normalizeFiniteNumber(
+            candidate.currentAvailableAcuteCareBeds
+        )
+        ??
+        (
+            staffedAcuteCareBeds
+            -
+            occupiedAcuteCareBeds
+        );
 
-        operationalState === null
+    const expectedStaffedAcuteCareBeds =
+        normalizePositiveNumber(
+            candidate.expectedStaffedAcuteCareBeds
+        ) ?? staffedAcuteCareBeds;
 
-    ){
+    const expectedOccupiedAcuteCareBeds =
+        normalizeNonNegativeNumber(
+            candidate.expectedOccupiedAcuteCareBeds
+        ) ?? occupiedAcuteCareBeds;
 
-        return null;
+    const expectedAvailableAcuteCareBeds =
+        normalizeFiniteNumber(
+            candidate.expectedAvailableAcuteCareBeds
+        )
+        ??
+        (
+            expectedStaffedAcuteCareBeds
+            -
+            expectedOccupiedAcuteCareBeds
+        );
 
-    }
+    const expectedEDAdmissions4h =
+        normalizeNonNegativeNumber(
+            candidate.expectedEDAdmissions4h
+        ) ?? 0;
 
+    const expectedHospitalInflow4h =
+        normalizeNonNegativeNumber(
+            candidate.expectedHospitalInflow4h
+        )
+        ??
+        (
+            expectedEDAdmissions4h
+            +
+            expectedDirectAdmissions4h
+            +
+            expectedSurgicalAdmissions4h
+        );
 
-    const status =
+    const expectedInpatientDepartures4h =
+        normalizeNonNegativeNumber(
+            candidate.expectedInpatientDepartures4h
+        ) ?? 0;
 
-        typeof candidate.status === "string"
+    const boardedPatients =
+        normalizeNonNegativeNumber(
+            candidate.boardedPatients
+        ) ?? 0;
 
-        &&
+    const projectedDirectAdmissions =
+        normalizeNonNegativeNumber(
+            candidate.projectedDirectAdmissions
+        ) ?? currentDirectAdmissions;
 
-        candidate.status.trim().length > 0
+    const projectedSurgicalAdmissions =
+        normalizeNonNegativeNumber(
+            candidate.projectedSurgicalAdmissions
+        ) ?? currentSurgicalAdmissions;
 
-            ? candidate.status.trim()
+    const projectedNewAdmissions =
+        normalizeNonNegativeNumber(
+            candidate.projectedNewAdmissions
+        )
+        ??
+        (
+            expectedEDAdmissions4h
+            +
+            projectedDirectAdmissions
+            +
+            projectedSurgicalAdmissions
+        );
 
-            : operationalState.title;
+    const projectedTotalBedDemand =
+        normalizeNonNegativeNumber(
+            candidate.projectedTotalBedDemand
+        )
+        ??
+        (
+            boardedPatients
+            +
+            projectedNewAdmissions
+        );
 
+    const historicalProjectedBedDemand4h =
+        normalizeNonNegativeNumber(
+            candidate.historicalProjectedBedDemand4h
+        )
+        ??
+        expectedHospitalInflow4h;
 
-    return {
+    const projectedAvailableAcuteCareBeds =
+        normalizeFiniteNumber(
+            candidate.projectedAvailableAcuteCareBeds
+        )
+        ??
+        (
+            currentAvailableAcuteCareBeds
+            +
+            expectedInpatientDepartures4h
+            -
+            projectedTotalBedDemand
+        );
 
-        score:
-            clampScore(
+    const historicalProjectedBedBalance4h =
+        normalizeFiniteNumber(
+            candidate.historicalProjectedBedBalance4h
+        )
+        ??
+        (
+            expectedAvailableAcuteCareBeds
+            +
+            expectedInpatientDepartures4h
+            -
+            historicalProjectedBedDemand4h
+        );
 
-                score
+    const projectedCapacityVariance =
+        normalizeFiniteNumber(
+            candidate.projectedCapacityVariance
+        )
+        ??
+        (
+            projectedAvailableAcuteCareBeds
+            -
+            historicalProjectedBedBalance4h
+        );
 
-            ),
+    const normalized:EdoriSnapshot = {
+        schemaVersion: EDORI_SNAPSHOT_SCHEMA_VERSION,
 
-        status,
+        id:
+            normalizeString(candidate.id)
+            ??
+            createSnapshotId(timestamp),
+
+        timestamp,
+        score,
+
+        status:
+            normalizeString(candidate.status)
+            ??
+            operationalState.title,
 
         operationalState,
 
-        timestamp,
-
-        id:
-            normalizeOptionalString(
-
-                candidate.id
-
-            )
-
-            ??
-
-            createSnapshotId(
-
-                timestamp
-
-            ),
-
-        totalEDVolume:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.totalEDVolume
-
-            )
-
-            ??
-
-            0,
-
-        boardedPatients:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.boardedPatients
-
-            )
-
-            ??
-
-            0,
-
-        occupiedMedicalBeds:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.occupiedMedicalBeds
-
-            )
-
-            ??
-
-            0,
-
-        staffedMedicalBeds:
-            normalizeOptionalPositiveNumber(
-
-                candidate.staffedMedicalBeds
-
-            )
-
-            ??
-
-            273,
-
-        esi1:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.esi1
-
-            )
-
-            ??
-
-            0,
-
-        esi2:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.esi2
-
-            )
-
-            ??
-
-            0,
-
-        esi3:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.esi3
-
-            )
-
-            ??
-
-            0,
-
-        esi4:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.esi4
-
-            )
-
-            ??
-
-            0,
-
-        esi5:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.esi5
-
-            )
-
-            ??
-
-            0,
-
-        expectedVolume:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.expectedVolume
-
-            )
-
-            ??
-
-            0,
-
-        expectedBoarders:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.expectedBoarders
-
-            )
-
-            ??
-
-            0,
-
-        expectedArrivals:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.expectedArrivals
-
-            )
-
-            ??
-
-            0,
-
-        expectedDepartures:
-            normalizeOptionalNonNegativeNumber(
-
-                candidate.expectedDepartures
-
-            )
-
-            ??
-
-            0,
-
-        demandScore:
-            normalizeOptionalScore(
-
-                candidate.demandScore
-
-            )
-
-            ??
-
-            0,
-
-        boardingScore:
-            normalizeOptionalScore(
-
-                candidate.boardingScore
-
-            )
-
-            ??
-
-            0,
-
-        hospitalScore:
-            normalizeOptionalScore(
-
-                candidate.hospitalScore
-
-            )
-
-            ??
-
-            0,
-
-        acuityScore:
-            normalizeOptionalScore(
-
-                candidate.acuityScore
-
-            )
-
-            ??
-
-            0,
-
-        forecastScore:
-            normalizeOptionalScore(
-
-                candidate.forecastScore
-
-            )
-
-            ??
-
-            0,
-
         day:
-            normalizeOptionalString(
-
-                candidate.day
-
-            )
-
+            normalizeString(candidate.day)
             ??
-
-            "Sunday",
+            getDayName(timestamp),
 
         hour:
-            normalizeOptionalHour(
-
-                candidate.hour
-
-            )
-
+            normalizeHour(candidate.hour)
             ??
+            timestamp.getHours(),
 
-            0
+        forecastHours:
+            normalizePositiveInteger(
+                candidate.forecastHours
+            ) ?? 4,
 
+        totalEDVolume:
+            normalizeNonNegativeNumber(
+                candidate.totalEDVolume
+            ) ?? 0,
+
+        boardedPatients,
+
+        esi1:
+            normalizeNonNegativeNumber(
+                candidate.esi1
+            ) ?? 0,
+
+        esi2:
+            normalizeNonNegativeNumber(
+                candidate.esi2
+            ) ?? 0,
+
+        staffedAcuteCareBeds,
+        occupiedAcuteCareBeds,
+
+        staffedCriticalCareBeds:
+            normalizePositiveNumber(
+                candidate.staffedCriticalCareBeds
+            ) ?? 1,
+
+        occupiedCriticalCareBeds:
+            normalizeNonNegativeNumber(
+                candidate.occupiedCriticalCareBeds
+            ) ?? 0,
+
+        currentDirectAdmissions,
+        currentSurgicalAdmissions,
+        knownNonEDInflow,
+        expectedNonEDInflow,
+
+        expectedEDVolume:
+            normalizeNonNegativeNumber(
+                candidate.expectedEDVolume
+            ) ?? 0,
+
+        expectedEDBoarders:
+            normalizeNonNegativeNumber(
+                candidate.expectedEDBoarders
+            ) ?? 0,
+
+        expectedStaffedAcuteCareBeds,
+        expectedOccupiedAcuteCareBeds,
+        expectedAvailableAcuteCareBeds,
+
+        expectedEDAdmissions4h,
+        expectedDirectAdmissions4h,
+        expectedSurgicalAdmissions4h,
+        expectedHospitalInflow4h,
+        expectedInpatientDepartures4h,
+
+        projectedDirectAdmissions,
+        projectedSurgicalAdmissions,
+        projectedNewAdmissions,
+        projectedTotalBedDemand,
+        historicalProjectedBedDemand4h,
+
+        currentAvailableAcuteCareBeds,
+        projectedAvailableAcuteCareBeds,
+        historicalProjectedBedBalance4h,
+        projectedCapacityVariance,
+
+        edPressureScore:
+            normalizeScore(
+                candidate.edPressureScore
+            ) ?? 0,
+
+        acuteCapacityScore:
+            normalizeScore(
+                candidate.acuteCapacityScore
+            ) ?? 0,
+
+        criticalCapacityScore:
+            normalizeScore(
+                candidate.criticalCapacityScore
+            ) ?? 0,
+
+        inflowScore:
+            normalizeScore(
+                candidate.inflowScore
+            ) ?? 0,
+
+        projectedCapacityScore:
+            normalizeScore(
+                candidate.projectedCapacityScore
+            ) ?? 0,
+
+        edVolumeScore:
+            normalizeScore(
+                candidate.edVolumeScore
+            ) ?? 0,
+
+        edBoardingScore:
+            normalizeScore(
+                candidate.edBoardingScore
+            ) ?? 0,
+
+        edAcuityScore:
+            normalizeScore(
+                candidate.edAcuityScore
+            ) ?? 0,
+
+        currentEDAdmissions: 0,
+
+        currentHospitalInflow:
+            normalizeNonNegativeNumber(
+                candidate.currentHospitalInflow
+            )
+            ??
+            knownNonEDInflow,
+
+        projectedHospitalInflow:
+            normalizeNonNegativeNumber(
+                candidate.projectedHospitalInflow
+            )
+            ??
+            projectedNewAdmissions
     };
 
-}
+    const scoreChange =
+        normalizeFiniteNumber(candidate.scoreChange);
 
-
-/**
- * Validate and normalize an operational state.
- */
-function normalizeOperationalState(
-
-    value:unknown
-
-):OperationalState | null {
-
-    if(
-
-        typeof value !== "object"
-
-        ||
-
-        value === null
-
-    ){
-
-        return null;
-
+    if(scoreChange !== undefined){
+        normalized.scoreChange = scoreChange;
     }
 
+    const trendDirection =
+        normalizeString(candidate.trendDirection);
+
+    if(trendDirection){
+        normalized.trendDirection = trendDirection;
+    }
+
+    const activeTriggerIds =
+        normalizeStringArray(candidate.activeTriggerIds);
+
+    if(activeTriggerIds){
+        normalized.activeTriggerIds = activeTriggerIds;
+    }
+
+    const activeTriggerTitles =
+        normalizeStringArray(candidate.activeTriggerTitles);
+
+    if(activeTriggerTitles){
+        normalized.activeTriggerTitles =
+            activeTriggerTitles;
+    }
+
+    return normalized;
+}
+
+function normalizeOperationalState(
+    value:unknown
+):OperationalState | null {
+    if(
+        typeof value !== "object"
+        ||
+        value === null
+    ){
+        return null;
+    }
 
     const candidate = value as {
-
         title?:unknown;
-
         icon?:unknown;
-
         color?:unknown;
-
         recommendation?:unknown;
-
     };
-
 
     if(
-
-        !isOperationalStateTitle(
-
-            candidate.title
-
-        )
-
+        !isOperationalStateTitle(candidate.title)
         ||
-
         typeof candidate.icon !== "string"
-
         ||
-
         candidate.icon.trim().length === 0
-
         ||
-
         typeof candidate.color !== "string"
-
         ||
-
         candidate.color.trim().length === 0
-
         ||
-
         typeof candidate.recommendation !== "string"
-
         ||
-
         candidate.recommendation.trim().length === 0
-
     ){
-
         return null;
-
     }
-
 
     return {
-
-        title:
-            candidate.title,
-
-        icon:
-            candidate.icon.trim(),
-
-        color:
-            candidate.color.trim(),
-
-        recommendation:
-            candidate.recommendation.trim()
-
+        title: candidate.title,
+        icon: candidate.icon.trim(),
+        color: candidate.color.trim(),
+        recommendation: candidate.recommendation.trim()
     };
-
 }
 
-
-/**
- * Determine whether a value is a supported
- * Alpha–Echo operational title.
- */
 function isOperationalStateTitle(
-
     value:unknown
-
 ):value is OperationalStateTitle {
-
-    if(typeof value !== "string"){
-
-        return false;
-
-    }
-
-
     const titles:OperationalStateTitle[] = [
-
         "Alpha",
-
         "Bravo",
-
         "Charlie",
-
         "Delta",
-
         "Echo"
-
     ];
 
-
-    return titles.includes(
-
-        value as OperationalStateTitle
-
-    );
-
+    return typeof value === "string"
+        &&
+        titles.includes(
+            value as OperationalStateTitle
+        );
 }
 
-
-/**
- * Create a defensive copy of one snapshot.
- *
- * Every expanded field is retained.
- */
-function cloneSnapshot(
-
-    snapshot:EdoriSnapshot
-
-):EdoriSnapshot {
-
-    return {
-
-        score:
-            snapshot.score,
-
-        status:
-            snapshot.status,
-
-        operationalState:{
-
-            ...snapshot.operationalState
-
-        },
-
-        timestamp:new Date(
-
-            snapshot.timestamp
-
-        ),
-
-        id:
-            snapshot.id,
-
-        totalEDVolume:
-            snapshot.totalEDVolume,
-
-        boardedPatients:
-            snapshot.boardedPatients,
-
-        occupiedMedicalBeds:
-            snapshot.occupiedMedicalBeds,
-
-        staffedMedicalBeds:
-            snapshot.staffedMedicalBeds,
-
-        esi1:
-            snapshot.esi1,
-
-        esi2:
-            snapshot.esi2,
-
-        esi3:
-            snapshot.esi3,
-
-        esi4:
-            snapshot.esi4,
-
-        esi5:
-            snapshot.esi5,
-
-        expectedVolume:
-            snapshot.expectedVolume,
-
-        expectedBoarders:
-            snapshot.expectedBoarders,
-
-        expectedArrivals:
-            snapshot.expectedArrivals,
-
-        expectedDepartures:
-            snapshot.expectedDepartures,
-
-        demandScore:
-            snapshot.demandScore,
-
-        boardingScore:
-            snapshot.boardingScore,
-
-        hospitalScore:
-            snapshot.hospitalScore,
-
-        acuityScore:
-            snapshot.acuityScore,
-
-        forecastScore:
-            snapshot.forecastScore,
-
-        day:
-            snapshot.day,
-
-        hour:
-            snapshot.hour
-
-    };
-
-}
-
-
-/**
- * Determine whether a snapshot duplicates the most
- * recently saved assessment.
- */
 function isDuplicateSnapshot(
-
     candidate:EdoriSnapshot
-
 ):boolean {
+    const latest = getLatestSnapshot();
 
-    const latestSnapshot = snapshots
-
-        .slice()
-
-        .sort(
-
-            compareSnapshotsChronologically
-
-        )[
-
-            snapshots.length - 1
-
-        ];
-
-
-    if(!latestSnapshot){
-
+    if(!latest){
         return false;
-
     }
-
 
     const timeDifference = Math.abs(
-
-        new Date(
-
-            candidate.timestamp
-
-        ).getTime()
-
+        new Date(candidate.timestamp).getTime()
         -
-
-        new Date(
-
-            latestSnapshot.timestamp
-
-        ).getTime()
-
+        new Date(latest.timestamp).getTime()
     );
 
-
     if(
-
         timeDifference
-
         >
-
         DUPLICATE_TIME_WINDOW_MILLISECONDS
-
     ){
-
         return false;
-
     }
-
 
     return snapshotsContainSameAssessment(
-
-        latestSnapshot,
-
+        latest,
         candidate
-
     );
-
 }
 
-
-/**
- * Compare values that identify one assessment.
- */
 function snapshotsContainSameAssessment(
-
     previous:EdoriSnapshot,
-
     candidate:EdoriSnapshot
-
 ):boolean {
-
-    return previous.score === candidate.score
-
+    return (
+        previous.score === candidate.score
         &&
-
-        previous.status === candidate.status
-
+        previous.totalEDVolume === candidate.totalEDVolume
         &&
-
-        previous.operationalState.title
-
-            ===
-
-            candidate.operationalState.title
-
+        previous.boardedPatients === candidate.boardedPatients
         &&
-
-        previous.totalEDVolume
-
-            ===
-
-            candidate.totalEDVolume
-
+        previous.staffedAcuteCareBeds === candidate.staffedAcuteCareBeds
         &&
-
-        previous.boardedPatients
-
-            ===
-
-            candidate.boardedPatients
-
+        previous.occupiedAcuteCareBeds === candidate.occupiedAcuteCareBeds
         &&
-
-        previous.occupiedMedicalBeds
-
-            ===
-
-            candidate.occupiedMedicalBeds
-
+        previous.staffedCriticalCareBeds === candidate.staffedCriticalCareBeds
         &&
-
-        previous.staffedMedicalBeds
-
-            ===
-
-            candidate.staffedMedicalBeds
-
+        previous.occupiedCriticalCareBeds === candidate.occupiedCriticalCareBeds
         &&
-
+        previous.currentDirectAdmissions === candidate.currentDirectAdmissions
+        &&
+        previous.currentSurgicalAdmissions === candidate.currentSurgicalAdmissions
+        &&
+        previous.projectedTotalBedDemand === candidate.projectedTotalBedDemand
+        &&
+        previous.projectedCapacityVariance === candidate.projectedCapacityVariance
+        &&
         previous.esi1 === candidate.esi1
-
         &&
-
         previous.esi2 === candidate.esi2
-
-        &&
-
-        previous.esi3 === candidate.esi3
-
-        &&
-
-        previous.esi4 === candidate.esi4
-
-        &&
-
-        previous.esi5 === candidate.esi5;
-
+    );
 }
 
-
-/**
- * Remove duplicated restored records.
- */
 function removeDuplicateSnapshots(
-
     candidates:EdoriSnapshot[]
-
 ):EdoriSnapshot[] {
-
     const uniqueSnapshots:EdoriSnapshot[] = [];
 
-
     candidates.forEach(
-
         candidate => {
-
-            const previousSnapshot =
-
+            const previous =
                 uniqueSnapshots[
-
                     uniqueSnapshots.length - 1
-
                 ];
 
-
-            if(!previousSnapshot){
-
+            if(!previous){
                 uniqueSnapshots.push(
-
-                    cloneSnapshot(
-
-                        candidate
-
-                    )
-
+                    cloneSnapshot(candidate)
                 );
-
-
                 return;
-
             }
-
 
             const timeDifference = Math.abs(
-
-                new Date(
-
-                    candidate.timestamp
-
-                ).getTime()
-
+                new Date(candidate.timestamp).getTime()
                 -
-
-                new Date(
-
-                    previousSnapshot.timestamp
-
-                ).getTime()
-
+                new Date(previous.timestamp).getTime()
             );
 
-
-            const duplicated =
-
+            if(
                 timeDifference
-
                 <=
-
                 DUPLICATE_TIME_WINDOW_MILLISECONDS
-
                 &&
-
                 snapshotsContainSameAssessment(
-
-                    previousSnapshot,
-
+                    previous,
                     candidate
-
-                );
-
-
-            if(!duplicated){
-
-                uniqueSnapshots.push(
-
-                    cloneSnapshot(
-
-                        candidate
-
-                    )
-
-                );
-
+                )
+            ){
+                return;
             }
 
+            uniqueSnapshots.push(
+                cloneSnapshot(candidate)
+            );
         }
-
     );
-
 
     return uniqueSnapshots;
-
 }
 
+function cloneSnapshot(
+    snapshot:EdoriSnapshot
+):EdoriSnapshot {
+    return {
+        ...snapshot,
 
-/**
- * Keep only the newest configured number of
- * snapshots.
- */
+        timestamp:
+            new Date(snapshot.timestamp),
+
+        operationalState:{
+            ...snapshot.operationalState
+        },
+
+        activeTriggerIds:
+            snapshot.activeTriggerIds
+                ? [...snapshot.activeTriggerIds]
+                : undefined,
+
+        activeTriggerTitles:
+            snapshot.activeTriggerTitles
+                ? [...snapshot.activeTriggerTitles]
+                : undefined
+    };
+}
+
+function compareSnapshotsChronologically(
+    first:EdoriSnapshot,
+    second:EdoriSnapshot
+):number {
+    return (
+        new Date(first.timestamp).getTime()
+        -
+        new Date(second.timestamp).getTime()
+    );
+}
+
 function trimSnapshotHistory():void {
-
     if(
-
         snapshots.length
-
         <=
-
         MAXIMUM_SNAPSHOT_COUNT
-
     ){
-
         return;
-
     }
-
 
     snapshots = snapshots.slice(
-
         -MAXIMUM_SNAPSHOT_COUNT
-
     );
-
 }
 
-
-/**
- * Sort oldest to newest.
- */
-function compareSnapshotsChronologically(
-
-    first:EdoriSnapshot,
-
-    second:EdoriSnapshot
-
-):number {
-
-    return new Date(
-
-        first.timestamp
-
-    ).getTime()
-
-    -
-
-    new Date(
-
-        second.timestamp
-
-    ).getTime();
-
-}
-
-
-/**
- * Normalize a required finite number.
- */
-function normalizeRequiredNumber(
-
+function normalizeFiniteNumber(
     value:unknown
-
-):number | null {
-
-    return typeof value === "number"
-
+):number | undefined {
+    return (
+        typeof value === "number"
         &&
-
         Number.isFinite(value)
-
-            ? value
-
-            : null;
-
+    )
+        ? value
+        : undefined;
 }
 
-
-/**
- * Normalize an optional nonnegative number.
- */
-function normalizeOptionalNonNegativeNumber(
-
+function normalizeNonNegativeNumber(
     value:unknown
-
 ):number | undefined {
+    const normalized =
+        normalizeFiniteNumber(value);
 
-    if(
-
-        typeof value !== "number"
-
-        ||
-
-        !Number.isFinite(value)
-
-    ){
-
+    if(normalized === undefined){
         return undefined;
-
     }
 
+    return normalized >= 0
+        ? normalized
+        : undefined;
+}
 
-    return Math.max(
+function normalizePositiveNumber(
+    value:unknown
+):number | undefined {
+    const normalized =
+        normalizeFiniteNumber(value);
 
-        0,
+    if(
+        normalized === undefined
+        ||
+        normalized <= 0
+    ){
+        return undefined;
+    }
 
-        value
+    return normalized;
+}
 
+function normalizeScore(
+    value:unknown
+):number | null {
+    const normalized =
+        normalizeFiniteNumber(value);
+
+    if(normalized === undefined){
+        return null;
+    }
+
+    return Math.min(
+        100,
+        Math.max(
+            0,
+            normalized
+        )
     );
-
 }
 
-
-/**
- * Normalize an optional positive number.
- */
-function normalizeOptionalPositiveNumber(
-
+function normalizeInteger(
     value:unknown
-
-):number | undefined {
-
+):number | null {
     if(
-
         typeof value !== "number"
-
         ||
-
         !Number.isFinite(value)
-
         ||
-
-        value <= 0
-
+        !Number.isInteger(value)
     ){
-
-        return undefined;
-
+        return null;
     }
-
 
     return value;
-
 }
 
-
-/**
- * Normalize an optional score.
- */
-function normalizeOptionalScore(
-
+function normalizePositiveInteger(
     value:unknown
-
 ):number | undefined {
+    const normalized =
+        normalizeInteger(value);
 
-    if(
-
-        typeof value !== "number"
-
-        ||
-
-        !Number.isFinite(value)
-
-    ){
-
-        return undefined;
-
-    }
-
-
-    return clampScore(
-
-        value
-
-    );
-
+    return (
+        normalized !== null
+        &&
+        normalized > 0
+    )
+        ? normalized
+        : undefined;
 }
 
-
-/**
- * Normalize an optional hour.
- */
-function normalizeOptionalHour(
-
+function normalizeHour(
     value:unknown
-
 ):number | undefined {
+    const normalized =
+        normalizeInteger(value);
 
     if(
-
-        typeof value !== "number"
-
+        normalized === null
         ||
-
-        !Number.isFinite(value)
-
+        normalized < 0
+        ||
+        normalized > 23
     ){
-
         return undefined;
-
     }
 
-
-    const roundedHour = Math.round(
-
-        value
-
-    );
-
-
-    if(
-
-        roundedHour < 0
-
-        ||
-
-        roundedHour > 23
-
-    ){
-
-        return undefined;
-
-    }
-
-
-    return roundedHour;
-
+    return normalized;
 }
 
-
-/**
- * Normalize an optional nonempty string.
- */
-function normalizeOptionalString(
-
+function normalizeString(
     value:unknown
-
 ):string | undefined {
-
     if(typeof value !== "string"){
-
         return undefined;
-
     }
-
 
     const normalized = value.trim();
 
-
     return normalized.length > 0
-
         ? normalized
-
         : undefined;
-
 }
 
-
-/**
- * Normalize a date.
- */
-function normalizeDate(
-
+function normalizeStringArray(
     value:unknown
-
-):Date | null {
-
-    if(
-
-        !isDateInput(
-
-            value
-
-        )
-
-    ){
-
-        return null;
-
+):string[] | undefined {
+    if(!Array.isArray(value)){
+        return undefined;
     }
 
-
-    const date = value instanceof Date
-
-        ? new Date(
-
-            value.getTime()
-
-        )
-
-        : new Date(
-
-            value
-
+    const strings = value
+        .map(normalizeString)
+        .filter(
+            (item):item is string =>
+                item !== undefined
         );
 
-
-    return Number.isNaN(
-
-        date.getTime()
-
-    )
-
-        ? null
-
-        : date;
-
+    return strings.length > 0
+        ? strings
+        : undefined;
 }
 
-
-/**
- * Narrow supported Date-constructor inputs.
- */
-function isDateInput(
-
+function normalizeDate(
     value:unknown
-
-):value is Date | string | number {
-
-    return value instanceof Date
-
-        ||
-
-        typeof value === "string"
-
-        ||
-
-        typeof value === "number";
-
-}
-
-
-/**
- * Create a stable fallback identifier for restored
- * snapshots that predate snapshot IDs.
- */
-function createSnapshotId(
-
-    timestamp:Date
-
-):string {
-
-    return `snapshot-${timestamp.getTime()}-${Math.random()
-        .toString(36)
-        .slice(2, 10)}`;
-
-}
-
-
-/**
- * Clamp a numerical EDORI score to 0–100.
- */
-function clampScore(
-
-    value:number
-
-):number {
-
-    return Math.min(
-
-        100,
-
-        Math.max(
-
-            0,
-
-            value
-
+):Date | null {
+    if(
+        !(
+            value instanceof Date
+            ||
+            typeof value === "string"
+            ||
+            typeof value === "number"
         )
+    ){
+        return null;
+    }
 
-    );
+    const date =
+        value instanceof Date
+            ? new Date(value.getTime())
+            : new Date(value);
 
+    return Number.isNaN(date.getTime())
+        ? null
+        : date;
 }
 
+function getDayName(
+    value:Date
+):string {
+    const days = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+    ];
 
-/**
- * Remove corrupted localStorage history.
- */
+    return days[value.getDay()]
+        ?? "Sunday";
+}
+
+function createSnapshotId(
+    timestamp:Date
+):string {
+    return (
+        `snapshot-${timestamp.getTime()}-`
+        +
+        Math.random()
+            .toString(36)
+            .slice(2, 10)
+    );
+}
+
 function removeCorruptedStorage():void {
-
     try {
-
-        localStorage.removeItem(
-
-            SNAPSHOT_STORAGE_KEY
-
-        );
-
+        localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
     }
     catch(error){
-
         console.error(
-
-            "SnapshotService could not remove corrupted history.",
-
+            "SnapshotService could not remove corrupted Hospital Readiness history.",
             error
-
         );
-
     }
-
 }
 
-
-/**
- * Notify subscribed dashboard components.
- */
 function publishHistoryChanged():void {
-
     emit(
-
-        APP_EVENTS.HISTORY_CHANGED
-
+        APP_EVENTS.HISTORY_CHANGED,
+        
     );
-
 }

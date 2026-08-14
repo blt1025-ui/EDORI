@@ -1,12 +1,12 @@
 /**
  * AssessmentHistory
  *
- * Displays persistent EDORI assessment history
+ * Displays persistent Hospital Readiness assessment history
  * using the Alpha–Echo operational-level model.
  *
  * This component does not:
  *
- * - Calculate EDORI
+ * - Calculate Hospital Readiness
  * - Evaluate operational triggers
  * - Save or alter snapshots
  * - Reconstruct past trigger-adjusted levels
@@ -83,7 +83,7 @@ export function AssessmentHistory():string {
                     </h3>
 
                     <p class="panel-description">
-                        Saved EDORI assessments and Alpha–Echo levels
+                        Saved Hospital Readiness assessments and Alpha–Echo levels
                     </p>
 
                 </div>
@@ -277,7 +277,11 @@ function updateAssessmentHistory():void {
                             </th>
 
                             <th scope="col">
-                                Medical Beds
+                                Acute Care
+                            </th>
+
+                            <th scope="col">
+                                Critical Care
                             </th>
 
                         </tr>
@@ -698,8 +702,19 @@ function createHistoryRowMarkup(
 
             <td>
 
-                ${formatSnapshotValue(
-                    row.snapshot.occupiedMedicalBeds
+                ${formatCapacitySnapshot(
+                    row.snapshot.occupiedAcuteCareBeds,
+                    row.snapshot.staffedAcuteCareBeds
+                )}
+
+            </td>
+
+
+            <td>
+
+                ${formatCapacitySnapshot(
+                    row.snapshot.occupiedCriticalCareBeds,
+                    row.snapshot.staffedCriticalCareBeds
                 )}
 
             </td>
@@ -728,7 +743,7 @@ function handleClearHistory():void {
 
     const confirmed = window.confirm(
 
-        "Clear all saved EDORI assessment history? This cannot be undone."
+        "Clear all saved Hospital Readiness assessment history? This cannot be undone."
 
     );
 
@@ -946,6 +961,34 @@ function formatAssessmentDate(
 
 
 /**
+ * Format occupied / staffed capacity for a saved
+ * Hospital Readiness snapshot.
+ */
+function formatCapacitySnapshot(
+
+    occupied:number,
+
+    staffed:number
+
+):string {
+
+    if(
+        !Number.isFinite(occupied)
+        ||
+        !Number.isFinite(staffed)
+    ){
+
+        return "--";
+
+    }
+
+
+    return `${formatSnapshotValue(occupied)} / ${formatSnapshotValue(staffed)}`;
+
+}
+
+
+/**
  * Format a saved snapshot value.
  */
 function formatSnapshotValue(
@@ -1009,7 +1052,7 @@ function createEmptyHistoryState():string {
             </strong>
 
             <p>
-                Completed EDORI calculations will appear here.
+                Completed Hospital Readiness assessments will appear here.
             </p>
 
         </div>

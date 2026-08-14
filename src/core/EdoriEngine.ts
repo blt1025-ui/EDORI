@@ -1,30 +1,28 @@
 /**
  * EdoriEngine
  *
+ * Version 2.1 Hospital Readiness Model
+ *
  * Central orchestration layer for one completed
- * EDORI operational assessment.
+ * Hospital Readiness assessment.
  *
  * Responsibilities:
  *
- * - Validate current inputs
- * - Capture one assessment timestamp
+ * - Validate current user-entered values
+ * - Capture one authoritative assessment timestamp
  * - Determine weekday and hour
- * - Load historical expectations
- * - Build the completed assessment
+ * - Load current-hour ED historical expectations
+ * - Load rolling four-hour hospital-flow expectations
+ * - Build the completed SituationAssessment
  * - Validate the completed assessment
- * - Calculate EDORI exactly once
+ * - Calculate Hospital Readiness exactly once
  * - Persist state and result
- * - Save one eligible snapshot
+ * - Save one eligible Version 2.1 snapshot
  * - Emit RESULT_CHANGED
+ *
+ * The historical EdoriEngine name is temporarily
+ * retained during the Version 2 migration.
  */
-
-import type {
-
-    EdoriSnapshot
-
-}
-
-from "../types/EdoriSnapshot";
 
 import {
 
@@ -59,7 +57,9 @@ import {
 
     getExpectedOperationalValues,
 
-    hasHistoricalExpectation
+    hasHistoricalExpectation,
+
+    HOSPITAL_FORECAST_HOURS
 
 }
 
@@ -106,6 +106,24 @@ import {
 from "../services/ValidationService";
 
 
+import {
+
+    EDORI_SNAPSHOT_SCHEMA_VERSION
+
+}
+
+from "../types/EdoriSnapshot";
+
+
+import type {
+
+    EdoriSnapshot
+
+}
+
+from "../types/EdoriSnapshot";
+
+
 import type {
 
     EdoriAssessmentInput
@@ -143,7 +161,8 @@ from "../types/SituationAssessment";
 
 
 /**
- * Complete one authoritative EDORI assessment.
+ * Complete one authoritative Hospital Readiness
+ * assessment.
  */
 export function runEdoriAssessment(
 
@@ -154,7 +173,9 @@ export function runEdoriAssessment(
 ):EdoriEngineResult {
 
     /*
-     * Validate the supplied timestamp.
+     * =================================================
+     * Validate assessment timestamp
+     * =================================================
      */
 
     if(
@@ -181,8 +202,9 @@ export function runEdoriAssessment(
 
 
     /*
-     * Validate all user-entered current values
-     * through ValidationService.
+     * =================================================
+     * Validate user-entered current values
+     * =================================================
      */
 
     const inputValidation =
@@ -206,18 +228,28 @@ export function runEdoriAssessment(
 
 
     /*
-     * Determine the automatic historical period.
+     * =================================================
+     * Determine historical assessment period
+     * =================================================
      */
 
-    const period = getAssessmentPeriod(
+    const period =
 
-        calculationTime
+        getAssessmentPeriod(
 
-    );
+            calculationTime
+
+        );
 
 
     /*
-     * Do not calculate against zero fallback values.
+     * =================================================
+     * Confirm complete four-hour historical coverage
+     * =================================================
+     *
+     * Hospital Readiness requires the current hourly
+     * ED baseline plus a complete rolling four-hour
+     * hospital-flow window.
      */
 
     if(
@@ -226,7 +258,9 @@ export function runEdoriAssessment(
 
             period.day,
 
-            period.hour
+            period.hour,
+
+            HOSPITAL_FORECAST_HOURS
 
         )
 
@@ -234,14 +268,20 @@ export function runEdoriAssessment(
 
         return createFailure([
 
-            `Historical expectations are not available for ${period.day} at ${formatHour(period.hour)}.`,
+            `Complete historical expectations are not available for the ${HOSPITAL_FORECAST_HOURS}-hour forecast beginning ${period.day} at ${formatHour(period.hour)}.`,
 
-            "Import or add the missing historical record before calculating EDORI."
+            "Import or add all required hourly historical records before calculating Hospital Readiness."
 
         ]);
 
     }
 
+
+    /*
+     * =================================================
+     * Load historical expectations
+     * =================================================
+     */
 
     const expectedValues =
 
@@ -254,6 +294,12 @@ export function runEdoriAssessment(
         );
 
 
+    /*
+     * =================================================
+     * Build completed SituationAssessment
+     * =================================================
+     */
+
     const assessment:SituationAssessment = {
 
         assessmentTime:
@@ -265,17 +311,19 @@ export function runEdoriAssessment(
         hour:
             period.hour,
 
+        forecastHours:
+            HOSPITAL_FORECAST_HOURS,
+
+
+        /*
+         * Current ED conditions
+         */
+
         totalEDVolume:
             input.totalEDVolume,
 
         boardedPatients:
             input.boardedPatients,
-
-        occupiedMedicalBeds:
-            input.occupiedMedicalBeds,
-
-            staffedMedicalBeds:
-    input.staffedMedicalBeds,
 
         esi1:
             input.esi1,
@@ -283,40 +331,122 @@ export function runEdoriAssessment(
         esi2:
             input.esi2,
 
-        esi3:
-            input.esi3,
 
-        esi4:
-            input.esi4,
+        /*
+         * Current acute-care capacity
+         */
 
-        esi5:
-            input.esi5,
+        staffedAcuteCareBeds:
+            input.staffedAcuteCareBeds,
 
-        expectedVolume:
-            expectedValues.expectedVolume,
+        occupiedAcuteCareBeds:
+            input.occupiedAcuteCareBeds,
 
-        expectedBoarders:
-            expectedValues.expectedBoarders,
 
-        expectedArrivals:
-            expectedValues.expectedArrivals,
+        /*
+         * Current critical-care capacity
+         */
 
-        expectedDepartures:
-            expectedValues.expectedDepartures
+        staffedCriticalCareBeds:
+            input.staffedCriticalCareBeds,
+
+        occupiedCriticalCareBeds:
+            input.occupiedCriticalCareBeds,
+
+
+        /*
+         * Known non-ED inflow
+         */
+
+        currentDirectAdmissions:
+            input.currentDirectAdmissions,
+
+        currentSurgicalAdmissions:
+            input.currentSurgicalAdmissions,
+
+
+        /*
+         * Compatibility field only.
+         *
+         * Version 2.1 never uses a user-entered current
+         * ED admissions value.
+         */
+
+        currentEDAdmissions:
+            0,
+
+
+        /*
+         * Current-hour ED historical expectations
+         */
+
+        expectedEDVolume:
+            expectedValues.expectedEDVolume,
+
+        expectedEDBoarders:
+            expectedValues.expectedEDBoarders,
+
+
+        /*
+         * Historical acute-care baseline
+         */
+
+        expectedStaffedAcuteCareBeds:
+            expectedValues.expectedStaffedAcuteCareBeds,
+
+        expectedOccupiedAcuteCareBeds:
+            expectedValues.expectedOccupiedAcuteCareBeds,
+
+        expectedAvailableAcuteCareBeds:
+            expectedValues.expectedAvailableAcuteCareBeds,
+
+
+        /*
+         * Rolling four-hour historical flow
+         */
+
+        expectedEDAdmissions4h:
+            expectedValues.expectedEDAdmissions4h,
+
+        expectedDirectAdmissions4h:
+            expectedValues.expectedDirectAdmissions4h,
+
+        expectedSurgicalAdmissions4h:
+            expectedValues.expectedSurgicalAdmissions4h,
+
+        expectedHospitalInflow4h:
+            expectedValues.expectedHospitalInflow4h,
+
+        expectedInpatientDepartures4h:
+            expectedValues.expectedInpatientDepartures4h,
+
+
+        /*
+         * Historical projected capacity baseline
+         */
+
+        historicalProjectedBedDemand4h:
+            expectedValues.historicalProjectedBedDemand4h,
+
+        historicalProjectedBedBalance4h:
+            expectedValues.historicalProjectedBedBalance4h
 
     };
 
 
     /*
-     * Validate the completed assessment, including
-     * metadata and historical expectations.
+     * =================================================
+     * Validate completed assessment
+     * =================================================
      */
 
-    const stateValidation = validateState(
+    const stateValidation =
 
-        assessment
+        validateState(
 
-    );
+            assessment
+
+        );
 
 
     if(!stateValidation.valid){
@@ -331,18 +461,24 @@ export function runEdoriAssessment(
 
 
     /*
-     * Calculate exactly once before persistence.
+     * =================================================
+     * Calculate Hospital Readiness exactly once
+     * =================================================
      */
 
-    const result = calculateEdori(
+    const result =
 
-        assessment
+        calculateEdori(
 
-    );
+            assessment
+
+        );
 
 
     /*
-     * Persist the committed assessment.
+     * =================================================
+     * Persist authoritative assessment state
+     * =================================================
      */
 
     setState(
@@ -353,7 +489,9 @@ export function runEdoriAssessment(
 
 
     /*
-     * Persist the current authoritative result.
+     * =================================================
+     * Persist authoritative result
+     * =================================================
      */
 
     setLatestResult(
@@ -364,119 +502,182 @@ export function runEdoriAssessment(
 
 
     /*
-     * Create one eligible historical snapshot.
+     * =================================================
+     * Create Version 2 historical snapshot
+     * =================================================
      */
 
     const snapshot:EdoriSnapshot = {
 
-id:
-    crypto.randomUUID(),
+        id:
+            createSnapshotId(),
+
+        schemaVersion:
+            EDORI_SNAPSHOT_SCHEMA_VERSION,
+
+        timestamp:
+            new Date(
+                result.timestamp
+            ),
+
+        score:
+            result.score,
+
+        status:
+            result.operationalState.title,
+
+        operationalState:{
+            ...result.operationalState
+        },
+
+        day:
+            assessment.day,
+
+        hour:
+            assessment.hour,
+
+        forecastHours:
+            assessment.forecastHours,
+
+        totalEDVolume:
+            assessment.totalEDVolume,
+
+        boardedPatients:
+            assessment.boardedPatients,
+
+        esi1:
+            assessment.esi1,
+
+        esi2:
+            assessment.esi2,
+
+        staffedAcuteCareBeds:
+            assessment.staffedAcuteCareBeds,
+
+        occupiedAcuteCareBeds:
+            assessment.occupiedAcuteCareBeds,
+
+        staffedCriticalCareBeds:
+            assessment.staffedCriticalCareBeds,
+
+        occupiedCriticalCareBeds:
+            assessment.occupiedCriticalCareBeds,
+
+        currentDirectAdmissions:
+            assessment.currentDirectAdmissions,
+
+        currentSurgicalAdmissions:
+            assessment.currentSurgicalAdmissions,
+
+        knownNonEDInflow:
+            result.knownNonEDInflow,
+
+        expectedNonEDInflow:
+            result.expectedNonEDInflow,
+
+        expectedEDVolume:
+            assessment.expectedEDVolume,
+
+        expectedEDBoarders:
+            assessment.expectedEDBoarders,
+
+        expectedStaffedAcuteCareBeds:
+            assessment.expectedStaffedAcuteCareBeds,
+
+        expectedOccupiedAcuteCareBeds:
+            assessment.expectedOccupiedAcuteCareBeds,
+
+        expectedAvailableAcuteCareBeds:
+            assessment.expectedAvailableAcuteCareBeds,
+
+        expectedEDAdmissions4h:
+            assessment.expectedEDAdmissions4h,
+
+        expectedDirectAdmissions4h:
+            assessment.expectedDirectAdmissions4h,
+
+        expectedSurgicalAdmissions4h:
+            assessment.expectedSurgicalAdmissions4h,
+
+        expectedHospitalInflow4h:
+            assessment.expectedHospitalInflow4h,
+
+        expectedInpatientDepartures4h:
+            assessment.expectedInpatientDepartures4h,
+
+        projectedDirectAdmissions:
+            result.projectedDirectAdmissions,
+
+        projectedSurgicalAdmissions:
+            result.projectedSurgicalAdmissions,
+
+        projectedNewAdmissions:
+            result.projectedNewAdmissions,
+
+        projectedTotalBedDemand:
+            result.projectedTotalBedDemand,
+
+        historicalProjectedBedDemand4h:
+            assessment.historicalProjectedBedDemand4h,
+
+        currentAvailableAcuteCareBeds:
+            result.currentAvailableAcuteCareBeds,
+
+        projectedAvailableAcuteCareBeds:
+            result.projectedAvailableAcuteCareBeds,
+
+        historicalProjectedBedBalance4h:
+            assessment.historicalProjectedBedBalance4h,
+
+        projectedCapacityVariance:
+            result.projectedCapacityVariance,
+
+        edPressureScore:
+            result.edPressureScore,
+
+        acuteCapacityScore:
+            result.acuteCapacityScore,
+
+        criticalCapacityScore:
+            result.criticalCapacityScore,
+
+        inflowScore:
+            result.inflowScore,
+
+        projectedCapacityScore:
+            result.projectedCapacityScore,
+
+        edVolumeScore:
+            result.edVolumeScore,
+
+        edBoardingScore:
+            result.edBoardingScore,
+
+        edAcuityScore:
+            result.edAcuityScore,
 
 
-    score:
-        result.score,
+        /*
+         * Temporary compatibility fields.
+         */
 
-    status:
-        result.operationalState.title,
+        currentEDAdmissions:
+            0,
 
-    operationalState:{
+        currentHospitalInflow:
+            result.currentHospitalInflow,
 
-        ...result.operationalState
+        projectedHospitalInflow:
+            result.projectedHospitalInflow
 
-    },
-
-    timestamp:new Date(
-
-        result.timestamp
-
-    ),
+    };
 
 
     /*
-     * Current operational inputs
+     * =================================================
+     * Save snapshot when eligible
+     * =================================================
      */
-
-    totalEDVolume:
-        assessment.totalEDVolume,
-
-    boardedPatients:
-        assessment.boardedPatients,
-
-    occupiedMedicalBeds:
-        assessment.occupiedMedicalBeds,
-
-        staffedMedicalBeds:
-    assessment.staffedMedicalBeds,
-
-    /*
-     * ESI distribution
-     */
-
-    esi1:
-        assessment.esi1,
-
-    esi2:
-        assessment.esi2,
-
-    esi3:
-        assessment.esi3,
-
-    esi4:
-        assessment.esi4,
-
-    esi5:
-        assessment.esi5,
-
-
-    /*
-     * Historical expectations
-     */
-
-    expectedVolume:
-        assessment.expectedVolume,
-
-    expectedBoarders:
-        assessment.expectedBoarders,
-
-    expectedArrivals:
-        assessment.expectedArrivals,
-
-    expectedDepartures:
-        assessment.expectedDepartures,
-
-
-    /*
-     * EDORI domain scores
-     */
-
-    demandScore:
-        result.demandScore,
-
-    boardingScore:
-        result.boardingScore,
-
-    hospitalScore:
-        result.hospitalScore,
-
-    acuityScore:
-        result.acuityScore,
-
-    forecastScore:
-        result.forecastScore,
-
-
-    /*
-     * Assessment timing
-     */
-
-    day:
-        assessment.day,
-
-    hour:
-        assessment.hour
-
-};
-
 
     let snapshotSaved = false;
 
@@ -491,21 +692,25 @@ id:
 
     ){
 
-        saveSnapshot(
+        snapshotSaved =
 
-            snapshot
+            saveSnapshot(
 
-        );
+                snapshot
 
-
-        snapshotSaved = true;
+            );
 
     }
 
 
     /*
-     * Publish only after the complete workflow
-     * succeeds.
+     * =================================================
+     * Publish completed calculation
+     * =================================================
+     *
+     * Components subscribed to RESULT_CHANGED can
+     * refresh only after the entire workflow has
+     * completed successfully.
      */
 
     emit(
@@ -515,21 +720,29 @@ id:
     );
 
 
+    /*
+     * =================================================
+     * Return defensive copies
+     * =================================================
+     */
+
     return {
 
         success:true,
 
-        assessment:cloneAssessment(
+        assessment:
+            cloneAssessment(
 
-            assessment
+                assessment
 
-        ),
+            ),
 
-        result:cloneResult(
+        result:
+            cloneResult(
 
-            result
+                result
 
-        ),
+            ),
 
         snapshotSaved
 
@@ -551,15 +764,16 @@ function createFailure(
 
         success:false,
 
-        errors:Array.from(
+        errors:
+            Array.from(
 
-            new Set(
+                new Set(
 
-                errors
+                    errors
+
+                )
 
             )
-
-        )
 
     };
 
@@ -567,7 +781,7 @@ function createFailure(
 
 
 /**
- * Return a defensive assessment copy.
+ * Return a defensive SituationAssessment copy.
  */
 function cloneAssessment(
 
@@ -585,7 +799,7 @@ function cloneAssessment(
 
 
 /**
- * Return a defensive result copy.
+ * Return a defensive Hospital Readiness result copy.
  */
 function cloneResult(
 
@@ -603,15 +817,16 @@ function cloneResult(
 
         },
 
-        drivers:result.drivers.map(
+        drivers:
+            result.drivers.map(
 
-            driver => ({
+                driver => ({
 
-                ...driver
+                    ...driver
 
-            })
+                })
 
-        ),
+            ),
 
         recommendations:[
 
@@ -619,13 +834,55 @@ function cloneResult(
 
         ],
 
-        timestamp:new Date(
+        timestamp:
+            new Date(
 
-            result.timestamp
+                result.timestamp
+
+            )
+
+    };
+
+}
+
+
+/**
+ * Create one browser-safe snapshot identifier.
+ */
+function createSnapshotId():
+
+string {
+
+    if(
+
+        typeof crypto !== "undefined"
+
+        &&
+
+        typeof crypto.randomUUID === "function"
+
+    ){
+
+        return crypto.randomUUID();
+
+    }
+
+
+    return `snapshot-${Date.now()}-${Math.random()
+
+        .toString(
+
+            36
 
         )
 
-    };
+        .slice(
+
+            2,
+
+            10
+
+        )}`;
 
 }
 
@@ -639,23 +896,25 @@ function formatHour(
 
 ):string {
 
-    const safeHour = Math.min(
+    const safeHour =
 
-        23,
+        Math.min(
 
-        Math.max(
+            23,
 
-            0,
+            Math.max(
 
-            Math.floor(
+                0,
 
-                hour
+                Math.floor(
+
+                    hour
+
+                )
 
             )
 
-        )
-
-    );
+        );
 
 
     const meridiem =

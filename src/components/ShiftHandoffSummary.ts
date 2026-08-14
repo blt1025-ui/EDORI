@@ -2,7 +2,7 @@
  * ShiftHandoffSummary
  *
  * Creates a concise operational handoff from the
- * authoritative EDORI OperationalAssessment.
+ * authoritative Hospital Readiness OperationalAssessment.
  *
  * The component:
  *
@@ -12,7 +12,7 @@
  * - Lists urgent operational actions
  * - Produces a copyable plain-text handoff
  *
- * This component does not calculate EDORI or
+ * This component does not calculate Hospital Readiness or
  * modify application state.
  */
 
@@ -23,15 +23,6 @@ import {
 }
 
 from "../config/appEvents";
-
-
-import {
-
-    HOSPITAL
-
-}
-
-from "../config/constants";
 
 
 import {
@@ -108,6 +99,9 @@ import type {
 }
 
 from "../types/OperationalRecommendation";
+
+
+const ED_TREATMENT_BEDS = 63;
 
 
 /**
@@ -415,188 +409,76 @@ function createHandoffMarkup(
 
 ):string {
 
-    const assessment =
+    const assessment = operationalAssessment.assessment;
 
-        operationalAssessment.assessment;
+    const result = operationalAssessment.scoreResult;
 
+    const finalState = operationalAssessment.finalOperationalState;
 
-    const finalState =
+    const baseState = operationalAssessment.baseOperationalState;
 
-        operationalAssessment.finalOperationalState;
-
-
-    const baseState =
-
-        operationalAssessment.baseOperationalState;
-
-
-    const score = Math.round(
-
-        operationalAssessment
-            .scoreResult
-            .score
-
-    );
-
+    const score = Math.round(result.score);
 
     const scoreChange = determineScoreChange(
-
         snapshots,
-
         score
-
     );
-
 
     const edCapacityPercent = calculatePercentage(
-
         assessment.totalEDVolume,
-
-        HOSPITAL.ED_BEDS
-
+        ED_TREATMENT_BEDS
     );
-
 
     const boardingShare = calculatePercentage(
-
         assessment.boardedPatients,
-
         assessment.totalEDVolume
-
     );
 
-
-    const medicalOccupancy = calculatePercentage(
-
-        assessment.occupiedMedicalBeds,
-
-        HOSPITAL.MEDICAL_BEDS
-
+    const acuteOccupancy = calculatePercentage(
+        assessment.occupiedAcuteCareBeds,
+        assessment.staffedAcuteCareBeds
     );
 
-
-    const expectedNetFlow =
-
-        assessment.expectedArrivals
-
-        -
-
-        assessment.expectedDepartures;
-
+    const criticalOccupancy = calculatePercentage(
+        assessment.occupiedCriticalCareBeds,
+        assessment.staffedCriticalCareBeds
+    );
 
     const highAcuityCount =
-
-        assessment.esi1
-
-        +
-
-        assessment.esi2;
-
+        assessment.esi1 + assessment.esi2;
 
     const urgentActions =
-
         operationalAssessment.recommendations
-
             .filter(
-
                 recommendation =>
-
-                    recommendation.priority
-
-                    ===
-
-                    "Immediate"
-
+                    recommendation.priority === "Immediate"
                     ||
-
-                    recommendation.priority
-
-                    ===
-
-                    "High"
-
+                    recommendation.priority === "High"
             )
-
             .slice()
-
-            .sort(
-
-                compareRecommendations
-
-            )
-
-            .slice(
-
-                0,
-
-                MAXIMUM_HANDOFF_ACTIONS
-
-            );
-
+            .sort(compareRecommendations)
+            .slice(0, MAXIMUM_HANDOFF_ACTIONS);
 
     const leadingDrivers =
-
         operationalAssessment.primaryDrivers
-
             .slice()
-
             .sort(
-
-                (
-
-                    first,
-
-                    second
-
-                ) =>
-
-                    second.severity
-
-                    -
-
-                    first.severity
-
+                (first, second) =>
+                    second.severity - first.severity
             )
-
-            .slice(
-
-                0,
-
-                MAXIMUM_HANDOFF_DRIVERS
-
-            );
-
+            .slice(0, MAXIMUM_HANDOFF_DRIVERS);
 
     const activeTriggers =
-
         operationalAssessment.activeTriggers
-
-            .slice(
-
-                0,
-
-                MAXIMUM_HANDOFF_TRIGGERS
-
-            );
-
+            .slice(0, MAXIMUM_HANDOFF_TRIGGERS);
 
     const levelWasEscalated =
-
-        finalState.title
-
-        !==
-
-        baseState.title;
-
+        finalState.title !== baseState.title;
 
     const handoffText = createPlainTextHandoff(
-
         operationalAssessment,
-
         snapshots
-
     );
-
 
     return `
 
@@ -604,9 +486,7 @@ function createHandoffMarkup(
             class="shift-handoff-status"
             style="
                 --handoff-state-color:
-                ${escapeAttribute(
-                    finalState.color
-                )};
+                ${escapeAttribute(finalState.color)};
             "
         >
 
@@ -616,13 +496,8 @@ function createHandoffMarkup(
                     class="shift-handoff-status-icon"
                     aria-hidden="true"
                 >
-
-                    ${escapeHtml(
-                        finalState.icon
-                    )}
-
+                    ${escapeHtml(finalState.icon)}
                 </span>
-
 
                 <div>
 
@@ -631,38 +506,21 @@ function createHandoffMarkup(
                     </span>
 
                     <strong>
-
-                        ${escapeHtml(
-                            finalState.title
-                        )}
-
-                        · EDORI ${score}
-
+                        ${escapeHtml(finalState.title)}
+                        · HRI ${score}
                     </strong>
 
-
                     <small>
-
-                        ${escapeHtml(
-                            operationalAssessment.riskDirection
-                        )}
-
+                        ${escapeHtml(operationalAssessment.riskDirection)}
                         ${scoreChange === null
-
                             ? "· no prior score comparison"
-
-                            : `· ${formatSignedNumber(
-                                scoreChange
-                            )} since previous assessment`
-
+                            : `· ${formatSignedNumber(scoreChange)} since previous assessment`
                         }
-
                     </small>
 
                 </div>
 
             </div>
-
 
             <div class="shift-handoff-status-time">
 
@@ -671,13 +529,11 @@ function createHandoffMarkup(
                 </span>
 
                 <strong>
-
                     ${escapeHtml(
                         formatAssessmentTime(
                             assessment.assessmentTime
                         )
                     )}
-
                 </strong>
 
             </div>
@@ -686,9 +542,7 @@ function createHandoffMarkup(
 
 
         ${levelWasEscalated
-
             ? `
-
                 <div class="shift-handoff-escalation">
 
                     <strong>
@@ -696,128 +550,79 @@ function createHandoffMarkup(
                     </strong>
 
                     <span>
-
                         The score-derived level was
-
-                        ${escapeHtml(
-                            baseState.title
-                        )}.
-
+                        ${escapeHtml(baseState.title)}.
                         Active triggers elevated the final level to
-
-                        ${escapeHtml(
-                            finalState.title
-                        )}.
-
+                        ${escapeHtml(finalState.title)}.
                     </span>
 
                 </div>
-
             `
-
             : ""
-
         }
 
 
         <div class="shift-handoff-metrics">
 
             ${createMetricCard(
-
                 "ED Census",
-
-                `${formatNumber(
-                    assessment.totalEDVolume
-                )} patients`,
-
-                `${formatNumber(
-                    edCapacityPercent
-                )}% of ${HOSPITAL.ED_BEDS}-bed capacity`
-
+                `${formatNumber(assessment.totalEDVolume)} patients`,
+                `${formatNumber(edCapacityPercent)}% of ${ED_TREATMENT_BEDS}-bed treatment capacity`
             )}
 
-
             ${createMetricCard(
-
                 "Boarding",
-
-                `${formatNumber(
-                    assessment.boardedPatients
-                )} patients`,
-
-                `${formatNumber(
-                    boardingShare
-                )}% of ED census`
-
+                `${formatNumber(assessment.boardedPatients)} patients`,
+                `${formatNumber(boardingShare)}% of ED census`
             )}
 
-
             ${createMetricCard(
-
-                "Medical Capacity",
-
-                `${formatNumber(
-                    assessment.occupiedMedicalBeds
-                )} / ${HOSPITAL.MEDICAL_BEDS}`,
-
-                `${formatNumber(
-                    medicalOccupancy
-                )}% occupied`
-
+                "Acute-Care Capacity",
+                `${formatNumber(assessment.occupiedAcuteCareBeds)} / ${formatNumber(assessment.staffedAcuteCareBeds)}`,
+                `${formatNumber(acuteOccupancy)}% occupied`
             )}
 
+            ${createMetricCard(
+                "Critical-Care Capacity",
+                `${formatNumber(assessment.occupiedCriticalCareBeds)} / ${formatNumber(assessment.staffedCriticalCareBeds)}`,
+                `${formatNumber(criticalOccupancy)}% occupied`
+            )}
 
             ${createMetricCard(
+                "Four-Hour Hospital Flow",
+                `${formatNumber(result.projectedHospitalInflow)} projected inflow`,
+                `${formatNumber(result.expectedInpatientDepartures)} expected departures`
+            )}
 
-                "Expected Net Flow",
-
-                formatSignedNumber(
-                    expectedNetFlow
+            ${createMetricCard(
+                "Projected Acute Beds",
+                formatBedAvailability(
+                    result.projectedAvailableAcuteCareBeds
                 ),
-
-                `${formatNumber(
-                    assessment.expectedArrivals
-                )} arrivals · ${formatNumber(
-                    assessment.expectedDepartures
-                )} departures`
-
+                createProjectedCapacityDescription(
+                    result.projectedAvailableAcuteCareBeds
+                )
             )}
 
-
             ${createMetricCard(
-
                 "High Acuity",
-
-                `${formatNumber(
-                    highAcuityCount
-                )} ESI 1–2`,
-
+                `${formatNumber(highAcuityCount)} ESI 1–2`,
                 `${formatNumber(
                     calculatePercentage(
                         highAcuityCount,
                         assessment.totalEDVolume
                     )
                 )}% of ED census`
-
             )}
 
-
             ${createMetricCard(
-
                 "Active Triggers",
-
                 String(
-                    operationalAssessment
-                        .activeTriggers
-                        .length
+                    operationalAssessment.activeTriggers.length
                 ),
-
                 createTriggerCountDescription(
-                    operationalAssessment
-                        .activeTriggers
-                        .length
+                    operationalAssessment.activeTriggers.length
                 )
-
             )}
 
         </div>
@@ -825,17 +630,11 @@ function createHandoffMarkup(
 
         <div class="shift-handoff-sections">
 
-            ${createDriverSection(
-                leadingDrivers
-            )}
+            ${createDriverSection(leadingDrivers)}
 
-            ${createTriggerSection(
-                activeTriggers
-            )}
+            ${createTriggerSection(activeTriggers)}
 
-            ${createActionSection(
-                urgentActions
-            )}
+            ${createActionSection(urgentActions)}
 
         </div>
 
@@ -845,34 +644,29 @@ function createHandoffMarkup(
             <div>
 
                 <span class="shift-handoff-label">
-                    Near-Term Operational Outlook
+                    Four-Hour Hospital Outlook
                 </span>
 
                 <strong>
-
                     ${escapeHtml(
                         createOutlookHeading(
-                            expectedNetFlow,
+                            result.projectedAvailableAcuteCareBeds,
                             operationalAssessment.riskDirection
                         )
                     )}
-
                 </strong>
 
             </div>
 
-
             <p>
-
                 ${escapeHtml(
                     createOutlookDescription(
-                        expectedNetFlow,
+                        result.projectedAvailableAcuteCareBeds,
                         assessment.boardedPatients,
-                        assessment.expectedBoarders,
+                        assessment.expectedEDBoarders,
                         operationalAssessment.riskDirection
                     )
                 )}
-
             </p>
 
         </div>
@@ -1263,171 +1057,66 @@ function createPlainTextHandoff(
 
 ):string {
 
-    const assessment =
+    const assessment = operationalAssessment.assessment;
 
-        operationalAssessment.assessment;
+    const result = operationalAssessment.scoreResult;
 
+    const score = Math.round(result.score);
 
-    const score = Math.round(
+    const finalState = operationalAssessment.finalOperationalState;
 
-        operationalAssessment
-            .scoreResult
-            .score
-
-    );
-
-
-    const finalState =
-
-        operationalAssessment.finalOperationalState;
-
-
-    const baseState =
-
-        operationalAssessment.baseOperationalState;
-
+    const baseState = operationalAssessment.baseOperationalState;
 
     const scoreChange = determineScoreChange(
-
         snapshots,
-
         score
-
     );
 
-
-    const expectedNetFlow =
-
-        assessment.expectedArrivals
-
-        -
-
-        assessment.expectedDepartures;
-
-
     const driverLines =
-
         operationalAssessment.primaryDrivers
-
             .slice()
-
             .sort(
-
-                (
-
-                    first,
-
-                    second
-
-                ) =>
-
-                    second.severity
-
-                    -
-
-                    first.severity
-
+                (first, second) =>
+                    second.severity - first.severity
             )
-
-            .slice(
-
-                0,
-
-                MAXIMUM_HANDOFF_DRIVERS
-
-            )
-
+            .slice(0, MAXIMUM_HANDOFF_DRIVERS)
             .map(
-
                 driver =>
-
                     `- ${driver.title}: ${driver.description}`
-
             );
-
 
     const triggerLines =
-
         operationalAssessment.activeTriggers
-
-            .slice(
-
-                0,
-
-                MAXIMUM_HANDOFF_TRIGGERS
-
-            )
-
+            .slice(0, MAXIMUM_HANDOFF_TRIGGERS)
             .map(
-
                 triggerResult =>
-
                     `- ${triggerResult.trigger.title} (${triggerResult.trigger.priority}): ${triggerResult.activationReason}`
-
             );
-
 
     const actionLines =
-
         operationalAssessment.recommendations
-
             .filter(
-
                 recommendation =>
-
-                    recommendation.priority
-
-                    ===
-
-                    "Immediate"
-
+                    recommendation.priority === "Immediate"
                     ||
-
-                    recommendation.priority
-
-                    ===
-
-                    "High"
-
+                    recommendation.priority === "High"
             )
-
             .slice()
-
-            .sort(
-
-                compareRecommendations
-
-            )
-
-            .slice(
-
-                0,
-
-                MAXIMUM_HANDOFF_ACTIONS
-
-            )
-
+            .sort(compareRecommendations)
+            .slice(0, MAXIMUM_HANDOFF_ACTIONS)
             .map(
-
                 recommendation =>
-
                     `- ${recommendation.priority}: ${recommendation.title} — ${recommendation.description}`
-
             );
 
-
     const escalationLine =
-
         finalState.title !== baseState.title
-
             ? `Final level was elevated from ${baseState.title} to ${finalState.title} by active operational triggers.`
-
             : `Final level matches the score-derived ${baseState.title} level.`;
-
 
     return [
 
-        "EDORI SHIFT HANDOFF",
+        "HOSPITAL READINESS SHIFT HANDOFF",
 
         `Assessment: ${formatAssessmentTime(
             assessment.assessmentTime
@@ -1435,7 +1124,7 @@ function createPlainTextHandoff(
 
         "",
 
-        `Status: ${finalState.title} — EDORI ${score}`,
+        `Status: ${finalState.title} — HRI ${score}`,
 
         `Trend: ${operationalAssessment.riskDirection}`,
 
@@ -1453,9 +1142,9 @@ function createPlainTextHandoff(
         )} patients (${formatNumber(
             calculatePercentage(
                 assessment.totalEDVolume,
-                HOSPITAL.ED_BEDS
+                ED_TREATMENT_BEDS
             )
-        )}% of configured capacity)`,
+        )}% of ${ED_TREATMENT_BEDS}-bed treatment capacity)`,
 
         `Boarding: ${formatNumber(
             assessment.boardedPatients
@@ -1466,21 +1155,46 @@ function createPlainTextHandoff(
             )
         )}% of ED census)`,
 
-        `Medical beds: ${formatNumber(
-            assessment.occupiedMedicalBeds
-        )}/${HOSPITAL.MEDICAL_BEDS} occupied (${formatNumber(
+        `Acute-care beds: ${formatNumber(
+            assessment.occupiedAcuteCareBeds
+        )}/${formatNumber(
+            assessment.staffedAcuteCareBeds
+        )} occupied (${formatNumber(
             calculatePercentage(
-                assessment.occupiedMedicalBeds,
-                HOSPITAL.MEDICAL_BEDS
+                assessment.occupiedAcuteCareBeds,
+                assessment.staffedAcuteCareBeds
             )
         )}%)`,
 
-        `Expected flow: ${formatNumber(
-            assessment.expectedArrivals
-        )} arrivals, ${formatNumber(
-            assessment.expectedDepartures
-        )} departures, net ${formatSignedNumber(
-            expectedNetFlow
+        `Critical-care beds: ${formatNumber(
+            assessment.occupiedCriticalCareBeds
+        )}/${formatNumber(
+            assessment.staffedCriticalCareBeds
+        )} occupied (${formatNumber(
+            calculatePercentage(
+                assessment.occupiedCriticalCareBeds,
+                assessment.staffedCriticalCareBeds
+            )
+        )}%)`,
+
+        `Known hospital inflow: ${formatNumber(
+            result.currentHospitalInflow
+        )}`,
+
+        `Historical expected four-hour inflow: ${formatNumber(
+            result.expectedHospitalInflow
+        )}`,
+
+        `Hospital inflow used for forecast: ${formatNumber(
+            result.projectedHospitalInflow
+        )}`,
+
+        `Historical expected four-hour inpatient departures: ${formatNumber(
+            result.expectedInpatientDepartures
+        )}`,
+
+        `Projected available acute-care beds: ${formatBedAvailability(
+            result.projectedAvailableAcuteCareBeds
         )}`,
 
         "",
@@ -1488,17 +1202,11 @@ function createPlainTextHandoff(
         "PRIMARY DRIVERS",
 
         ...(
-
             driverLines.length > 0
-
                 ? driverLines
-
                 : [
-
-                    "- No dominant score drivers identified."
-
+                    "- No dominant Hospital Readiness drivers identified."
                 ]
-
         ),
 
         "",
@@ -1506,17 +1214,11 @@ function createPlainTextHandoff(
         "ACTIVE TRIGGERS",
 
         ...(
-
             triggerLines.length > 0
-
                 ? triggerLines
-
                 : [
-
                     "- No active operational triggers."
-
                 ]
-
         ),
 
         "",
@@ -1524,33 +1226,23 @@ function createPlainTextHandoff(
         "PRIORITY ACTIONS",
 
         ...(
-
             actionLines.length > 0
-
                 ? actionLines
-
                 : [
-
                     "- No immediate or high-priority actions listed."
-
                 ]
-
         ),
 
         "",
 
-        `Near-term outlook: ${createOutlookDescription(
-            expectedNetFlow,
+        `Four-hour outlook: ${createOutlookDescription(
+            result.projectedAvailableAcuteCareBeds,
             assessment.boardedPatients,
-            assessment.expectedBoarders,
+            assessment.expectedEDBoarders,
             operationalAssessment.riskDirection
         )}`
 
-    ].join(
-
-        "\n"
-
-    );
+    ].join("\n");
 
 }
 
@@ -1949,72 +1641,118 @@ function getRecommendationPriorityRank(
 
 
 /**
- * Create the near-term outlook heading.
+ * Format current or projected acute-care bed availability.
+ *
+ * Negative values are intentionally preserved because
+ * they represent a projected capacity deficit.
+ */
+function formatBedAvailability(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "--";
+
+    }
+
+    if(value < 0){
+
+        return `${formatNumber(value)} beds (deficit)`;
+
+    }
+
+    if(value === 1){
+
+        return "1 bed";
+
+    }
+
+    return `${formatNumber(value)} beds`;
+
+}
+
+
+/**
+ * Explain projected acute-care capacity.
+ */
+function createProjectedCapacityDescription(
+
+    projectedAvailableBeds:number
+
+):string {
+
+    if(projectedAvailableBeds < 0){
+
+        return `Projected demand exceeds staffed acute-care capacity by approximately ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds.`;
+
+    }
+
+    if(projectedAvailableBeds === 0){
+
+        return "Projected flow fully utilizes staffed acute-care capacity.";
+
+    }
+
+    return `${formatNumber(
+        projectedAvailableBeds
+    )} staffed acute-care beds projected to remain available.`;
+
+}
+
+
+/**
+ * Create the four-hour hospital outlook heading.
  */
 function createOutlookHeading(
 
-    expectedNetFlow:number,
+    projectedAvailableBeds:number,
 
     riskDirection:OperationalAssessment["riskDirection"]
 
 ):string {
 
     if(
-
+        projectedAvailableBeds < 0
+        ||
         riskDirection === "Rapidly Worsening"
-
-        ||
-
-        expectedNetFlow >= 8
-
     ){
 
-        return "Significant worsening pressure expected";
+        return "Significant hospital capacity pressure expected";
 
     }
 
-
     if(
-
+        projectedAvailableBeds === 0
+        ||
         riskDirection === "Increasing"
-
-        ||
-
-        expectedNetFlow > 0
-
     ){
 
-        return "Continued operational pressure expected";
+        return "Continued hospital capacity pressure expected";
 
     }
 
-
-    if(
-
-        riskDirection === "Improving"
-
-        &&
-
-        expectedNetFlow < 0
-
-    ){
+    if(riskDirection === "Improving"){
 
         return "Conditions may improve";
 
     }
 
-
-    return "Conditions expected to remain relatively stable";
+    return "Near-term hospital capacity remains available";
 
 }
 
 
 /**
- * Create a transparent outlook explanation.
+ * Create a transparent four-hour hospital outlook.
  */
 function createOutlookDescription(
 
-    expectedNetFlow:number,
+    projectedAvailableBeds:number,
 
     boardedPatients:number,
 
@@ -2025,69 +1763,53 @@ function createOutlookDescription(
 ):string {
 
     const boardingDifference =
+        boardedPatients - expectedBoarders;
 
-        boardedPatients
+    if(projectedAvailableBeds < 0){
 
-        -
+        return `The four-hour forecast projects an acute-care capacity deficit of approximately ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds after projected hospital inflow and historical expected inpatient departures.`;
 
-        expectedBoarders;
-
+    }
 
     if(
-
-        expectedNetFlow > 0
-
+        projectedAvailableBeds === 0
         &&
-
         boardingDifference > 0
-
     ){
 
-        return `Expected arrivals exceed departures by ${formatNumber(
-            expectedNetFlow
-        )} per hour while boarding remains ${formatNumber(
+        return `The four-hour forecast projects full utilization of staffed acute-care capacity while ED boarding remains ${formatNumber(
             boardingDifference
-        )} patients above baseline. Continued census and throughput pressure is likely if conditions persist.`;
+        )} patients above baseline. Inpatient throughput remains an important constraint.`;
 
     }
-
-
-    if(expectedNetFlow > 0){
-
-        return `Expected arrivals exceed departures by ${formatNumber(
-            expectedNetFlow
-        )} per hour. ED census may continue to increase if actual flow follows the historical expectation.`;
-
-    }
-
 
     if(
-
-        expectedNetFlow < 0
-
+        projectedAvailableBeds > 0
         &&
-
         riskDirection === "Improving"
-
     ){
 
-        return `Expected departures exceed arrivals by ${formatNumber(
-            Math.abs(expectedNetFlow)
-        )} per hour and the recent EDORI trend is improving. Operational pressure may decrease if departures occur as expected.`;
+        return `Approximately ${formatNumber(
+            projectedAvailableBeds
+        )} staffed acute-care beds are projected to remain available at the end of the four-hour horizon, and the recent operational trend is improving.`;
 
     }
-
 
     if(boardingDifference > 0){
 
-        return `Expected arrivals and departures are relatively balanced, but boarding remains ${formatNumber(
+        return `Approximately ${formatNumber(
+            projectedAvailableBeds
+        )} staffed acute-care beds are projected to remain available, but ED boarding remains ${formatNumber(
             boardingDifference
-        )} patients above baseline. Inpatient flow remains an important constraint.`;
+        )} patients above baseline. Continue monitoring hospital throughput and active triggers.`;
 
     }
 
-
-    return "Expected arrivals and departures are relatively balanced. Continue monitoring actual census movement and operational triggers.";
+    return `Approximately ${formatNumber(
+        projectedAvailableBeds
+    )} staffed acute-care beds are projected to remain available after projected inflow and historical expected inpatient departures.`;
 
 }
 
@@ -2390,7 +2112,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to generate a shift handoff summary.
+                Calculate Hospital Readiness to generate a shift handoff summary.
             </p>
 
         </div>

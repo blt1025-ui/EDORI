@@ -1,41 +1,74 @@
 /**
  * OperationalPillarScores
  *
- * EDORI 2.0 organizes operational strain into
- * four explainable pillars.
+ * Version 2 Hospital Readiness Model
  *
- * Every pillar score is normalized from
- * 0 through 100.
+ * Exposes the five authoritative weighted Hospital
+ * Readiness domains directly, plus Operational
+ * Momentum as a separate non-weighted trend measure.
+ *
+ * Authoritative HRI domains:
+ *
+ * - ED Operational Pressure      35%
+ * - Acute-Care Capacity          20%
+ * - Critical-Care Capacity       15%
+ * - Hospital Inflow              15%
+ * - Projected Capacity           15%
+ *
+ * Operational Momentum is NOT part of the weighted
+ * Hospital Readiness score.
  */
 
 export interface OperationalPillarScores {
 
     /**
-     * Current emergency department workload,
-     * occupancy, and boarding burden.
-     */
-    operationalDemand:number;
-
-
-    /**
-     * Intensity and acuity of the current
-     * patient population.
-     */
-    clinicalComplexity:number;
-
-
-    /**
-     * Hospital capacity and patient-flow
-     * constraints affecting the ED.
-     */
-    hospitalThroughput:number;
-
-
-    /**
-     * Direction and rate of operational change.
+     * Emergency Department operational pressure.
      *
-     * May be unavailable when insufficient
-     * snapshot history exists.
+     * Authoritative HRI weight: 35%
+     */
+    edOperationalPressure:number;
+
+
+    /**
+     * Acute-care inpatient capacity pressure.
+     *
+     * Authoritative HRI weight: 20%
+     */
+    acuteCareCapacity:number;
+
+
+    /**
+     * Critical-care inpatient capacity pressure.
+     *
+     * Authoritative HRI weight: 15%
+     */
+    criticalCareCapacity:number;
+
+
+    /**
+     * Current hospital inflow pressure relative to
+     * historical four-hour expectations.
+     *
+     * Authoritative HRI weight: 15%
+     */
+    hospitalInflow:number;
+
+
+    /**
+     * Four-hour projected acute-care capacity
+     * pressure.
+     *
+     * Authoritative HRI weight: 15%
+     */
+    projectedCapacity:number;
+
+
+    /**
+     * Direction and rate of Hospital Readiness change
+     * over time.
+     *
+     * This is explanatory only and is not included in
+     * the weighted Hospital Readiness score.
      */
     operationalMomentum:number | null;
 

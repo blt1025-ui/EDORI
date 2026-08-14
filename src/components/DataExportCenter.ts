@@ -1,12 +1,12 @@
 /**
  * DataExportCenter
  *
- * Exports the current EDORI assessment and saved
+ * Exports the current Hospital Readiness assessment and saved
  * snapshot history to CSV or JSON files.
  *
  * This component does not:
  *
- * - Calculate EDORI
+ * - Calculate Hospital Readiness
  * - Modify application state
  * - Change snapshot history
  * - Import or restore data
@@ -115,7 +115,7 @@ export function DataExportCenter():string {
                     </h3>
 
                     <p class="panel-description">
-                        Download the current assessment or saved EDORI history
+                        Download the current assessment or saved Hospital Readiness history
                     </p>
 
                 </div>
@@ -144,7 +144,7 @@ export function DataExportCenter():string {
                             </span>
 
                             <h4>
-                                Current EDORI CSV
+                                Current Hospital Readiness CSV
                             </h4>
 
                         </div>
@@ -206,7 +206,7 @@ export function DataExportCenter():string {
 
 
                     <p>
-                        Export all saved EDORI snapshots in a spreadsheet-friendly
+                        Export all saved Hospital Readiness snapshots in a spreadsheet-friendly
                         format with one assessment per row.
                     </p>
 
@@ -570,7 +570,7 @@ function exportCurrentAssessmentCsv():void {
 
             createTimestampedFilename(
 
-                "edori-current-assessment",
+                "hospital-readiness-current-assessment",
 
                 "csv"
 
@@ -585,7 +585,7 @@ function exportCurrentAssessmentCsv():void {
 
         showExportMessage(
 
-            "The current EDORI assessment CSV was downloaded.",
+            "The current Hospital Readiness assessment CSV was downloaded.",
 
             "success"
 
@@ -666,7 +666,7 @@ function exportHistoryCsv():void {
 
             createTimestampedFilename(
 
-                "edori-assessment-history",
+                "hospital-readiness-assessment-history",
 
                 "csv"
 
@@ -692,7 +692,7 @@ function exportHistoryCsv():void {
 
         console.error(
 
-            "Unable to export EDORI history CSV:",
+            "Unable to export Hospital Readiness history CSV:",
 
             error
 
@@ -741,10 +741,10 @@ function exportHistoryJson():void {
         const exportDocument = {
 
             exportType:
-                "EDORI Snapshot History",
+                "Hospital Readiness Snapshot History",
 
             schemaVersion:
-                1,
+                2,
 
             exportedAt:
                 new Date().toISOString(),
@@ -783,7 +783,7 @@ function exportHistoryJson():void {
 
             createTimestampedFilename(
 
-                "edori-assessment-history-backup",
+                "hospital-readiness-assessment-history-backup",
 
                 "json"
 
@@ -809,7 +809,7 @@ function exportHistoryJson():void {
 
         console.error(
 
-            "Unable to export EDORI history JSON:",
+            "Unable to export Hospital Readiness history JSON:",
 
             error
 
@@ -839,22 +839,24 @@ function createCurrentAssessmentRow(
 ):Record<string, unknown> {
 
     const assessment =
-
         operationalAssessment.assessment;
 
-
     const result =
-
         operationalAssessment.scoreResult;
 
+    const highAcuityCount =
+        assessment.esi1 + assessment.esi2;
+
+    const inferredEsi3To5 = Math.max(
+        0,
+        assessment.totalEDVolume - highAcuityCount
+    );
 
     return {
 
         assessmentTime:
             normalizeDateForExport(
-
                 assessment.assessmentTime
-
             ),
 
         day:
@@ -863,7 +865,10 @@ function createCurrentAssessmentRow(
         hour:
             assessment.hour,
 
-        edoriScore:
+        forecastHours:
+            assessment.forecastHours,
+
+        hospitalReadinessScore:
             result.score,
 
         finalOperationalLevel:
@@ -891,11 +896,8 @@ function createCurrentAssessmentRow(
             operationalAssessment
                 .activeTriggers
                 .map(
-
                     trigger =>
-
                         trigger.trigger.title
-
                 )
                 .join(" | "),
 
@@ -908,11 +910,8 @@ function createCurrentAssessmentRow(
             operationalAssessment
                 .recommendations
                 .map(
-
                     recommendation =>
-
                         `${recommendation.priority}: ${recommendation.title}`
-
                 )
                 .join(" | "),
 
@@ -922,80 +921,97 @@ function createCurrentAssessmentRow(
         boardedPatients:
             assessment.boardedPatients,
 
-        occupiedMedicalBeds:
-            assessment.occupiedMedicalBeds,
-
         esi1:
             assessment.esi1,
 
         esi2:
             assessment.esi2,
 
-        esi3:
-            assessment.esi3,
+        inferredEsi3To5,
 
-        esi4:
-            assessment.esi4,
+        staffedAcuteCareBeds:
+            assessment.staffedAcuteCareBeds,
 
-        esi5:
-            assessment.esi5,
+        occupiedAcuteCareBeds:
+            assessment.occupiedAcuteCareBeds,
 
-        expectedVolume:
-            assessment.expectedVolume,
+        staffedCriticalCareBeds:
+            assessment.staffedCriticalCareBeds,
 
-        expectedBoarders:
-            assessment.expectedBoarders,
+        occupiedCriticalCareBeds:
+            assessment.occupiedCriticalCareBeds,
 
-        expectedArrivals:
-            assessment.expectedArrivals,
+        currentEDAdmissions:
+            assessment.currentEDAdmissions,
 
-        expectedDepartures:
-            assessment.expectedDepartures,
+        currentDirectAdmissions:
+            assessment.currentDirectAdmissions,
 
-        demandScore:
-            readOptionalResultNumber(
+        currentSurgicalAdmissions:
+            assessment.currentSurgicalAdmissions,
 
-                result,
+        expectedEDVolume:
+            assessment.expectedEDVolume,
 
-                "demandScore"
+        expectedEDBoarders:
+            assessment.expectedEDBoarders,
 
-            ),
+        expectedEDAdmissions4h:
+            assessment.expectedEDAdmissions4h,
 
-        boardingScore:
-            readOptionalResultNumber(
+        expectedDirectAdmissions4h:
+            assessment.expectedDirectAdmissions4h,
 
-                result,
+        expectedSurgicalAdmissions4h:
+            assessment.expectedSurgicalAdmissions4h,
 
-                "boardingScore"
+        expectedHospitalInflow4h:
+            assessment.expectedHospitalInflow4h,
 
-            ),
+        expectedInpatientDepartures4h:
+            assessment.expectedInpatientDepartures4h,
 
-        hospitalScore:
-            readOptionalResultNumber(
+        edPressureScore:
+            result.edPressureScore,
 
-                result,
+        acuteCapacityScore:
+            result.acuteCapacityScore,
 
-                "hospitalScore"
+        criticalCapacityScore:
+            result.criticalCapacityScore,
 
-            ),
+        inflowScore:
+            result.inflowScore,
 
-        acuityScore:
-            readOptionalResultNumber(
+        projectedCapacityScore:
+            result.projectedCapacityScore,
 
-                result,
+        edVolumeScore:
+            result.edVolumeScore,
 
-                "acuityScore"
+        edBoardingScore:
+            result.edBoardingScore,
 
-            ),
+        edAcuityScore:
+            result.edAcuityScore,
 
-        forecastScore:
-            readOptionalResultNumber(
+        currentHospitalInflow:
+            result.currentHospitalInflow,
 
-                result,
+        expectedHospitalInflow:
+            result.expectedHospitalInflow,
 
-                "forecastScore"
+        projectedHospitalInflow:
+            result.projectedHospitalInflow,
 
-            )
+        expectedInpatientDepartures:
+            result.expectedInpatientDepartures,
+
+        currentAvailableAcuteCareBeds:
+            result.currentAvailableAcuteCareBeds,
+
+        projectedAvailableAcuteCareBeds:
+            result.projectedAvailableAcuteCareBeds
 
     };
 
@@ -1011,12 +1027,32 @@ function createSnapshotCsvRow(
 
 ):Record<string, unknown> {
 
+    const highAcuityCount =
+
+        snapshot.esi1
+
+        +
+
+        snapshot.esi2;
+
+
+    const inferredEsi3To5 = Math.max(
+
+        0,
+
+        snapshot.totalEDVolume
+
+        -
+
+        highAcuityCount
+
+    );
+
+
     return {
 
         id:
-            snapshot.id
-
-            ?? "",
+            snapshot.id,
 
         timestamp:
             normalizeDateForExport(
@@ -1024,6 +1060,9 @@ function createSnapshotCsvRow(
                 snapshot.timestamp
 
             ),
+
+        schemaVersion:
+            snapshot.schemaVersion,
 
         score:
             snapshot.score,
@@ -1041,99 +1080,117 @@ function createSnapshotCsvRow(
             snapshot.operationalState.color,
 
         day:
-            snapshot.day
-
-            ?? "",
+            snapshot.day,
 
         hour:
-            snapshot.hour
+            snapshot.hour,
 
-            ?? "",
+        forecastHours:
+            snapshot.forecastHours,
 
         totalEDVolume:
-            snapshot.totalEDVolume
-
-            ?? "",
+            snapshot.totalEDVolume,
 
         boardedPatients:
-            snapshot.boardedPatients
-
-            ?? "",
-
-        occupiedMedicalBeds:
-            snapshot.occupiedMedicalBeds
-
-            ?? "",
+            snapshot.boardedPatients,
 
         esi1:
-            snapshot.esi1
-
-            ?? "",
+            snapshot.esi1,
 
         esi2:
-            snapshot.esi2
+            snapshot.esi2,
 
-            ?? "",
+        inferredEsi3To5,
 
-        esi3:
-            snapshot.esi3
+        staffedAcuteCareBeds:
+            snapshot.staffedAcuteCareBeds,
 
-            ?? "",
+        occupiedAcuteCareBeds:
+            snapshot.occupiedAcuteCareBeds,
 
-        esi4:
-            snapshot.esi4
+        staffedCriticalCareBeds:
+            snapshot.staffedCriticalCareBeds,
 
-            ?? "",
+        occupiedCriticalCareBeds:
+            snapshot.occupiedCriticalCareBeds,
 
-        esi5:
-            snapshot.esi5
+        currentEDAdmissions:
+            snapshot.currentEDAdmissions,
 
-            ?? "",
+        currentDirectAdmissions:
+            snapshot.currentDirectAdmissions,
 
-        expectedVolume:
-            snapshot.expectedVolume
+        currentSurgicalAdmissions:
+            snapshot.currentSurgicalAdmissions,
 
-            ?? "",
+        currentHospitalInflow:
+            snapshot.currentHospitalInflow,
 
-        expectedBoarders:
-            snapshot.expectedBoarders
+        expectedEDVolume:
+            snapshot.expectedEDVolume,
 
-            ?? "",
+        expectedEDBoarders:
+            snapshot.expectedEDBoarders,
 
-        expectedArrivals:
-            snapshot.expectedArrivals
+        expectedEDAdmissions4h:
+            snapshot.expectedEDAdmissions4h,
 
-            ?? "",
+        expectedDirectAdmissions4h:
+            snapshot.expectedDirectAdmissions4h,
 
-        expectedDepartures:
-            snapshot.expectedDepartures
+        expectedSurgicalAdmissions4h:
+            snapshot.expectedSurgicalAdmissions4h,
 
-            ?? "",
+        expectedHospitalInflow4h:
+            snapshot.expectedHospitalInflow4h,
 
-        demandScore:
-            snapshot.demandScore
+        expectedInpatientDepartures4h:
+            snapshot.expectedInpatientDepartures4h,
 
-            ?? "",
+        projectedHospitalInflow:
+            snapshot.projectedHospitalInflow,
 
-        boardingScore:
-            snapshot.boardingScore
+        currentAvailableAcuteCareBeds:
+            snapshot.currentAvailableAcuteCareBeds,
 
-            ?? "",
+        projectedAvailableAcuteCareBeds:
+            snapshot.projectedAvailableAcuteCareBeds,
 
-        hospitalScore:
-            snapshot.hospitalScore
+        edPressureScore:
+            snapshot.edPressureScore,
 
-            ?? "",
+        acuteCapacityScore:
+            snapshot.acuteCapacityScore,
 
-        acuityScore:
-            snapshot.acuityScore
+        criticalCapacityScore:
+            snapshot.criticalCapacityScore,
 
-            ?? "",
+        inflowScore:
+            snapshot.inflowScore,
 
-        forecastScore:
-            snapshot.forecastScore
+        projectedCapacityScore:
+            snapshot.projectedCapacityScore,
 
-            ?? ""
+        edVolumeScore:
+            snapshot.edVolumeScore,
+
+        edBoardingScore:
+            snapshot.edBoardingScore,
+
+        edAcuityScore:
+            snapshot.edAcuityScore,
+
+        scoreChange:
+            snapshot.scoreChange ?? "",
+
+        trendDirection:
+            snapshot.trendDirection ?? "",
+
+        activeTriggerIds:
+            snapshot.activeTriggerIds?.join(" | ") ?? "",
+
+        activeTriggerTitles:
+            snapshot.activeTriggerTitles?.join(" | ") ?? ""
 
     };
 
@@ -1381,48 +1438,6 @@ function escapeCsvValue(
 
 
     return text;
-
-}
-
-
-/**
- * Read an optional numeric property from the score
- * result without requiring every result interface
- * version to expose the field.
- */
-function readOptionalResultNumber(
-
-    result:OperationalAssessment["scoreResult"],
-
-    propertyName:string
-
-):number | "" {
-
-    const candidate = result as unknown as
-
-    Record<string, unknown>;
-
-
-    const value = candidate[
-
-        propertyName
-
-    ];
-
-
-    return typeof value === "number"
-
-        &&
-
-        Number.isFinite(
-
-            value
-
-        )
-
-            ? value
-
-            : "";
 
 }
 

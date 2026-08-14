@@ -1,8 +1,8 @@
 /**
  * OperationalAssessmentService
  *
- * Creates one authoritative EDORI 2.0
- * operational assessment.
+ * Creates one authoritative Version 2 Hospital
+ * Readiness operational assessment.
  *
  * Combines:
  *
@@ -12,7 +12,7 @@
  * - Operational pillar scores
  * - Risk direction
  * - Confidence
- * - Trigger-adjusted operational state
+ * - Score-derived operational state
  * - Configured operational recommendations
  *
  * This service does not:
@@ -21,7 +21,7 @@
  * - Save results
  * - Save snapshots
  * - Emit application events
- * - Recalculate EDORI
+ * - Recalculate Hospital Readiness
  */
 
 import {
@@ -33,15 +33,6 @@ import {
 from "../config/interventions";
 
 
-import {
-
-    getOperationalStateByTitle,
-
-    getOperationalStateRank
-
-}
-
-from "../config/operationalStates";
 
 
 import {
@@ -249,17 +240,11 @@ export function createOperationalAssessment(
     );
 
 
-    const finalOperationalState =
+    const finalOperationalState = {
 
-        determineFinalOperationalState(
+        ...normalizedContext.result.operationalState
 
-            normalizedContext
-                .result
-                .operationalState,
-
-            activeTriggers
-
-        );
+    };
 
 
     const recommendations =
@@ -523,11 +508,12 @@ export function createOperationalAssessment(
 
 
 /**
- * Create transitional pillar values from the
- * existing EDORI domain scores.
+ * Create Version 2 Hospital Readiness explanatory
+ * pillar scores.
  *
- * These mappings can later be replaced with
- * dedicated EDORI 2.0 pillar formulas.
+ * These pillars do not replace or recalculate HRI.
+ * They group authoritative Hospital Readiness
+ * domains into leadership-friendly categories.
  */
 function createInitialPillarScores(
 
@@ -535,49 +521,56 @@ function createInitialPillarScores(
 
 ):OperationalPillarScores {
 
-    const operationalDemand = clampScore(
+    /*
+     * The five displayed domain scores map directly to
+     * the authoritative Hospital Readiness result.
+     *
+     * No secondary weighting or averaging occurs here.
+     */
 
-        (
+    const edOperationalPressure =
 
-            context.result.demandScore
+        clampScore(
 
-            +
+            context.result.edPressureScore
 
-            context.result.boardingScore
-
-        )
-
-        /
-
-        2
-
-    );
+        );
 
 
-    const clinicalComplexity = clampScore(
+    const acuteCareCapacity =
 
-        context.result.acuityScore
+        clampScore(
 
-    );
+            context.result.acuteCapacityScore
+
+        );
 
 
-    const hospitalThroughput = clampScore(
+    const criticalCareCapacity =
 
-        (
+        clampScore(
 
-            context.result.hospitalScore
+            context.result.criticalCapacityScore
 
-            +
+        );
 
-            context.result.forecastScore
 
-        )
+    const hospitalInflow =
 
-        /
+        clampScore(
 
-        2
+            context.result.inflowScore
 
-    );
+        );
+
+
+    const projectedCapacity =
+
+        clampScore(
+
+            context.result.projectedCapacityScore
+
+        );
 
 
     const operationalMomentum =
@@ -591,11 +584,15 @@ function createInitialPillarScores(
 
     return {
 
-        operationalDemand,
+        edOperationalPressure,
 
-        clinicalComplexity,
+        acuteCareCapacity,
 
-        hospitalThroughput,
+        criticalCareCapacity,
+
+        hospitalInflow,
+
+        projectedCapacity,
 
         operationalMomentum
 
@@ -605,7 +602,8 @@ function createInitialPillarScores(
 
 
 /**
- * Create explainable pillar details.
+ * Create explainable Version 2 Hospital Readiness
+ * pillar details.
  */
 function createInitialPillarDetails(
 
@@ -629,30 +627,100 @@ function createInitialPillarDetails(
         context.assessment.esi2;
 
 
-    const expectedNetFlow =
+    const highAcuityPercent =
 
-        context.assessment.expectedArrivals
+        calculatePercentage(
+
+            highAcuityCount,
+
+            totalEDVolume
+
+        );
+
+
+    const acuteOccupancyPercent =
+
+        calculatePercentage(
+
+            context.assessment.occupiedAcuteCareBeds,
+
+            context.assessment.staffedAcuteCareBeds
+
+        );
+
+
+    const criticalOccupancyPercent =
+
+        calculatePercentage(
+
+            context.assessment.occupiedCriticalCareBeds,
+
+            context.assessment.staffedCriticalCareBeds
+
+        );
+
+
+    const currentAvailableAcuteCareBeds =
+
+        context.assessment.staffedAcuteCareBeds
 
         -
 
-        context.assessment.expectedDepartures;
+        context.assessment.occupiedAcuteCareBeds;
+
+
+    const currentAvailableCriticalCareBeds =
+
+        context.assessment.staffedCriticalCareBeds
+
+        -
+
+        context.assessment.occupiedCriticalCareBeds;
+
+
+    const inflowVariance =
+
+        context.result.currentHospitalInflow
+
+        -
+
+        context.result.expectedHospitalInflow;
+
+
+    const projectedCapacityChange =
+
+        context.result.projectedAvailableAcuteCareBeds
+
+        -
+
+        context.result.currentAvailableAcuteCareBeds;
 
 
     return [
 
+        /*
+         * =================================================
+         * ED Operational Pressure — 35%
+         * =================================================
+         */
+
         {
 
             id:
-                "operationalDemand",
+                "edOperationalPressure",
 
             title:
-                "Operational Demand",
+                "ED Operational Pressure",
 
             score:
-                scores.operationalDemand,
+                scores.edOperationalPressure,
 
             summary:
-                "Current ED workload based on volume and boarding strain.",
+                createEdOperationalPressureSummary(
+
+                    context
+
+                ),
 
             factors:[
 
@@ -668,24 +736,24 @@ function createInitialPillarDetails(
                         totalEDVolume,
 
                     comparisonValue:
-                        context.assessment.expectedVolume,
+                        context.assessment.expectedEDVolume,
 
                     difference:
                         totalEDVolume
 
                         -
 
-                        context.assessment.expectedVolume,
+                        context.assessment.expectedEDVolume,
 
                     severity:
                         clampScore(
 
-                            context.result.demandScore
+                            context.result.edVolumeScore
 
                         ),
 
                     explanation:
-                        "Current ED census compared with the historical weekday and hour expectation."
+                        "Current ED census compared with the historical expectation for the current weekday and hour."
 
                 },
 
@@ -693,83 +761,33 @@ function createInitialPillarDetails(
                 {
 
                     id:
-                        "boarding",
+                        "ed-boarding",
 
                     label:
-                        "Boarding",
+                        "ED Boarding",
 
                     currentValue:
                         context.assessment.boardedPatients,
 
                     comparisonValue:
-                        context.assessment.expectedBoarders,
+                        context.assessment.expectedEDBoarders,
 
                     difference:
                         context.assessment.boardedPatients
 
                         -
 
-                        context.assessment.expectedBoarders,
+                        context.assessment.expectedEDBoarders,
 
                     severity:
                         clampScore(
 
-                            context.result.boardingScore
+                            context.result.edBoardingScore
 
                         ),
 
                     explanation:
-                        "Current boarding compared with the historical weekday and hour expectation."
-
-                }
-
-            ]
-
-        },
-
-
-        {
-
-            id:
-                "clinicalComplexity",
-
-            title:
-                "Clinical Complexity",
-
-            score:
-                scores.clinicalComplexity,
-
-            summary:
-                "Current patient acuity burden based on the ESI distribution.",
-
-            factors:[
-
-                {
-
-                    id:
-                        "high-acuity-count",
-
-                    label:
-                        "ESI 1 and ESI 2 Patients",
-
-                    currentValue:
-                        highAcuityCount,
-
-                    comparisonValue:
-                        null,
-
-                    difference:
-                        null,
-
-                    severity:
-                        clampScore(
-
-                            context.result.acuityScore
-
-                        ),
-
-                    explanation:
-                        "Number of current ED patients categorized as ESI 1 or ESI 2."
+                        "Current ED boarding population compared with the historical expectation for the current weekday and hour."
 
                 },
 
@@ -780,42 +798,30 @@ function createInitialPillarDetails(
                         "high-acuity-percent",
 
                     label:
-                        "High-Acuity Percentage",
+                        "ESI 1-2 Percentage",
 
                     currentValue:
-                        calculatePercentage(
-
-                            highAcuityCount,
-
-                            totalEDVolume
-
-                        ),
+                        highAcuityPercent,
 
                     comparisonValue:
-                        25,
+                        30,
 
                     difference:
-                        calculatePercentage(
-
-                            highAcuityCount,
-
-                            totalEDVolume
-
-                        )
+                        highAcuityPercent
 
                         -
 
-                        25,
+                        30,
 
                     severity:
                         clampScore(
 
-                            context.result.acuityScore
+                            context.result.edAcuityScore
 
                         ),
 
                     explanation:
-                        "Percentage of the ED census categorized as ESI 1 or ESI 2."
+                        "Percentage of the current ED census categorized as ESI 1 or ESI 2."
 
                 }
 
@@ -824,54 +830,62 @@ function createInitialPillarDetails(
         },
 
 
+        /*
+         * =================================================
+         * Acute-Care Capacity — 20%
+         * =================================================
+         */
+
         {
 
             id:
-                "hospitalThroughput",
+                "acuteCareCapacity",
 
             title:
-                "Hospital Throughput",
+                "Acute-Care Capacity",
 
             score:
-                scores.hospitalThroughput,
+                scores.acuteCareCapacity,
 
             summary:
-                "Hospital capacity and expected hourly flow affecting ED operations.",
+                createAcuteCareCapacitySummary(
+
+                    context,
+
+                    acuteOccupancyPercent,
+
+                    currentAvailableAcuteCareBeds
+
+                ),
 
             factors:[
 
                 {
 
                     id:
-                        "hospital-occupancy",
+                        "acute-care-occupancy",
 
                     label:
-                        "Occupied Medical Beds",
+                        "Acute-Care Occupancy",
 
                     currentValue:
-                        context.assessment
-                            .occupiedMedicalBeds,
+                        acuteOccupancyPercent,
 
                     comparisonValue:
-                        273,
+                        null,
 
                     difference:
-                        context.assessment
-                            .occupiedMedicalBeds
-
-                        -
-
-                        273,
+                        null,
 
                     severity:
                         clampScore(
 
-                            context.result.hospitalScore
+                            context.result.acuteCapacityScore
 
                         ),
 
                     explanation:
-                        "Current occupied medical beds compared with the configured 273-bed denominator."
+                        `Current staffed acute-care occupancy: ${formatNumber(context.assessment.occupiedAcuteCareBeds)} of ${formatNumber(context.assessment.staffedAcuteCareBeds)} staffed beds.`
 
                 },
 
@@ -879,29 +893,29 @@ function createInitialPillarDetails(
                 {
 
                     id:
-                        "expected-net-flow",
+                        "available-acute-care-beds",
 
                     label:
-                        "Expected Net Flow",
+                        "Available Acute-Care Beds",
 
                     currentValue:
-                        expectedNetFlow,
+                        currentAvailableAcuteCareBeds,
 
                     comparisonValue:
-                        0,
+                        null,
 
                     difference:
-                        expectedNetFlow,
+                        null,
 
                     severity:
                         clampScore(
 
-                            context.result.forecastScore
+                            context.result.acuteCapacityScore
 
                         ),
 
                     explanation:
-                        "Expected arrivals minus expected departures for the current hourly period."
+                        "Current staffed acute-care beds not occupied."
 
                 }
 
@@ -909,6 +923,294 @@ function createInitialPillarDetails(
 
         },
 
+
+        /*
+         * =================================================
+         * Critical-Care Capacity — 15%
+         * =================================================
+         */
+
+        {
+
+            id:
+                "criticalCareCapacity",
+
+            title:
+                "Critical-Care Capacity",
+
+            score:
+                scores.criticalCareCapacity,
+
+            summary:
+                createCriticalCareCapacitySummary(
+
+                    context,
+
+                    criticalOccupancyPercent,
+
+                    currentAvailableCriticalCareBeds
+
+                ),
+
+            factors:[
+
+                {
+
+                    id:
+                        "critical-care-occupancy",
+
+                    label:
+                        "Critical-Care Occupancy",
+
+                    currentValue:
+                        criticalOccupancyPercent,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.criticalCapacityScore
+
+                        ),
+
+                    explanation:
+                        `Current staffed critical-care occupancy: ${formatNumber(context.assessment.occupiedCriticalCareBeds)} of ${formatNumber(context.assessment.staffedCriticalCareBeds)} staffed beds.`
+
+                },
+
+
+                {
+
+                    id:
+                        "available-critical-care-beds",
+
+                    label:
+                        "Available Critical-Care Beds",
+
+                    currentValue:
+                        currentAvailableCriticalCareBeds,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.criticalCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Current staffed critical-care beds not occupied."
+
+                }
+
+            ]
+
+        },
+
+
+        /*
+         * =================================================
+         * Hospital Inflow — 15%
+         * =================================================
+         */
+
+        {
+
+            id:
+                "hospitalInflow",
+
+            title:
+                "Hospital Inflow",
+
+            score:
+                scores.hospitalInflow,
+
+            summary:
+                createHospitalInflowSummary(
+
+                    context
+
+                ),
+
+            factors:[
+
+                {
+
+                    id:
+                        "known-hospital-inflow",
+
+                    label:
+                        "Known Hospital Inflow",
+
+                    currentValue:
+                        context.result.currentHospitalInflow,
+
+                    comparisonValue:
+                        context.result.expectedHospitalInflow,
+
+                    difference:
+                        inflowVariance,
+
+                    severity:
+                        clampScore(
+
+                            context.result.inflowScore
+
+                        ),
+
+                    explanation:
+                        "Current known ED, direct, and surgical/procedural admissions compared with the historical four-hour hospital inflow expectation."
+
+                },
+
+
+                {
+
+                    id:
+                        "projected-hospital-inflow",
+
+                    label:
+                        "Projected Hospital Inflow",
+
+                    currentValue:
+                        context.result.projectedHospitalInflow,
+
+                    comparisonValue:
+                        context.result.expectedHospitalInflow,
+
+                    difference:
+                        context.result.projectedHospitalInflow
+
+                        -
+
+                        context.result.expectedHospitalInflow,
+
+                    severity:
+                        clampScore(
+
+                            context.result.inflowScore
+
+                        ),
+
+                    explanation:
+                        "Hospital inflow used by the four-hour forecast. The model uses the greater of currently known inflow and historical expected inflow."
+
+                }
+
+            ]
+
+        },
+
+
+        /*
+         * =================================================
+         * Projected Capacity — 15%
+         * =================================================
+         */
+
+        {
+
+            id:
+                "projectedCapacity",
+
+            title:
+                "Projected Capacity",
+
+            score:
+                scores.projectedCapacity,
+
+            summary:
+                createProjectedCapacitySummary(
+
+                    context
+
+                ),
+
+            factors:[
+
+                {
+
+                    id:
+                        "expected-inpatient-departures",
+
+                    label:
+                        "Expected Inpatient Departures",
+
+                    currentValue:
+                        context.result.expectedInpatientDepartures,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Historical expected inpatient departures during the four-hour forecast period. This value is not entered or estimated by the user."
+
+                },
+
+
+                {
+
+                    id:
+                        "projected-available-acute-care-beds",
+
+                    label:
+                        "Projected Available Acute-Care Beds",
+
+                    currentValue:
+                        context.result.projectedAvailableAcuteCareBeds,
+
+                    comparisonValue:
+                        context.result.currentAvailableAcuteCareBeds,
+
+                    difference:
+                        projectedCapacityChange,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        createProjectedCapacityExplanation(
+
+                            context
+
+                        )
+
+                }
+
+            ]
+
+        },
+
+
+        /*
+         * =================================================
+         * Operational Momentum — not part of HRI
+         * =================================================
+         */
 
         {
 
@@ -924,7 +1226,7 @@ function createInitialPillarDetails(
             summary:
                 scores.operationalMomentum === null
 
-                    ? "Insufficient history is available to calculate operational momentum."
+                    ? "Insufficient Hospital Readiness history is available to calculate operational momentum."
 
                     : createMomentumSummary(
 
@@ -932,13 +1234,14 @@ function createInitialPillarDetails(
 
                     ),
 
-            factors:createMomentumFactors(
+            factors:
+                createMomentumFactors(
 
-                context,
+                    context,
 
-                scores.operationalMomentum
+                    scores.operationalMomentum
 
-            )
+                )
 
         }
 
@@ -946,6 +1249,276 @@ function createInitialPillarDetails(
 
 }
 
+/**
+ * Explain the ED Operational Pressure pillar.
+ */
+function createEdOperationalPressureSummary(
+
+    context:OperationalTriggerContext
+
+):string {
+
+    const result =
+
+        context.result;
+
+
+    const drivers:string[] = [];
+
+
+    if(result.edVolumeScore >= 40){
+
+        drivers.push(
+
+            "ED census"
+
+        );
+
+    }
+
+
+    if(result.edBoardingScore >= 40){
+
+        drivers.push(
+
+            "boarding"
+
+        );
+
+    }
+
+
+    if(result.edAcuityScore >= 40){
+
+        drivers.push(
+
+            "high acuity"
+
+        );
+
+    }
+
+
+    if(drivers.length === 0){
+
+        return "ED volume, boarding, and high-acuity burden are not currently generating substantial operational pressure.";
+
+    }
+
+
+    return `ED operational pressure is being driven by ${formatReadableList(drivers)}.`;
+
+}
+
+
+/**
+ * Explain the Acute-Care Capacity domain.
+ */
+function createAcuteCareCapacitySummary(
+
+    context:OperationalTriggerContext,
+
+    occupancyPercent:number,
+
+    availableBeds:number
+
+):string {
+
+    if(availableBeds <= 0){
+
+        return `Acute-care capacity is fully utilized with ${formatNumber(context.assessment.occupiedAcuteCareBeds)} of ${formatNumber(context.assessment.staffedAcuteCareBeds)} staffed beds occupied.`;
+
+    }
+
+
+    if(context.result.acuteCapacityScore >= 60){
+
+        return `Acute-care capacity is significantly constrained at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds currently available.`;
+
+    }
+
+
+    if(context.result.acuteCapacityScore >= 30){
+
+        return `Acute-care capacity is under pressure at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds currently available.`;
+
+    }
+
+
+    return `Acute-care capacity is currently in a lower-pressure range at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds available.`;
+
+}
+
+
+/**
+ * Explain the Critical-Care Capacity domain.
+ */
+function createCriticalCareCapacitySummary(
+
+    context:OperationalTriggerContext,
+
+    occupancyPercent:number,
+
+    availableBeds:number
+
+):string {
+
+    if(availableBeds <= 0){
+
+        return `Critical-care capacity is fully utilized with ${formatNumber(context.assessment.occupiedCriticalCareBeds)} of ${formatNumber(context.assessment.staffedCriticalCareBeds)} staffed beds occupied.`;
+
+    }
+
+
+    if(context.result.criticalCapacityScore >= 60){
+
+        return `Critical-care capacity is significantly constrained at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds currently available.`;
+
+    }
+
+
+    if(context.result.criticalCapacityScore >= 30){
+
+        return `Critical-care capacity is under pressure at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds currently available.`;
+
+    }
+
+
+    return `Critical-care capacity is currently in a lower-pressure range at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds available.`;
+
+}
+
+
+/**
+ * Explain the Hospital Inflow domain.
+ */
+function createHospitalInflowSummary(
+
+    context:OperationalTriggerContext
+
+):string {
+
+    const current =
+
+        context.result.currentHospitalInflow;
+
+
+    const expected =
+
+        context.result.expectedHospitalInflow;
+
+
+    const variance =
+
+        current
+
+        -
+
+        expected;
+
+
+    if(variance > 0){
+
+        return `Known four-hour hospital inflow is ${formatNumber(variance)} patients above the historical expectation (${formatNumber(current)} known versus ${formatNumber(expected)} expected).`;
+
+    }
+
+
+    if(variance < 0){
+
+        return `Known four-hour hospital inflow is ${formatNumber(Math.abs(variance))} patients below the historical expectation; the forecast continues to use at least the historical expected inflow.`;
+
+    }
+
+
+    return `Known four-hour hospital inflow matches the historical expectation at ${formatNumber(expected)} patients.`;
+
+}
+
+
+/**
+ * Explain the Projected Capacity domain.
+ */
+function createProjectedCapacitySummary(
+
+    context:OperationalTriggerContext
+
+):string {
+
+    const currentAvailable =
+
+        context.result.currentAvailableAcuteCareBeds;
+
+
+    const projectedAvailable =
+
+        context.result.projectedAvailableAcuteCareBeds;
+
+
+    if(projectedAvailable < 0){
+
+        return `The four-hour forecast projects demand exceeding staffed acute-care capacity by approximately ${formatNumber(Math.abs(projectedAvailable))} beds.`;
+
+    }
+
+
+    if(projectedAvailable === 0){
+
+        return "The four-hour forecast projects complete utilization of currently staffed acute-care capacity.";
+
+    }
+
+
+    if(projectedAvailable < currentAvailable){
+
+        return `Acute-care availability is projected to tighten from ${formatNumber(currentAvailable)} beds currently available to approximately ${formatNumber(projectedAvailable)} beds over the next four hours.`;
+
+    }
+
+
+    if(projectedAvailable > currentAvailable){
+
+        return `Acute-care availability is projected to improve from ${formatNumber(currentAvailable)} beds currently available to approximately ${formatNumber(projectedAvailable)} beds over the next four hours.`;
+
+    }
+
+
+    return `Acute-care availability is projected to remain approximately stable at ${formatNumber(projectedAvailable)} beds over the next four hours.`;
+
+}
+
+
+/**
+ * Explain the projected-capacity calculation.
+ */
+function createProjectedCapacityExplanation(
+
+    context:OperationalTriggerContext
+
+):string {
+
+    const projectedAvailable =
+
+        context.result.projectedAvailableAcuteCareBeds;
+
+
+    if(projectedAvailable < 0){
+
+        return `The four-hour forecast projects a capacity deficit of approximately ${formatNumber(Math.abs(projectedAvailable))} acute-care beds after expected inpatient departures and projected hospital inflow are applied.`;
+
+    }
+
+
+    if(projectedAvailable === 0){
+
+        return "The four-hour forecast projects no remaining staffed acute-care bed availability after expected departures and projected inflow are applied.";
+
+    }
+
+
+    return `The four-hour forecast projects approximately ${formatNumber(projectedAvailable)} staffed acute-care beds remaining available after expected departures and projected inflow are applied.`;
+
+}
 
 /**
  * Determine operational risk direction.
@@ -1016,10 +1589,11 @@ function determineRiskDirection(
 
 
 /**
- * Determine assessment confidence.
+ * Determine Hospital Readiness assessment confidence.
  *
- * This is a data-completeness indicator, not a
- * statistical confidence interval.
+ * This represents data completeness and historical
+ * availability, not a statistical confidence
+ * interval.
  */
 function determineConfidence(
 
@@ -1034,19 +1608,55 @@ function determineConfidence(
 
     const historicalValuesAvailable =
 
-        context.assessment.expectedVolume > 0
+        Number.isFinite(
+
+            context.assessment.expectedEDVolume
+
+        )
 
         &&
 
-        context.assessment.expectedBoarders >= 0
+        context.assessment.expectedEDVolume > 0
 
         &&
 
-        context.assessment.expectedArrivals >= 0
+        Number.isFinite(
+
+            context.assessment.expectedEDBoarders
+
+        )
 
         &&
 
-        context.assessment.expectedDepartures >= 0;
+        context.assessment.expectedEDBoarders >= 0
+
+        &&
+
+        Number.isFinite(
+
+            context.assessment.expectedHospitalInflow4h
+
+        )
+
+        &&
+
+        context.assessment.expectedHospitalInflow4h >= 0
+
+        &&
+
+        Number.isFinite(
+
+            context.assessment.expectedInpatientDepartures4h
+
+        )
+
+        &&
+
+        context.assessment.expectedInpatientDepartures4h >= 0
+
+        &&
+
+        context.assessment.forecastHours === 4;
 
 
     const assessmentTimestamp = new Date(
@@ -1100,91 +1710,10 @@ function determineConfidence(
 
 
 /**
- * Elevate the base state when an active trigger
- * requires a higher minimum Alpha–Echo level.
+ * Operational triggers do not alter Alpha–Echo in
+ * Version 2.1. They remain available for warnings,
+ * recommendations, and reassessment guidance.
  */
-function determineFinalOperationalState(
-
-    baseState:OperationalAssessment["baseOperationalState"],
-
-    activeTriggers:OperationalAssessment["activeTriggers"]
-
-):OperationalAssessment["finalOperationalState"] {
-
-    let finalState = {
-
-        ...baseState
-
-    };
-
-
-    activeTriggers.forEach(
-
-        result => {
-
-            const minimumState =
-
-                result.trigger
-                    .minimumOperationalState;
-
-
-            if(!minimumState){
-
-                return;
-
-            }
-
-
-            const minimumStateRank =
-
-                getOperationalStateRank(
-
-                    minimumState
-
-                );
-
-
-            const currentStateRank =
-
-                getOperationalStateRank(
-
-                    finalState.title
-
-                );
-
-
-            if(
-
-                minimumStateRank
-
-                >
-
-                currentStateRank
-
-            ){
-
-                finalState =
-
-                    getOperationalStateByTitle(
-
-                        minimumState
-
-                    );
-
-            }
-
-        }
-
-    );
-
-
-    return {
-
-        ...finalState
-
-    };
-
-}
 
 
 /**
@@ -1636,7 +2165,8 @@ function createScoreSeries(
 
 
 /**
- * Create a readable momentum summary.
+ * Create a readable Hospital Readiness
+ * momentum summary.
  */
 function createMomentumSummary(
 
@@ -1653,7 +2183,7 @@ function createMomentumSummary(
 
     if(scores.length < 2){
 
-        return "Insufficient history is available to calculate operational momentum.";
+        return "Insufficient Hospital Readiness history is available to calculate operational momentum.";
 
     }
 
@@ -1669,26 +2199,26 @@ function createMomentumSummary(
 
     if(latestChange >= 10){
 
-        return `EDORI increased rapidly by ${formatSignedNumber(latestChange)} points since the previous assessment.`;
+        return `Hospital Readiness pressure increased rapidly by ${formatSignedNumber(latestChange)} points since the previous assessment.`;
 
     }
 
 
     if(latestChange > 0){
 
-        return `EDORI increased by ${formatSignedNumber(latestChange)} points since the previous assessment.`;
+        return `Hospital Readiness pressure increased by ${formatSignedNumber(latestChange)} points since the previous assessment.`;
 
     }
 
 
     if(latestChange <= -5){
 
-        return `EDORI improved by ${Math.abs(latestChange)} points since the previous assessment.`;
+        return `Hospital Readiness pressure improved by ${Math.abs(roundValue(latestChange))} points since the previous assessment.`;
 
     }
 
 
-    return "EDORI is stable compared with the previous assessment.";
+    return "Hospital Readiness is stable compared with the previous assessment.";
 
 }
 
@@ -1743,8 +2273,8 @@ function createMomentumFactors(
             id:
                 "latest-score-change",
 
-            label:
-                "Latest EDORI Change",
+           label:
+    "Latest Hospital Readiness Change",
 
             currentValue:
                 latestScore,
@@ -1762,8 +2292,8 @@ function createMomentumFactors(
             severity:
                 momentumScore,
 
-            explanation:
-                "Change in EDORI compared with the previous recorded assessment."
+           explanation:
+    "Change in Hospital Readiness compared with the previous recorded assessment."
 
         }
 
@@ -2196,6 +2726,97 @@ function roundValue(
 
 }
 
+
+/**
+ * Format a number without unnecessary trailing
+ * decimal zeros.
+ */
+function formatNumber(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "0";
+
+    }
+
+
+    const rounded =
+
+        roundValue(
+
+            value
+
+        );
+
+
+    return Number.isInteger(
+
+        rounded
+
+    )
+
+        ? String(
+
+            rounded
+
+        )
+
+        : rounded
+
+            .toFixed(
+
+                1
+
+            )
+
+            .replace(
+
+                /\.0$/,
+
+                ""
+
+            );
+
+}
+
+
+/**
+ * Format a readable English list.
+ */
+function formatReadableList(
+
+    values:string[]
+
+):string {
+
+    if(values.length === 0){
+
+        return "";
+
+    }
+
+
+    if(values.length === 1){
+
+        return values[0];
+
+    }
+
+
+    if(values.length === 2){
+
+        return `${values[0]} and ${values[1]}`;
+
+    }
+
+
+    return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
+
+}
 
 /**
  * Format a signed value for readable text.

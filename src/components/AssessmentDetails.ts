@@ -1,12 +1,12 @@
 /**
  * AssessmentDetails
  *
- * Displays the current committed EDORI assessment
+ * Displays the current committed Hospital Readiness assessment
  * values and historical comparisons.
  *
  * This component does not:
  *
- * - Calculate EDORI
+ * - Calculate Hospital Readiness
  * - Evaluate operational triggers
  * - Modify application state
  * - Save assessments
@@ -19,15 +19,6 @@ import {
 }
 
 from "../config/appEvents";
-
-
-import {
-
-    HOSPITAL
-
-}
-
-from "../config/constants";
 
 
 import {
@@ -69,6 +60,13 @@ from "../types/SituationAssessment";
 
 
 /**
+ * Physical ED treatment-bed capacity used for the
+ * ED capacity-use display.
+ */
+const ED_TREATMENT_BEDS = 63;
+
+
+/**
  * Render the Current Assessment Details panel.
  */
 export function AssessmentDetails():string {
@@ -86,7 +84,7 @@ export function AssessmentDetails():string {
                     </h3>
 
                     <p class="panel-description">
-                        Submitted operational values and historical comparisons
+                        Submitted hospital operational values, historical comparisons, and four-hour capacity forecast
                     </p>
 
                 </div>
@@ -208,7 +206,7 @@ function createAssessmentMarkup(
 
         -
 
-        assessment.expectedVolume;
+        assessment.expectedEDVolume;
 
 
     const boardingDifference =
@@ -217,46 +215,25 @@ function createAssessmentMarkup(
 
         -
 
-        assessment.expectedBoarders;
+        assessment.expectedEDBoarders;
 
 
-    const hospitalOccupancy = calculatePercentage(
+    const edCapacityUse = calculatePercentage(
 
-        assessment.occupiedMedicalBeds,
+        assessment.totalEDVolume,
 
-        HOSPITAL.MEDICAL_BEDS
+        ED_TREATMENT_BEDS
 
     );
 
 
-    const expectedNetFlow =
+    const boardingShare = calculatePercentage(
 
-        assessment.expectedArrivals
+        assessment.boardedPatients,
 
-        -
+        assessment.totalEDVolume
 
-        assessment.expectedDepartures;
-
-
-    const esiTotal =
-
-        assessment.esi1
-
-        +
-
-        assessment.esi2
-
-        +
-
-        assessment.esi3
-
-        +
-
-        assessment.esi4
-
-        +
-
-        assessment.esi5;
+    );
 
 
     const highAcuityCount =
@@ -268,6 +245,19 @@ function createAssessmentMarkup(
         assessment.esi2;
 
 
+    const lowerAcuityCount = Math.max(
+
+        0,
+
+        assessment.totalEDVolume
+
+        -
+
+        highAcuityCount
+
+    );
+
+
     const highAcuityPercent = calculatePercentage(
 
         highAcuityCount,
@@ -275,6 +265,86 @@ function createAssessmentMarkup(
         assessment.totalEDVolume
 
     );
+
+
+    const acuteOccupancyPercent = calculatePercentage(
+
+        assessment.occupiedAcuteCareBeds,
+
+        assessment.staffedAcuteCareBeds
+
+    );
+
+
+    const criticalOccupancyPercent = calculatePercentage(
+
+        assessment.occupiedCriticalCareBeds,
+
+        assessment.staffedCriticalCareBeds
+
+    );
+
+
+    const currentAvailableAcuteCareBeds =
+
+        assessment.staffedAcuteCareBeds
+
+        -
+
+        assessment.occupiedAcuteCareBeds;
+
+
+    const currentAvailableCriticalCareBeds =
+
+        assessment.staffedCriticalCareBeds
+
+        -
+
+        assessment.occupiedCriticalCareBeds;
+
+
+    const currentHospitalInflow =
+
+        assessment.currentEDAdmissions
+
+        +
+
+        assessment.currentDirectAdmissions
+
+        +
+
+        assessment.currentSurgicalAdmissions;
+
+
+    const inflowDifference =
+
+        currentHospitalInflow
+
+        -
+
+        assessment.expectedHospitalInflow4h;
+
+
+    const projectedHospitalInflow = Math.max(
+
+        currentHospitalInflow,
+
+        assessment.expectedHospitalInflow4h
+
+    );
+
+
+    const projectedAvailableAcuteCareBeds =
+
+        currentAvailableAcuteCareBeds
+
+        +
+
+        assessment.expectedInpatientDepartures4h
+
+        -
+
+        projectedHospitalInflow;
 
 
     return `
@@ -345,13 +415,26 @@ function createAssessmentMarkup(
 
             </div>
 
+
+            <div>
+
+                <span class="assessment-details-label">
+                    Forecast Horizon
+                </span>
+
+                <strong>
+                    ${formatNumber(assessment.forecastHours)} hours
+                </strong>
+
+            </div>
+
         </div>
 
 
         <div class="assessment-details-section">
 
             <h4>
-                ED Demand
+                ED Operational Pressure
             </h4>
 
 
@@ -366,7 +449,7 @@ function createAssessmentMarkup(
                         assessment.totalEDVolume,
 
                     expectedValue:
-                        assessment.expectedVolume,
+                        assessment.expectedEDVolume,
 
                     difference:
                         edVolumeDifference,
@@ -386,7 +469,7 @@ function createAssessmentMarkup(
                         assessment.boardedPatients,
 
                     expectedValue:
-                        assessment.expectedBoarders,
+                        assessment.expectedEDBoarders,
 
                     difference:
                         boardingDifference,
@@ -403,15 +486,12 @@ function createAssessmentMarkup(
                         "ED Capacity Use",
 
                     value:
-                        `${formatNumber(
-                            calculatePercentage(
-                                assessment.totalEDVolume,
-                                HOSPITAL.ED_BEDS
-                            )
-                        )}%`,
+                        `${formatNumber(edCapacityUse)}%`,
 
                     description:
-                        `${assessment.totalEDVolume} patients across ${HOSPITAL.ED_BEDS} configured ED beds.`
+                        `${formatNumber(
+                            assessment.totalEDVolume
+                        )} patients across ${ED_TREATMENT_BEDS} ED treatment beds.`
 
                 })}
 
@@ -422,12 +502,7 @@ function createAssessmentMarkup(
                         "Boarding Share",
 
                     value:
-                        `${formatNumber(
-                            calculatePercentage(
-                                assessment.boardedPatients,
-                                assessment.totalEDVolume
-                            )
-                        )}%`,
+                        `${formatNumber(boardingShare)}%`,
 
                     description:
                         "Percentage of the current ED census consisting of admitted boarders."
@@ -442,7 +517,7 @@ function createAssessmentMarkup(
         <div class="assessment-details-section">
 
             <h4>
-                Hospital Capacity and Expected Flow
+                Acute-Care Capacity
             </h4>
 
 
@@ -451,17 +526,19 @@ function createAssessmentMarkup(
                 ${createMetricCard({
 
                     label:
-                        "Occupied Medical Beds",
+                        "Occupied / Staffed Acute-Care Beds",
 
                     value:
-                        formatNumber(
-                            assessment.occupiedMedicalBeds
-                        ),
+                        `${formatNumber(
+                            assessment.occupiedAcuteCareBeds
+                        )} / ${formatNumber(
+                            assessment.staffedAcuteCareBeds
+                        )}`,
 
                     description:
                         `${formatNumber(
-                            hospitalOccupancy
-                        )}% of the configured ${HOSPITAL.MEDICAL_BEDS}-bed medical capacity.`
+                            acuteOccupancyPercent
+                        )}% of currently staffed acute-care capacity is occupied.`
 
                 })}
 
@@ -469,15 +546,93 @@ function createAssessmentMarkup(
                 ${createMetricCard({
 
                     label:
-                        "Expected Arrivals",
+                        "Currently Available Acute-Care Beds",
+
+                    value:
+                        formatBedAvailability(
+                            currentAvailableAcuteCareBeds
+                        ),
+
+                    description:
+                        "Staffed acute-care beds not currently occupied."
+
+                })}
+
+            </div>
+
+        </div>
+
+
+        <div class="assessment-details-section">
+
+            <h4>
+                Critical-Care Capacity
+            </h4>
+
+
+            <div class="assessment-details-grid">
+
+                ${createMetricCard({
+
+                    label:
+                        "Occupied / Staffed Critical-Care Beds",
+
+                    value:
+                        `${formatNumber(
+                            assessment.occupiedCriticalCareBeds
+                        )} / ${formatNumber(
+                            assessment.staffedCriticalCareBeds
+                        )}`,
+
+                    description:
+                        `${formatNumber(
+                            criticalOccupancyPercent
+                        )}% of currently staffed critical-care capacity is occupied.`
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Currently Available Critical-Care Beds",
+
+                    value:
+                        formatBedAvailability(
+                            currentAvailableCriticalCareBeds
+                        ),
+
+                    description:
+                        "Staffed critical-care beds not currently occupied."
+
+                })}
+
+            </div>
+
+        </div>
+
+
+        <div class="assessment-details-section">
+
+            <h4>
+                Hospital Inflow
+            </h4>
+
+
+            <div class="assessment-details-grid">
+
+                ${createMetricCard({
+
+                    label:
+                        "Known ED Admissions",
 
                     value:
                         formatNumber(
-                            assessment.expectedArrivals
+                            assessment.currentEDAdmissions
                         ),
 
                     description:
-                        "Historical expected arrivals for the current hourly period."
+                        "Known inpatient admissions currently originating from the Emergency Department."
 
                 })}
 
@@ -485,15 +640,15 @@ function createAssessmentMarkup(
                 ${createMetricCard({
 
                     label:
-                        "Expected Departures",
+                        "Known Direct Admissions",
 
                     value:
                         formatNumber(
-                            assessment.expectedDepartures
+                            assessment.currentDirectAdmissions
                         ),
 
                     description:
-                        "Historical expected departures for the current hourly period."
+                        "Known direct inpatient admissions during the current four-hour assessment horizon."
 
                 })}
 
@@ -501,28 +656,173 @@ function createAssessmentMarkup(
                 ${createMetricCard({
 
                     label:
-                        "Expected Net Flow",
+                        "Known Surgical / Procedural Admissions",
 
                     value:
-                        formatSignedNumber(
-                            expectedNetFlow
+                        formatNumber(
+                            assessment.currentSurgicalAdmissions
                         ),
 
                     description:
-                        createNetFlowDescription(
-                            expectedNetFlow
+                        "Known inpatient admissions expected from surgical or procedural areas."
+
+                })}
+
+
+                ${createComparisonCard({
+
+                    label:
+                        "Total Known Hospital Inflow",
+
+                    currentValue:
+                        currentHospitalInflow,
+
+                    expectedValue:
+                        assessment.expectedHospitalInflow4h,
+
+                    difference:
+                        inflowDifference,
+
+                    unit:
+                        "patients"
+
+                })}
+
+            </div>
+
+        </div>
+
+
+        <div class="assessment-details-section">
+
+            <h4>
+                Four-Hour Historical Flow and Projected Capacity
+            </h4>
+
+
+            <div class="assessment-details-grid">
+
+                ${createMetricCard({
+
+                    label:
+                        "Expected ED Admissions",
+
+                    value:
+                        formatNumber(
+                            assessment.expectedEDAdmissions4h
+                        ),
+
+                    description:
+                        "Historical expected ED-origin inpatient admissions during the four-hour forecast period."
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Expected Direct Admissions",
+
+                    value:
+                        formatNumber(
+                            assessment.expectedDirectAdmissions4h
+                        ),
+
+                    description:
+                        "Historical expected direct inpatient admissions during the four-hour forecast period."
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Expected Surgical / Procedural Admissions",
+
+                    value:
+                        formatNumber(
+                            assessment.expectedSurgicalAdmissions4h
+                        ),
+
+                    description:
+                        "Historical expected surgical/procedural inpatient admissions during the four-hour forecast period."
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Expected Total Hospital Inflow",
+
+                    value:
+                        formatNumber(
+                            assessment.expectedHospitalInflow4h
+                        ),
+
+                    description:
+                        "Historical total expected inpatient inflow during the four-hour forecast period."
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Expected Inpatient Departures",
+
+                    value:
+                        formatNumber(
+                            assessment.expectedInpatientDepartures4h
+                        ),
+
+                    description:
+                        "Historical expected inpatient hospital departures during the four-hour forecast period. This value is never entered by the user."
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Projected Hospital Inflow Used",
+
+                    value:
+                        formatNumber(
+                            projectedHospitalInflow
+                        ),
+
+                    description:
+                        "The capacity forecast uses the greater of currently known hospital inflow and historical expected four-hour inflow."
+
+                })}
+
+
+                ${createMetricCard({
+
+                    label:
+                        "Projected Available Acute-Care Beds",
+
+                    value:
+                        formatBedAvailability(
+                            projectedAvailableAcuteCareBeds
+                        ),
+
+                    description:
+                        createProjectedCapacityDescription(
+                            projectedAvailableAcuteCareBeds
                         ),
 
                     className:
-                        expectedNetFlow > 0
+                        projectedAvailableAcuteCareBeds < 0
 
                             ? "assessment-details-flow-increasing"
 
-                            : expectedNetFlow < 0
+                            : projectedAvailableAcuteCareBeds === 0
 
-                                ? "assessment-details-flow-improving"
+                                ? "assessment-details-flow-stable"
 
-                                : "assessment-details-flow-stable"
+                                : "assessment-details-flow-improving"
 
                 })}
 
@@ -543,11 +843,11 @@ function createAssessmentMarkup(
                 <div>
 
                     <span class="assessment-details-label">
-                        ESI Total
+                        ESI 1-2 Patients
                     </span>
 
                     <strong>
-                        ${formatNumber(esiTotal)}
+                        ${formatNumber(highAcuityCount)}
                     </strong>
 
                 </div>
@@ -556,11 +856,11 @@ function createAssessmentMarkup(
                 <div>
 
                     <span class="assessment-details-label">
-                        ESI 1–2 Patients
+                        Assumed ESI 3-5 Patients
                     </span>
 
                     <strong>
-                        ${formatNumber(highAcuityCount)}
+                        ${formatNumber(lowerAcuityCount)}
                     </strong>
 
                 </div>
@@ -595,21 +895,8 @@ function createAssessmentMarkup(
                     assessment.totalEDVolume
                 )}
 
-                ${createEsiCard(
-                    3,
-                    assessment.esi3,
-                    assessment.totalEDVolume
-                )}
-
-                ${createEsiCard(
-                    4,
-                    assessment.esi4,
-                    assessment.totalEDVolume
-                )}
-
-                ${createEsiCard(
-                    5,
-                    assessment.esi5,
+                ${createGroupedEsiCard(
+                    lowerAcuityCount,
                     assessment.totalEDVolume
                 )}
 
@@ -936,29 +1223,118 @@ function formatAssessmentTime(
 
 
 /**
- * Describe expected net flow.
+ * Create the inferred ESI 3-5 display card.
+ *
+ * ESI 3, 4, and 5 are intentionally not entered
+ * individually in the Version 2 assessment.
  */
-function createNetFlowDescription(
+function createGroupedEsiCard(
 
-    expectedNetFlow:number
+    patientCount:number,
+
+    totalEDVolume:number
 
 ):string {
 
-    if(expectedNetFlow > 0){
+    const percentage = calculatePercentage(
 
-        return "Expected arrivals exceed expected departures, suggesting potential census growth.";
+        patientCount,
+
+        totalEDVolume
+
+    );
+
+
+    return `
+
+        <article class="assessment-details-esi-card">
+
+            <span>
+                ESI 3-5
+            </span>
+
+            <strong>
+                ${formatNumber(patientCount)}
+            </strong>
+
+            <small>
+                ${formatNumber(percentage)}% · inferred
+            </small>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Format current or projected bed availability.
+ *
+ * Negative values are intentionally preserved because
+ * they represent demand projected to exceed staffed
+ * acute-care capacity.
+ */
+function formatBedAvailability(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "--";
 
     }
 
 
-    if(expectedNetFlow < 0){
+    if(value < 0){
 
-        return "Expected departures exceed expected arrivals, suggesting potential census reduction.";
+        return `${formatNumber(value)} beds (deficit)`;
 
     }
 
 
-    return "Expected arrivals and departures are balanced.";
+    if(value === 1){
+
+        return "1 bed";
+
+    }
+
+
+    return `${formatNumber(value)} beds`;
+
+}
+
+
+/**
+ * Explain the four-hour projected acute-care result.
+ */
+function createProjectedCapacityDescription(
+
+    projectedAvailableBeds:number
+
+):string {
+
+    if(projectedAvailableBeds < 0){
+
+        return `Projected demand exceeds staffed acute-care capacity by approximately ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds over the four-hour forecast horizon.`;
+
+    }
+
+
+    if(projectedAvailableBeds === 0){
+
+        return "Projected inflow and historical inpatient departures result in complete utilization of staffed acute-care capacity.";
+
+    }
+
+
+    return `Approximately ${formatNumber(
+        projectedAvailableBeds
+    )} staffed acute-care beds are projected to remain available after expected departures and projected inflow.`;
 
 }
 
@@ -1104,7 +1480,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to display the committed operational values.
+                Calculate Hospital Readiness to display the committed operational values.
             </p>
 
         </div>

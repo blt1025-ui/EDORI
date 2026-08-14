@@ -1,9 +1,9 @@
 /**
  * OperationalOverview
  *
- * Displays the EDORI 2.0 operational assessment.
+ * Displays the Version 2 Hospital Readiness operational assessment.
  *
- * This component does not calculate EDORI or
+ * This component does not calculate Hospital Readiness or
  * modify application state.
  */
 
@@ -90,7 +90,7 @@ export function OperationalOverview():string {
                     </h3>
 
                     <p class="panel-description">
-                        Trigger-adjusted operational readiness overview
+                        Trigger-adjusted Hospital Readiness overview
                     </p>
 
                 </div>
@@ -407,36 +407,72 @@ function createOperationalAssessmentMarkup(
 
             ${createPillarCard(
 
-                "Operational Demand",
+                "ED Operational Pressure",
 
                 operationalAssessment
                     .pillarScores
-                    .operationalDemand
+                    .edOperationalPressure,
+
+                "35%"
 
             )}
 
 
             ${createPillarCard(
 
-                "Clinical Complexity",
+                "Acute-Care Capacity",
 
                 operationalAssessment
                     .pillarScores
-                    .clinicalComplexity
+                    .acuteCareCapacity,
+
+                "20%"
 
             )}
 
 
             ${createPillarCard(
 
-                "Hospital Throughput",
+                "Critical-Care Capacity",
 
                 operationalAssessment
                     .pillarScores
-                    .hospitalThroughput
+                    .criticalCareCapacity,
+
+                "15%"
 
             )}
 
+
+            ${createPillarCard(
+
+                "Hospital Inflow",
+
+                operationalAssessment
+                    .pillarScores
+                    .hospitalInflow,
+
+                "15%"
+
+            )}
+
+
+            ${createPillarCard(
+
+                "Projected Capacity",
+
+                operationalAssessment
+                    .pillarScores
+                    .projectedCapacity,
+
+                "15%"
+
+            )}
+
+        </div>
+
+
+        <div class="operational-momentum-section">
 
             ${createPillarCard(
 
@@ -444,7 +480,9 @@ function createOperationalAssessmentMarkup(
 
                 operationalAssessment
                     .pillarScores
-                    .operationalMomentum
+                    .operationalMomentum,
+
+                "Trend — not weighted"
 
             )}
 
@@ -501,7 +539,9 @@ function createPillarCard(
 
     title:string,
 
-    score:number | null
+    score:number | null,
+
+    weightLabel:string
 
 ):string {
 
@@ -541,9 +581,17 @@ function createPillarCard(
 
             <div class="operational-pillar-header">
 
-                <span>
-                    ${escapeHtml(title)}
-                </span>
+                <div>
+
+                    <span>
+                        ${escapeHtml(title)}
+                    </span>
+
+                    <small class="operational-pillar-weight">
+                        ${escapeHtml(weightLabel)}
+                    </small>
+
+                </div>
 
                 <strong>
                     ${scoreText}
@@ -748,7 +796,7 @@ function createEmptyState():string {
             </strong>
 
             <p>
-                Complete the Situation Assessment and calculate EDORI.
+                Complete the Hospital Readiness Assessment and calculate Hospital Readiness.
             </p>
 
         </div>

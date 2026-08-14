@@ -1,19 +1,19 @@
 /**
  * SummaryCards
  *
- * Displays six command-center operational cards
+ * Displays six Hospital Readiness command-center cards
  * using the authoritative OperationalAssessment.
  *
  * Cards:
  *
- * - ED Demand
- * - Boarding
- * - Medical Capacity
- * - Expected Throughput
- * - Clinical Acuity
- * - Operational Status
+ * - ED Operational Pressure
+ * - Acute-Care Capacity
+ * - Critical-Care Capacity
+ * - Hospital Inflow
+ * - Projected Capacity
+ * - Hospital Readiness
  *
- * This component does not calculate EDORI,
+ * This component does not calculate Hospital Readiness,
  * evaluate triggers, or modify application state.
  */
 
@@ -24,15 +24,6 @@ import {
 }
 
 from "../config/appEvents";
-
-
-import {
-
-    HOSPITAL
-
-}
-
-from "../config/constants";
 
 
 import {
@@ -91,6 +82,13 @@ import type {
 }
 
 from "../types/OperationalAssessment";
+
+
+/**
+ * Physical ED treatment-bed capacity used for the
+ * ED census capacity-use display.
+ */
+const ED_TREATMENT_BEDS = 63;
 
 
 /**
@@ -306,6 +304,11 @@ function createCommandCenterCards(
         operationalAssessment.assessment;
 
 
+    const result =
+
+        operationalAssessment.scoreResult;
+
+
     const finalState =
 
         operationalAssessment.finalOperationalState;
@@ -316,11 +319,17 @@ function createCommandCenterCards(
         operationalAssessment.baseOperationalState;
 
 
+    /*
+     * =================================================
+     * Emergency Department
+     * =================================================
+     */
+
     const edOccupancyPercent = calculatePercentage(
 
         assessment.totalEDVolume,
 
-        HOSPITAL.ED_BEDS
+        ED_TREATMENT_BEDS
 
     );
 
@@ -331,7 +340,7 @@ function createCommandCenterCards(
 
         -
 
-        assessment.expectedVolume;
+        assessment.expectedEDVolume;
 
 
     const boardingDifference =
@@ -340,7 +349,7 @@ function createCommandCenterCards(
 
         -
 
-        assessment.expectedBoarders;
+        assessment.expectedEDBoarders;
 
 
     const boardingShare = calculatePercentage(
@@ -350,39 +359,6 @@ function createCommandCenterCards(
         assessment.totalEDVolume
 
     );
-
-
-    const hospitalOccupancyPercent =
-
-        calculatePercentage(
-
-            assessment.occupiedMedicalBeds,
-
-            HOSPITAL.MEDICAL_BEDS
-
-        );
-
-
-    const availableMedicalBeds = Math.max(
-
-        0,
-
-        HOSPITAL.MEDICAL_BEDS
-
-        -
-
-        assessment.occupiedMedicalBeds
-
-    );
-
-
-    const expectedNetFlow =
-
-        assessment.expectedArrivals
-
-        -
-
-        assessment.expectedDepartures;
 
 
     const highAcuityCount =
@@ -403,6 +379,55 @@ function createCommandCenterCards(
     );
 
 
+    /*
+     * =================================================
+     * Hospital Capacity
+     * =================================================
+     */
+
+    const acuteOccupancyPercent = calculatePercentage(
+
+        assessment.occupiedAcuteCareBeds,
+
+        assessment.staffedAcuteCareBeds
+
+    );
+
+
+    const criticalOccupancyPercent = calculatePercentage(
+
+        assessment.occupiedCriticalCareBeds,
+
+        assessment.staffedCriticalCareBeds
+
+    );
+
+
+    const currentAvailableAcuteCareBeds =
+
+        result.currentAvailableAcuteCareBeds;
+
+
+    /*
+     * =================================================
+     * Hospital Flow
+     * =================================================
+     */
+
+    const inflowDifference =
+
+        result.currentHospitalInflow
+
+        -
+
+        result.expectedHospitalInflow;
+
+
+    const projectedAvailableAcuteCareBeds =
+
+        result.projectedAvailableAcuteCareBeds;
+
+
     const activeTriggerCount =
 
         operationalAssessment.activeTriggers.length;
@@ -420,7 +445,7 @@ function createCommandCenterCards(
         ${createCommandCenterCard({
 
             title:
-                "ED Demand",
+                "ED Operational Pressure",
 
             icon:
                 "🏥",
@@ -431,31 +456,40 @@ function createCommandCenterCards(
             primaryValue:
                 `${formatNumber(
                     assessment.totalEDVolume
-                )} / ${HOSPITAL.ED_BEDS}`,
+                )} / ${ED_TREATMENT_BEDS}`,
 
             secondaryValue:
                 `${formatNumber(
                     edOccupancyPercent
-                )}% capacity use`,
+                )}% ED capacity use`,
 
             comparison:
                 createDifferenceText(
 
                     volumeDifference,
 
-                    "vs expected"
+                    "vs historical expected volume"
 
                 ),
 
             detail:
-                `Historical expectation: ${formatNumber(
-                    assessment.expectedVolume
-                )} patients.`,
+                `Boarding: ${formatNumber(
+                    assessment.boardedPatients
+                )} (${formatNumber(
+                    boardingShare
+                )}% of ED census); ${createDifferenceText(
+                    boardingDifference,
+                    "vs historical expected boarding"
+                )}. ESI 1-2: ${formatNumber(
+                    highAcuityCount
+                )} (${formatNumber(
+                    highAcuityPercent
+                )}%).`,
 
             severity:
-                determinePercentageSeverity(
+                severityFromScore(
 
-                    edOccupancyPercent
+                    result.edPressureScore
 
                 )
 
@@ -465,83 +499,40 @@ function createCommandCenterCards(
         ${createCommandCenterCard({
 
             title:
-                "Boarding",
+                "Acute-Care Capacity",
 
             icon:
                 "🛏️",
 
             primaryLabel:
-                "Boarding Patients",
-
-            primaryValue:
-                formatNumber(
-                    assessment.boardedPatients
-                ),
-
-            secondaryValue:
-                `${formatNumber(
-                    boardingShare
-                )}% of ED census`,
-
-            comparison:
-                createDifferenceText(
-
-                    boardingDifference,
-
-                    "vs expected"
-
-                ),
-
-            detail:
-                `Historical expectation: ${formatNumber(
-                    assessment.expectedBoarders
-                )} boarders.`,
-
-            severity:
-                determineBoardingSeverity(
-
-                    assessment.boardedPatients,
-
-                    boardingDifference
-
-                )
-
-        })}
-
-
-        ${createCommandCenterCard({
-
-            title:
-                "Medical Capacity",
-
-            icon:
-                "🏨",
-
-            primaryLabel:
-                "Occupied Medical Beds",
+                "Occupied / Staffed Beds",
 
             primaryValue:
                 `${formatNumber(
-                    assessment.occupiedMedicalBeds
-                )} / ${HOSPITAL.MEDICAL_BEDS}`,
+                    assessment.occupiedAcuteCareBeds
+                )} / ${formatNumber(
+                    assessment.staffedAcuteCareBeds
+                )}`,
 
             secondaryValue:
                 `${formatNumber(
-                    hospitalOccupancyPercent
+                    acuteOccupancyPercent
                 )}% occupied`,
 
             comparison:
-                `${formatNumber(
-                    availableMedicalBeds
-                )} beds available`,
+                `${formatSignedAvailability(
+                    currentAvailableAcuteCareBeds
+                )} currently available`,
 
             detail:
-                "Medical capacity affects admitted-patient movement from the ED.",
+                `Four-hour projected availability: ${formatSignedAvailability(
+                    projectedAvailableAcuteCareBeds
+                )}.`,
 
             severity:
-                determineHospitalSeverity(
+                severityFromScore(
 
-                    hospitalOccupancyPercent
+                    result.acuteCapacityScore
 
                 )
 
@@ -551,95 +542,40 @@ function createCommandCenterCards(
         ${createCommandCenterCard({
 
             title:
-                "Expected Throughput",
-
-            icon:
-                "↔️",
-
-            primaryLabel:
-                "Expected Net Flow",
-
-            primaryValue:
-                formatSignedNumber(
-
-                    expectedNetFlow
-
-                ),
-
-            secondaryValue:
-                `${formatNumber(
-                    assessment.expectedArrivals
-                )} arrivals · ${formatNumber(
-                    assessment.expectedDepartures
-                )} departures`,
-
-            comparison:
-                createNetFlowLabel(
-
-                    expectedNetFlow
-
-                ),
-
-            detail:
-                "Positive net flow suggests potential ED census growth.",
-
-            severity:
-                determineFlowSeverity(
-
-                    expectedNetFlow
-
-                )
-
-        })}
-
-
-        ${createCommandCenterCard({
-
-            title:
-                "Clinical Acuity",
+                "Critical-Care Capacity",
 
             icon:
                 "⚕️",
 
             primaryLabel:
-                "ESI 1–2 Patients",
+                "Occupied / Staffed Beds",
 
             primaryValue:
-                formatNumber(
-
-                    highAcuityCount
-
-                ),
+                `${formatNumber(
+                    assessment.occupiedCriticalCareBeds
+                )} / ${formatNumber(
+                    assessment.staffedCriticalCareBeds
+                )}`,
 
             secondaryValue:
                 `${formatNumber(
-                    highAcuityPercent
-                )}% high acuity`,
+                    criticalOccupancyPercent
+                )}% occupied`,
 
             comparison:
-                determineAcuityLabel(
-
-                    highAcuityPercent
-
-                ),
+                `${formatSignedAvailability(
+                    assessment.staffedCriticalCareBeds
+                    -
+                    assessment.occupiedCriticalCareBeds
+                )} currently available`,
 
             detail:
-                `ESI distribution total: ${formatNumber(
-                    assessment.esi1
-                    +
-                    assessment.esi2
-                    +
-                    assessment.esi3
-                    +
-                    assessment.esi4
-                    +
-                    assessment.esi5
-                )} patients.`,
+                "Critical-care capacity is evaluated separately from acute-care capacity.",
 
             severity:
-                determineAcuitySeverity(
+                severityFromScore(
 
-                    highAcuityPercent
+                    result.criticalCapacityScore
 
                 )
 
@@ -649,22 +585,118 @@ function createCommandCenterCards(
         ${createCommandCenterCard({
 
             title:
-                "Operational Status",
+                "Hospital Inflow",
+
+            icon:
+                "↘️",
+
+            primaryLabel:
+                "Known 4-Hour Inflow",
+
+            primaryValue:
+                formatNumber(
+
+                    result.currentHospitalInflow
+
+                ),
+
+            secondaryValue:
+                `${formatNumber(
+                    result.expectedHospitalInflow
+                )} historical expected`,
+
+            comparison:
+                createDifferenceText(
+
+                    inflowDifference,
+
+                    "vs historical expected inflow"
+
+                ),
+
+            detail:
+                `ED admissions ${formatNumber(
+                    assessment.currentEDAdmissions
+                )} · direct admissions ${formatNumber(
+                    assessment.currentDirectAdmissions
+                )} · surgical/procedural admissions ${formatNumber(
+                    assessment.currentSurgicalAdmissions
+                )}.`,
+
+            severity:
+                severityFromScore(
+
+                    result.inflowScore
+
+                )
+
+        })}
+
+
+        ${createCommandCenterCard({
+
+            title:
+                "Projected Capacity",
+
+            icon:
+                "↔️",
+
+            primaryLabel:
+                "Projected Acute-Care Beds",
+
+            primaryValue:
+                formatSignedAvailability(
+
+                    projectedAvailableAcuteCareBeds
+
+                ),
+
+            secondaryValue:
+                `${formatNumber(
+                    result.expectedInpatientDepartures
+                )} expected inpatient departures`,
+
+            comparison:
+                createProjectedCapacityLabel(
+
+                    projectedAvailableAcuteCareBeds
+
+                ),
+
+            detail:
+                `Forecast uses ${formatNumber(
+                    result.projectedHospitalInflow
+                )} projected admissions over the ${formatNumber(
+                    assessment.forecastHours
+                )}-hour horizon. Negative bed availability means projected demand exceeds staffed acute-care capacity.`,
+
+            severity:
+                severityFromScore(
+
+                    result.projectedCapacityScore
+
+                )
+
+        })}
+
+
+        ${createCommandCenterCard({
+
+            title:
+                "Hospital Readiness",
 
             icon:
                 finalState.icon,
 
             primaryLabel:
-                "Final EDORI Level",
+                "Final Operational Level",
 
             primaryValue:
                 finalState.title,
 
             secondaryValue:
-                `EDORI ${Math.round(
-                    operationalAssessment
-                        .scoreResult
-                        .score
+                `HRI ${Math.round(
+                    result.score
                 )} · ${operationalAssessment.riskDirection}`,
 
             comparison:
@@ -847,7 +879,7 @@ function createCommandCenterCard(
 
 
 /**
- * Determine the latest EDORI score change.
+ * Determine the latest Hospital Readiness score change.
  */
 function determineLatestScoreChange(
 
@@ -972,76 +1004,6 @@ function createDifferenceText(
 
 
 /**
- * Create net-flow interpretation.
- */
-function createNetFlowLabel(
-
-    netFlow:number
-
-):string {
-
-    if(netFlow >= 5){
-
-        return "Demand expected to increase";
-
-    }
-
-
-    if(netFlow > 0){
-
-        return "Mild census growth expected";
-
-    }
-
-
-    if(netFlow < 0){
-
-        return "Census reduction expected";
-
-    }
-
-
-    return "Expected flow is balanced";
-
-}
-
-
-/**
- * Create acuity interpretation.
- */
-function determineAcuityLabel(
-
-    highAcuityPercent:number
-
-):string {
-
-    if(highAcuityPercent >= 35){
-
-        return "Very high acuity burden";
-
-    }
-
-
-    if(highAcuityPercent >= 25){
-
-        return "High acuity burden";
-
-    }
-
-
-    if(highAcuityPercent >= 15){
-
-        return "Moderate acuity burden";
-
-    }
-
-
-    return "Lower acuity burden";
-
-}
-
-
-/**
  * Create the operational-status comparison line.
  */
 function createOperationalStatusComparison(
@@ -1094,11 +1056,12 @@ function createOperationalStatusComparison(
 
 
 /**
- * Determine severity from ED-capacity use.
+ * Convert an authoritative 0-100 domain score into
+ * the existing command-card severity classes.
  */
-function determinePercentageSeverity(
+function severityFromScore(
 
-    percentage:number
+    score:number
 
 ):
 
@@ -1112,28 +1075,28 @@ function determinePercentageSeverity(
 
     | "echo" {
 
-    if(percentage >= 140){
+    if(score >= 80){
 
         return "echo";
 
     }
 
 
-    if(percentage >= 120){
+    if(score >= 60){
 
         return "delta";
 
     }
 
 
-    if(percentage >= 105){
+    if(score >= 40){
 
         return "charlie";
 
     }
 
 
-    if(percentage >= 90){
+    if(score >= 20){
 
         return "bravo";
 
@@ -1146,227 +1109,69 @@ function determinePercentageSeverity(
 
 
 /**
- * Determine boarding-card severity.
+ * Format available-bed values without hiding a
+ * negative capacity deficit.
  */
-function determineBoardingSeverity(
+function formatSignedAvailability(
 
-    boardedPatients:number,
+    value:number
 
-    difference:number
+):string {
 
-):
+    if(!Number.isFinite(value)){
 
-    | "alpha"
-
-    | "bravo"
-
-    | "charlie"
-
-    | "delta"
-
-    | "echo" {
-
-    if(boardedPatients >= 50){
-
-        return "echo";
+        return "--";
 
     }
 
 
-    if(boardedPatients >= 40){
+    if(value < 0){
 
-        return "delta";
-
-    }
-
-
-    if(
-
-        boardedPatients >= 30
-
-        ||
-
-        difference >= 10
-
-    ){
-
-        return "charlie";
+        return `${formatNumber(value)} beds (deficit)`;
 
     }
 
 
-    if(
+    if(value === 1){
 
-        boardedPatients >= 20
-
-        ||
-
-        difference >= 5
-
-    ){
-
-        return "bravo";
+        return "1 bed";
 
     }
 
 
-    return "alpha";
+    return `${formatNumber(value)} beds`;
 
 }
 
 
 /**
- * Determine hospital-capacity severity.
+ * Interpret projected acute-care availability.
  */
-function determineHospitalSeverity(
+function createProjectedCapacityLabel(
 
-    percentage:number
+    projectedAvailableBeds:number
 
-):
+):string {
 
-    | "alpha"
+    if(projectedAvailableBeds < 0){
 
-    | "bravo"
-
-    | "charlie"
-
-    | "delta"
-
-    | "echo" {
-
-    if(percentage >= 100){
-
-        return "echo";
+        return `Projected capacity deficit of ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds`;
 
     }
 
 
-    if(percentage >= 97){
+    if(projectedAvailableBeds === 0){
 
-        return "delta";
-
-    }
-
-
-    if(percentage >= 95){
-
-        return "charlie";
+        return "Projected to fully utilize staffed capacity";
 
     }
 
 
-    if(percentage >= 90){
-
-        return "bravo";
-
-    }
-
-
-    return "alpha";
-
-}
-
-
-/**
- * Determine expected-flow severity.
- */
-function determineFlowSeverity(
-
-    netFlow:number
-
-):
-
-    | "alpha"
-
-    | "bravo"
-
-    | "charlie"
-
-    | "delta"
-
-    | "echo" {
-
-    if(netFlow >= 12){
-
-        return "echo";
-
-    }
-
-
-    if(netFlow >= 8){
-
-        return "delta";
-
-    }
-
-
-    if(netFlow >= 5){
-
-        return "charlie";
-
-    }
-
-
-    if(netFlow > 0){
-
-        return "bravo";
-
-    }
-
-
-    return "alpha";
-
-}
-
-
-/**
- * Determine clinical-acuity severity.
- */
-function determineAcuitySeverity(
-
-    percentage:number
-
-):
-
-    | "alpha"
-
-    | "bravo"
-
-    | "charlie"
-
-    | "delta"
-
-    | "echo" {
-
-    if(percentage >= 45){
-
-        return "echo";
-
-    }
-
-
-    if(percentage >= 35){
-
-        return "delta";
-
-    }
-
-
-    if(percentage >= 25){
-
-        return "charlie";
-
-    }
-
-
-    if(percentage >= 15){
-
-        return "bravo";
-
-    }
-
-
-    return "alpha";
+    return `${formatNumber(
+        projectedAvailableBeds
+    )} staffed beds projected available`;
 
 }
 
@@ -1556,63 +1361,33 @@ function createAwaitingAssessmentCards():string {
     const cards = [
 
         {
-
-            title:
-                "ED Demand",
-
-            icon:
-                "🏥"
-
+            title:"ED Operational Pressure",
+            icon:"🏥"
         },
 
         {
-
-            title:
-                "Boarding",
-
-            icon:
-                "🛏️"
-
+            title:"Acute-Care Capacity",
+            icon:"🛏️"
         },
 
         {
-
-            title:
-                "Medical Capacity",
-
-            icon:
-                "🏨"
-
+            title:"Critical-Care Capacity",
+            icon:"⚕️"
         },
 
         {
-
-            title:
-                "Expected Throughput",
-
-            icon:
-                "↔️"
-
+            title:"Hospital Inflow",
+            icon:"↘️"
         },
 
         {
-
-            title:
-                "Clinical Acuity",
-
-            icon:
-                "⚕️"
-
+            title:"Projected Capacity",
+            icon:"↔️"
         },
 
         {
-
-            title:
-                "Operational Status",
-
-            icon:
-                "◯"
-
+            title:"Hospital Readiness",
+            icon:"◯"
         }
 
     ];
@@ -1662,7 +1437,7 @@ function createAwaitingAssessmentCards():string {
 
 
                     <p class="command-center-card-description">
-                        Awaiting EDORI calculation.
+                        Awaiting Hospital Readiness calculation.
                     </p>
 
                 </article>

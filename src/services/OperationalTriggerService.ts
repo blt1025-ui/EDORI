@@ -1,9 +1,12 @@
 /**
  * OperationalTriggerService
  *
- * Evaluates configurable EDORI operational
- * triggers against a completed assessment,
- * current result, and persistent score history.
+ * Version 2 Hospital Readiness Model
+ *
+ * Evaluates configurable Hospital Readiness
+ * operational triggers against a completed
+ * assessment, current result, and persistent
+ * score history.
  *
  * This service does not:
  *
@@ -11,17 +14,8 @@
  * - Save results
  * - Save snapshots
  * - Emit events
- * - Change the EDORI score
+ * - Change the Hospital Readiness score
  */
-
-import {
-
-    HOSPITAL
-
-}
-
-from "../config/constants";
-
 
 import {
 
@@ -72,6 +66,17 @@ from "../types/OperationalTriggerResult";
  * overall proximity reaches this percentage.
  */
 const APPROACHING_TRIGGER_PERCENT = 85;
+
+
+/**
+ * Physical ED treatment-bed capacity.
+ *
+ * This remains fixed at 63 during the Version 2
+ * migration. Inpatient occupancy denominators use
+ * the currently staffed bed counts from the
+ * assessment instead of fixed licensed capacity.
+ */
+const ED_TREATMENT_BEDS = 63;
 
 
 /**
@@ -416,133 +421,223 @@ function getMetricValue(
 
 ):number {
 
-    const assessment =
+    const assessment = context.assessment;
 
-        context.assessment;
+    const result = context.result;
+
+
+    const edOccupancyPercent = calculatePercentage(
+
+        assessment.totalEDVolume,
+
+        ED_TREATMENT_BEDS
+
+    );
+
+
+    const volumeAboveExpected =
+
+        assessment.totalEDVolume
+
+        -
+
+        assessment.expectedEDVolume;
+
+
+    const boardingAboveExpected =
+
+        assessment.boardedPatients
+
+        -
+
+        assessment.expectedEDBoarders;
+
+
+    const boardingPercentOfVolume = calculatePercentage(
+
+        assessment.boardedPatients,
+
+        assessment.totalEDVolume
+
+    );
+
+
+    const highAcuityCount =
+
+        assessment.esi1
+
+        +
+
+        assessment.esi2;
+
+
+    const highAcuityPercent = calculatePercentage(
+
+        highAcuityCount,
+
+        assessment.totalEDVolume
+
+    );
+
+
+    const availableAcuteCareBeds =
+
+        assessment.staffedAcuteCareBeds
+
+        -
+
+        assessment.occupiedAcuteCareBeds;
+
+
+    const acuteCareOccupancyPercent = calculatePercentage(
+
+        assessment.occupiedAcuteCareBeds,
+
+        assessment.staffedAcuteCareBeds
+
+    );
+
+
+    const availableCriticalCareBeds =
+
+        assessment.staffedCriticalCareBeds
+
+        -
+
+        assessment.occupiedCriticalCareBeds;
+
+
+    const criticalCareOccupancyPercent = calculatePercentage(
+
+        assessment.occupiedCriticalCareBeds,
+
+        assessment.staffedCriticalCareBeds
+
+    );
+
+
+    const hospitalInflowAboveExpected =
+
+        result.currentHospitalInflow
+
+        -
+
+        result.expectedHospitalInflow;
+
+
+    const hospitalInflowPercentOfExpected = calculatePercentage(
+
+        result.currentHospitalInflow,
+
+        result.expectedHospitalInflow
+
+    );
+
+
+    /*
+     * Negative projected availability is
+     * operationally meaningful and is not clamped.
+     */
+    const projectedAcuteCareCapacityChange =
+
+        result.projectedAvailableAcuteCareBeds
+
+        -
+
+        result.currentAvailableAcuteCareBeds;
 
 
     switch(metric){
 
         case "totalEDVolume":
-
             return assessment.totalEDVolume;
 
-
         case "edOccupancyPercent":
-
-            return calculatePercentage(
-
-                assessment.totalEDVolume,
-
-                HOSPITAL.ED_BEDS
-
-            );
-
+            return edOccupancyPercent;
 
         case "volumeAboveExpected":
-
-            return assessment.totalEDVolume
-
-                -
-
-                assessment.expectedVolume;
-
+            return volumeAboveExpected;
 
         case "boardedPatients":
-
             return assessment.boardedPatients;
 
-
         case "boardingAboveExpected":
-
-            return assessment.boardedPatients
-
-                -
-
-                assessment.expectedBoarders;
-
+            return boardingAboveExpected;
 
         case "boardingPercentOfVolume":
-
-            return calculatePercentage(
-
-                assessment.boardedPatients,
-
-                assessment.totalEDVolume
-
-            );
-
-
-        case "occupiedMedicalBeds":
-
-            return assessment.occupiedMedicalBeds;
-
-
-        case "hospitalOccupancyPercent":
-
-            return calculatePercentage(
-
-                assessment.occupiedMedicalBeds,
-
-                HOSPITAL.MEDICAL_BEDS
-
-            );
-
-
-        case "expectedNetFlow":
-
-            return assessment.expectedArrivals
-
-                -
-
-                assessment.expectedDepartures;
-
+            return boardingPercentOfVolume;
 
         case "highAcuityCount":
-
-            return assessment.esi1
-
-                +
-
-                assessment.esi2;
-
+            return highAcuityCount;
 
         case "highAcuityPercent":
+            return highAcuityPercent;
 
-            return calculatePercentage(
+        case "edPressureScore":
+            return result.edPressureScore;
 
-                assessment.esi1
+        case "occupiedAcuteCareBeds":
+            return assessment.occupiedAcuteCareBeds;
 
-                +
+        case "availableAcuteCareBeds":
+            return availableAcuteCareBeds;
 
-                assessment.esi2,
+        case "acuteCareOccupancyPercent":
+            return acuteCareOccupancyPercent;
 
-                assessment.totalEDVolume
+        case "acuteCapacityScore":
+            return result.acuteCapacityScore;
 
-            );
+        case "occupiedCriticalCareBeds":
+            return assessment.occupiedCriticalCareBeds;
 
+        case "availableCriticalCareBeds":
+            return availableCriticalCareBeds;
 
-        case "edoriScore":
+        case "criticalCareOccupancyPercent":
+            return criticalCareOccupancyPercent;
 
-            return context.result.score;
+        case "criticalCapacityScore":
+            return result.criticalCapacityScore;
 
+        case "currentHospitalInflow":
+            return result.currentHospitalInflow;
+
+        case "expectedHospitalInflow":
+            return result.expectedHospitalInflow;
+
+        case "hospitalInflowAboveExpected":
+            return hospitalInflowAboveExpected;
+
+        case "hospitalInflowPercentOfExpected":
+            return hospitalInflowPercentOfExpected;
+
+        case "inflowScore":
+            return result.inflowScore;
+
+        case "expectedInpatientDepartures":
+            return result.expectedInpatientDepartures;
+
+        case "projectedHospitalInflow":
+            return result.projectedHospitalInflow;
+
+        case "projectedAvailableAcuteCareBeds":
+            return result.projectedAvailableAcuteCareBeds;
+
+        case "projectedAcuteCareCapacityChange":
+            return projectedAcuteCareCapacityChange;
+
+        case "projectedCapacityScore":
+            return result.projectedCapacityScore;
+
+        case "hospitalReadinessScore":
+            return result.score;
 
         case "consecutiveScoreIncreases":
-
-            return calculateConsecutiveScoreIncreases(
-
-                context
-
-            );
-
+            return calculateConsecutiveScoreIncreases(context);
 
         case "scoreChange":
-
-            return calculateLatestScoreChange(
-
-                context
-
-            );
+            return calculateLatestScoreChange(context);
 
     }
 
@@ -1206,46 +1301,94 @@ function getMetricLabel(
     > = {
 
         totalEDVolume:
-            "Total ED volume",
+            "Total ED Volume",
 
         edOccupancyPercent:
-            "ED occupancy",
+            "ED Occupancy",
 
         volumeAboveExpected:
-            "ED volume above expected",
+            "ED Volume Above Expected",
 
         boardedPatients:
-            "Boarding patients",
+            "ED Boarding",
 
         boardingAboveExpected:
-            "Boarding above expected",
+            "ED Boarding Above Expected",
 
         boardingPercentOfVolume:
-            "Boarding percentage of ED census",
-
-        occupiedMedicalBeds:
-            "Occupied medical beds",
-
-        hospitalOccupancyPercent:
-            "Hospital medical-bed occupancy",
-
-        expectedNetFlow:
-            "Expected net flow",
+            "Boarding Percentage of ED Census",
 
         highAcuityCount:
-            "ESI 1 and ESI 2 count",
+            "ESI 1-2 Patients",
 
         highAcuityPercent:
-            "ESI 1 and ESI 2 percentage",
+            "ESI 1-2 Percentage",
 
-        edoriScore:
-            "EDORI score",
+        edPressureScore:
+            "ED Operational Pressure Score",
+
+        occupiedAcuteCareBeds:
+            "Occupied Acute-Care Beds",
+
+        availableAcuteCareBeds:
+            "Available Acute-Care Beds",
+
+        acuteCareOccupancyPercent:
+            "Acute-Care Occupancy",
+
+        acuteCapacityScore:
+            "Acute-Care Capacity Score",
+
+        occupiedCriticalCareBeds:
+            "Occupied Critical-Care Beds",
+
+        availableCriticalCareBeds:
+            "Available Critical-Care Beds",
+
+        criticalCareOccupancyPercent:
+            "Critical-Care Occupancy",
+
+        criticalCapacityScore:
+            "Critical-Care Capacity Score",
+
+        currentHospitalInflow:
+            "Known Hospital Inflow",
+
+        expectedHospitalInflow:
+            "Expected Hospital Inflow",
+
+        hospitalInflowAboveExpected:
+            "Hospital Inflow Above Expected",
+
+        hospitalInflowPercentOfExpected:
+            "Hospital Inflow Percentage of Expected",
+
+        inflowScore:
+            "Hospital Inflow Pressure Score",
+
+        expectedInpatientDepartures:
+            "Expected Inpatient Departures",
+
+        projectedHospitalInflow:
+            "Projected Hospital Inflow",
+
+        projectedAvailableAcuteCareBeds:
+            "Projected Available Acute-Care Beds",
+
+        projectedAcuteCareCapacityChange:
+            "Projected Acute-Care Capacity Change",
+
+        projectedCapacityScore:
+            "Projected Capacity Pressure Score",
+
+        hospitalReadinessScore:
+            "Hospital Readiness Score",
 
         consecutiveScoreIncreases:
-            "Consecutive EDORI increases",
+            "Consecutive Score Increases",
 
         scoreChange:
-            "EDORI score change"
+            "Hospital Readiness Score Change"
 
     };
 

@@ -1,23 +1,18 @@
 /**
  * HistoricalDataRepository
  *
- * Persistent storage for the active EDORI
- * historical-expectation dataset.
+ * Version 2.1 Hospital Readiness Model
+ *
+ * Persistent storage for the active historical
+ * expectation dataset.
  *
  * Data-source priority:
  *
- * 1. Valid imported dataset from localStorage
+ * 1. Valid imported Version 2.1 dataset
  * 2. Built-in HistoricalExpectations.ts dataset
  *
- * This repository:
- *
- * - Validates imported datasets before saving
- * - Validates restored datasets before use
- * - Uses versioned browser storage
- * - Returns defensive copies
- * - Falls back safely to built-in data
- *
- * This repository does not parse CSV files.
+ * Version 2.1 adds historical acute-care staffed
+ * and occupied bed baselines.
  */
 
 import {
@@ -47,24 +42,21 @@ import type {
 from "../types/HistoricalExpectation";
 
 
-const STORAGE_KEY =
-
-    "edori_historical_expectations";
-
-
 /**
- * Increase when the persisted historical-data
- * structure changes incompatibly.
+ * A new key intentionally prevents Version 2 data,
+ * which lacks acute-care baseline fields, from being
+ * interpreted as Version 2.1.
  */
-const STORAGE_VERSION = 1;
+const STORAGE_KEY =
+    "edori_historical_expectations_v3";
+
+
+const STORAGE_VERSION = 3;
 
 
 const EXPECTED_RECORD_COUNT = 168;
 
 
-/**
- * Stored browser-data wrapper.
- */
 interface StoredHistoricalDataEnvelope {
 
     version:number;
@@ -85,22 +77,18 @@ export function saveHistoricalDataset(
 
 ):void {
 
-    const normalizedDataset =
+    const normalizedDataset = normalizeDataset(
 
-        normalizeDataset(
+        dataset
 
-            dataset
-
-        );
+    );
 
 
-    const validation =
+    const validation = validateHistoricalDataset(
 
-        validateHistoricalDataset(
+        normalizedDataset
 
-            normalizedDataset
-
-        );
+    );
 
 
     if(!validation.valid){
@@ -108,9 +96,7 @@ export function saveHistoricalDataset(
         throw new Error(
 
             createValidationErrorMessage(
-
                 validation
-
             )
 
         );
@@ -128,9 +114,7 @@ export function saveHistoricalDataset(
 
         records:
             cloneDataset(
-
                 normalizedDataset
-
             )
 
     };
@@ -143,9 +127,7 @@ export function saveHistoricalDataset(
             STORAGE_KEY,
 
             JSON.stringify(
-
                 envelope
-
             )
 
         );
@@ -155,7 +137,7 @@ export function saveHistoricalDataset(
 
         console.error(
 
-            "Unable to save the historical expectation dataset:",
+            "Unable to save the Version 2.1 historical expectation dataset:",
 
             error
 
@@ -175,17 +157,12 @@ export function saveHistoricalDataset(
 
 /**
  * Return the active historical dataset.
- *
- * Imported data are used only when the complete
- * stored dataset passes validation.
  */
 export function getHistoricalDataset():
 
 HistoricalExpectation[] {
 
-    const importedDataset =
-
-        loadImportedDataset();
+    const importedDataset = loadImportedDataset();
 
 
     if(importedDataset){
@@ -210,17 +187,12 @@ HistoricalExpectation[] {
 
 /**
  * Return imported data only.
- *
- * An empty array is returned when no valid imported
- * dataset exists.
  */
 export function getImportedHistoricalDataset():
 
 HistoricalExpectation[] {
 
-    const importedDataset =
-
-        loadImportedDataset();
+    const importedDataset = loadImportedDataset();
 
 
     if(!importedDataset){
@@ -252,9 +224,7 @@ boolean {
 
 
 /**
- * Remove imported historical expectations.
- *
- * The built-in dataset becomes active immediately.
+ * Remove imported Version 2.1 historical data.
  */
 export function clearImportedHistoricalDataset():
 
@@ -270,25 +240,23 @@ void {
 
 
 /**
- * Return the active dataset source.
+ * Return the active data source.
  */
 export function getHistoricalDataSource():
 
     | "imported"
-
     | "built-in" {
 
     return hasImportedHistoricalDataset()
 
         ? "imported"
-
         : "built-in";
 
 }
 
 
 /**
- * Return the number of active records.
+ * Return the active record count.
  */
 export function getHistoricalRecordCount():
 
@@ -300,14 +268,12 @@ number {
 
 
 /**
- * Return detailed repository diagnostics.
+ * Return repository diagnostics.
  */
 export function getHistoricalRepositoryStatus():{
 
     source:
-
         | "imported"
-
         | "built-in";
 
     recordCount:number;
@@ -320,9 +286,7 @@ export function getHistoricalRepositoryStatus():{
 
 } {
 
-    const importedDataset =
-
-        loadImportedDataset();
+    const importedDataset = loadImportedDataset();
 
 
     if(importedDataset){
@@ -340,16 +304,12 @@ export function getHistoricalRepositoryStatus():{
 
             importedAt:
                 new Date(
-
                     importedDataset.importedAt
-
                 ),
 
             complete:
                 importedDataset.records.length
-
                 ===
-
                 EXPECTED_RECORD_COUNT
 
         };
@@ -373,9 +333,7 @@ export function getHistoricalRepositoryStatus():{
 
         complete:
             HISTORICAL_EXPECTATIONS.length
-
             ===
-
             EXPECTED_RECORD_COUNT
 
     };
@@ -384,7 +342,7 @@ export function getHistoricalRepositoryStatus():{
 
 
 /**
- * Load and validate imported data.
+ * Load and validate imported Version 2.1 data.
  */
 function loadImportedDataset():
 
@@ -431,22 +389,18 @@ StoredHistoricalDataEnvelope | null {
         }
 
 
-        const normalizedDataset =
+        const normalizedDataset = normalizeDataset(
 
-            normalizeDataset(
+            envelope.records
 
-                envelope.records
-
-            );
+        );
 
 
-        const validation =
+        const validation = validateHistoricalDataset(
 
-            validateHistoricalDataset(
+            normalizedDataset
 
-                normalizedDataset
-
-            );
+        );
 
 
         if(!validation.valid){
@@ -454,9 +408,7 @@ StoredHistoricalDataEnvelope | null {
             throw new Error(
 
                 createValidationErrorMessage(
-
                     validation
-
                 )
 
             );
@@ -492,9 +444,7 @@ StoredHistoricalDataEnvelope | null {
 
             records:
                 cloneDataset(
-
                     normalizedDataset
-
                 )
 
         };
@@ -504,7 +454,7 @@ StoredHistoricalDataEnvelope | null {
 
         console.error(
 
-            "Unable to restore the imported historical dataset:",
+            "Unable to restore the imported Version 2.1 historical dataset:",
 
             error
 
@@ -526,7 +476,7 @@ StoredHistoricalDataEnvelope | null {
 
 
 /**
- * Extract the current or legacy storage format.
+ * Extract the Version 2.1 storage envelope.
  */
 function extractEnvelope(
 
@@ -541,13 +491,9 @@ function extractEnvelope(
 } | null {
 
     if(
-
         typeof value !== "object"
-
         ||
-
         value === null
-
     ){
 
         return null;
@@ -566,68 +512,26 @@ function extractEnvelope(
     };
 
 
-    /*
-     * Current versioned format.
-     */
-
     if(
-
-        typeof candidate.version === "number"
-
-        &&
-
-        candidate.records !== undefined
-
+        candidate.version !== STORAGE_VERSION
+        ||
+        candidate.records === undefined
     ){
 
-        if(
-
-            candidate.version
-
-            !==
-
-            STORAGE_VERSION
-
-        ){
-
-            return null;
-
-        }
-
-
-        return {
-
-            importedAt:
-                candidate.importedAt,
-
-            records:
-                candidate.records
-
-        };
+        return null;
 
     }
 
 
-    /*
-     * Legacy format stored the array directly.
-     */
+    return {
 
-    if(Array.isArray(value)){
+        importedAt:
+            candidate.importedAt,
 
-        return {
+        records:
+            candidate.records
 
-            importedAt:
-                new Date().toISOString(),
-
-            records:
-                value
-
-        };
-
-    }
-
-
-    return null;
+    };
 
 }
 
@@ -648,23 +552,17 @@ function normalizeDataset(
     }
 
 
-    const normalizedRecords = value
+    const normalizedRecords = value.map(
 
-        .map(
+        normalizeRecord
 
-            normalizeRecord
-
-        );
+    );
 
 
     if(
-
         normalizedRecords.some(
-
             record => record === null
-
         )
-
     ){
 
         return [];
@@ -673,22 +571,17 @@ function normalizeDataset(
 
 
     return (
-
         normalizedRecords as HistoricalExpectation[]
-
     )
-
         .sort(
-
             compareRecords
-
         );
 
 }
 
 
 /**
- * Normalize one historical record.
+ * Normalize one Version 2.1 record.
  */
 function normalizeRecord(
 
@@ -697,13 +590,9 @@ function normalizeRecord(
 ):HistoricalExpectation | null {
 
     if(
-
         typeof value !== "object"
-
         ||
-
         value === null
-
     ){
 
         return null;
@@ -717,91 +606,87 @@ function normalizeRecord(
 
         hour?:unknown;
 
-        expectedVolume?:unknown;
+        expectedEDVolume?:unknown;
 
-        expectedBoarders?:unknown;
+        expectedEDBoarders?:unknown;
 
-        expectedArrivals?:unknown;
+        expectedStaffedAcuteCareBeds?:unknown;
 
-        expectedDepartures?:unknown;
+        expectedOccupiedAcuteCareBeds?:unknown;
+
+        expectedEDAdmissions?:unknown;
+
+        expectedDirectAdmissions?:unknown;
+
+        expectedSurgicalAdmissions?:unknown;
+
+        expectedInpatientDepartures?:unknown;
 
     };
 
 
     const day = normalizeDay(
-
         candidate.day
-
     );
-
 
     const hour = normalizeHour(
-
         candidate.hour
-
     );
 
+    const expectedEDVolume = normalizeHistoricalNumber(
+        candidate.expectedEDVolume
+    );
 
-    const expectedVolume =
+    const expectedEDBoarders = normalizeHistoricalNumber(
+        candidate.expectedEDBoarders
+    );
 
-        normalizeHistoricalNumber(
+    const expectedStaffedAcuteCareBeds = normalizeHistoricalNumber(
+        candidate.expectedStaffedAcuteCareBeds,
+        true
+    );
 
-            candidate.expectedVolume
+    const expectedOccupiedAcuteCareBeds = normalizeHistoricalNumber(
+        candidate.expectedOccupiedAcuteCareBeds
+    );
 
-        );
+    const expectedEDAdmissions = normalizeHistoricalNumber(
+        candidate.expectedEDAdmissions
+    );
 
+    const expectedDirectAdmissions = normalizeHistoricalNumber(
+        candidate.expectedDirectAdmissions
+    );
 
-    const expectedBoarders =
+    const expectedSurgicalAdmissions = normalizeHistoricalNumber(
+        candidate.expectedSurgicalAdmissions
+    );
 
-        normalizeHistoricalNumber(
-
-            candidate.expectedBoarders
-
-        );
-
-
-    const expectedArrivals =
-
-        normalizeHistoricalNumber(
-
-            candidate.expectedArrivals
-
-        );
-
-
-    const expectedDepartures =
-
-        normalizeHistoricalNumber(
-
-            candidate.expectedDepartures
-
-        );
+    const expectedInpatientDepartures = normalizeHistoricalNumber(
+        candidate.expectedInpatientDepartures
+    );
 
 
     if(
-
         !day
-
         ||
-
         hour === null
-
         ||
-
-        expectedVolume === null
-
+        expectedEDVolume === null
         ||
-
-        expectedBoarders === null
-
+        expectedEDBoarders === null
         ||
-
-        expectedArrivals === null
-
+        expectedStaffedAcuteCareBeds === null
         ||
-
-        expectedDepartures === null
-
+        expectedOccupiedAcuteCareBeds === null
+        ||
+        expectedEDAdmissions === null
+        ||
+        expectedDirectAdmissions === null
+        ||
+        expectedSurgicalAdmissions === null
+        ||
+        expectedInpatientDepartures === null
     ){
 
         return null;
@@ -809,7 +694,22 @@ function normalizeRecord(
     }
 
 
-    if(expectedBoarders > expectedVolume){
+    if(
+        expectedEDBoarders
+        >
+        expectedEDVolume
+    ){
+
+        return null;
+
+    }
+
+
+    if(
+        expectedOccupiedAcuteCareBeds
+        >
+        expectedStaffedAcuteCareBeds
+    ){
 
         return null;
 
@@ -822,13 +722,21 @@ function normalizeRecord(
 
         hour,
 
-        expectedVolume,
+        expectedEDVolume,
 
-        expectedBoarders,
+        expectedEDBoarders,
 
-        expectedArrivals,
+        expectedStaffedAcuteCareBeds,
 
-        expectedDepartures
+        expectedOccupiedAcuteCareBeds,
+
+        expectedEDAdmissions,
+
+        expectedDirectAdmissions,
+
+        expectedSurgicalAdmissions,
+
+        expectedInpatientDepartures
 
     };
 
@@ -836,7 +744,7 @@ function normalizeRecord(
 
 
 /**
- * Normalize a weekday value.
+ * Normalize a weekday.
  */
 function normalizeDay(
 
@@ -854,17 +762,11 @@ function normalizeDay(
     const days:HistoricalExpectation["day"][] = [
 
         "Sunday",
-
         "Monday",
-
         "Tuesday",
-
         "Wednesday",
-
         "Thursday",
-
         "Friday",
-
         "Saturday"
 
     ];
@@ -873,11 +775,8 @@ function normalizeDay(
     const match = days.find(
 
         day =>
-
             day.toLowerCase()
-
             ===
-
             value.trim().toLowerCase()
 
     );
@@ -889,7 +788,7 @@ function normalizeDay(
 
 
 /**
- * Normalize an hour to 0–23.
+ * Normalize hour 0 through 23.
  */
 function normalizeHour(
 
@@ -898,33 +797,15 @@ function normalizeHour(
 ):number | null {
 
     if(
-
         typeof value !== "number"
-
         ||
-
-        !Number.isFinite(
-
-            value
-
-        )
-
+        !Number.isFinite(value)
         ||
-
-        !Number.isInteger(
-
-            value
-
-        )
-
+        !Number.isInteger(value)
         ||
-
         value < 0
-
         ||
-
         value > 23
-
     ){
 
         return null;
@@ -938,32 +819,28 @@ function normalizeHour(
 
 
 /**
- * Normalize a historical numeric value.
- *
- * Two decimal places are retained.
+ * Normalize a historical number.
  */
 function normalizeHistoricalNumber(
 
-    value:unknown
+    value:unknown,
+
+    strictlyPositive:boolean = false
 
 ):number | null {
 
     if(
-
         typeof value !== "number"
-
         ||
-
-        !Number.isFinite(
-
-            value
-
-        )
-
+        !Number.isFinite(value)
         ||
-
         value < 0
-
+        ||
+        (
+            strictlyPositive
+            &&
+            value <= 0
+        )
     ){
 
         return null;
@@ -972,9 +849,7 @@ function normalizeHistoricalNumber(
 
 
     return Math.round(
-
         value * 100
-
     ) / 100;
 
 }
@@ -992,38 +867,26 @@ function normalizeTimestamp(
     const timestamp = value instanceof Date
 
         ? new Date(
-
             value.getTime()
-
         )
 
         : typeof value === "string"
-
             ||
-
             typeof value === "number"
 
                 ? new Date(
-
                     value
-
                 )
 
                 : null;
 
 
     if(
-
         !timestamp
-
         ||
-
         Number.isNaN(
-
             timestamp.getTime()
-
         )
-
     ){
 
         return null;
@@ -1037,8 +900,7 @@ function normalizeTimestamp(
 
 
 /**
- * Sort records from Sunday 00:00 through
- * Saturday 23:00.
+ * Sort Sunday 00:00 through Saturday 23:00.
  */
 function compareRecords(
 
@@ -1049,20 +911,9 @@ function compareRecords(
 ):number {
 
     const dayDifference =
-
-        getDayIndex(
-
-            first.day
-
-        )
-
+        getDayIndex(first.day)
         -
-
-        getDayIndex(
-
-            second.day
-
-        );
+        getDayIndex(second.day);
 
 
     if(dayDifference !== 0){
@@ -1072,16 +923,11 @@ function compareRecords(
     }
 
 
-    return first.hour -
-
-        second.hour;
+    return first.hour - second.hour;
 
 }
 
 
-/**
- * Return the weekday sort position.
- */
 function getDayIndex(
 
     day:HistoricalExpectation["day"]
@@ -1091,26 +937,18 @@ function getDayIndex(
     const days:HistoricalExpectation["day"][] = [
 
         "Sunday",
-
         "Monday",
-
         "Tuesday",
-
         "Wednesday",
-
         "Thursday",
-
         "Friday",
-
         "Saturday"
 
     ];
 
 
     return days.indexOf(
-
         day
-
     );
 
 }
@@ -1139,13 +977,9 @@ function createValidationErrorMessage(
 
 
     if(
-
         validation.actualRecordCount
-
         !==
-
         EXPECTED_RECORD_COUNT
-
     ){
 
         problems.push(
@@ -1200,7 +1034,7 @@ function createValidationErrorMessage(
 
 
 /**
- * Return defensive dataset copies.
+ * Return defensive copies.
  */
 function cloneDataset(
 

@@ -1,19 +1,24 @@
 /**
  * ValidationService
  *
- * Central validation utilities for EDORI assessment
- * inputs and completed operational assessments.
+ * Version 2.1 Hospital Readiness Model
+ *
+ * Central validation utilities for current
+ * assessment inputs and completed hospital
+ * readiness assessments.
  *
  * Responsibilities:
  *
- * - Validate current assessment inputs
- * - Validate dynamic staffed medical-bed capacity
+ * - Validate current user-entered inputs
+ * - Validate acute-care and critical-care capacity
  * - Validate ED census and boarding relationships
- * - Validate ESI distribution
- * - Validate historical expectation values
- * - Provide reusable ESI calculation helpers
+ * - Validate ESI 1 and ESI 2 counts
+ * - Validate known non-ED hospital inflow values
+ * - Validate completed assessment metadata
+ * - Validate historical four-hour expectations
  *
- * This service does not calculate EDORI.
+ * This service does not calculate Hospital
+ * Readiness scores.
  */
 
 import type {
@@ -25,47 +30,13 @@ import type {
 from "../types/EdoriAssessmentInput";
 
 
-/**
- * Extended assessment shape used by the validation
- * service.
- *
- * A completed SituationAssessment may contain
- * additional fields such as day, hour, expectations,
- * staffing, and assessment time.
- */
-export type ValidatableAssessment =
+import type {
 
-    EdoriAssessmentInput
+    SituationAssessment
 
-    &
+}
 
-    {
-
-        staffedMedicalBeds:number;
-
-        day?:unknown;
-
-        hour?:unknown;
-
-        assessmentTime?:unknown;
-
-        expectedVolume?:unknown;
-
-        expectedBoarders?:unknown;
-
-        expectedArrivals?:unknown;
-
-        expectedDepartures?:unknown;
-
-        expectedRN?:unknown;
-
-        expectedMD?:unknown;
-
-        currentRN?:unknown;
-
-        currentMD?:unknown;
-
-    };
+from "../types/SituationAssessment";
 
 
 /**
@@ -83,101 +54,30 @@ export interface ValidationResult {
 
 
 /**
- * Fields that must contain nonnegative numbers.
+ * A validatable object may be either:
+ *
+ * - the current user input; or
+ * - a completed SituationAssessment.
  */
-const REQUIRED_NONNEGATIVE_FIELDS:Array<{
+export type ValidatableAssessment =
 
-    key:keyof EdoriAssessmentInput;
+    EdoriAssessmentInput
 
-    label:string;
+    |
 
-}> = [
+    SituationAssessment;
 
-    {
 
-        key:
-            "totalEDVolume",
-
-        label:
-            "Total ED volume"
-
-    },
-
-    {
-
-        key:
-            "boardedPatients",
-
-        label:
-            "Boarding patients"
-
-    },
-
-    {
-
-        key:
-            "occupiedMedicalBeds",
-
-        label:
-            "Occupied medical beds"
-
-    },
-
-    {
-
-        key:
-            "esi1",
-
-        label:
-            "ESI 1"
-
-    },
-
-    {
-
-        key:
-            "esi2",
-
-        label:
-            "ESI 2"
-
-    },
-
-    {
-
-        key:
-            "esi3",
-
-        label:
-            "ESI 3"
-
-    },
-
-    {
-
-        key:
-            "esi4",
-
-        label:
-            "ESI 4"
-
-    },
-
-    {
-
-        key:
-            "esi5",
-
-        label:
-            "ESI 5"
-
-    }
-
-];
+/*
+ * =====================================================
+ * Public validation API
+ * =====================================================
+ */
 
 
 /**
- * Validate an EDORI assessment.
+ * Validate either current input or a completed
+ * assessment.
  */
 export function validateAssessment(
 
@@ -190,22 +90,11 @@ export function validateAssessment(
     const warnings:string[] = [];
 
 
-    validateRequiredNumericFields(
+    validateCurrentInputFields(
 
         assessment,
 
         errors
-
-    );
-
-
-    validateStaffedMedicalBeds(
-
-        assessment,
-
-        errors,
-
-        warnings
 
     );
 
@@ -221,7 +110,7 @@ export function validateAssessment(
     );
 
 
-    validateEsiDistribution(
+    validateEsiRelationship(
 
         assessment,
 
@@ -232,16 +121,7 @@ export function validateAssessment(
     );
 
 
-    validateAssessmentPeriod(
-
-        assessment,
-
-        errors
-
-    );
-
-
-    validateHistoricalExpectations(
+    validateAcuteCareCapacity(
 
         assessment,
 
@@ -252,13 +132,48 @@ export function validateAssessment(
     );
 
 
-    validateOptionalStaffingValues(
+    validateCriticalCareCapacity(
+
+        assessment,
+
+        errors,
+
+        warnings
+
+    );
+
+
+    validateHospitalInflow(
 
         assessment,
 
         errors
 
     );
+
+
+    if(isCompletedAssessment(assessment)){
+
+        validateAssessmentMetadata(
+
+            assessment,
+
+            errors
+
+        );
+
+
+        validateHistoricalExpectations(
+
+            assessment,
+
+            errors,
+
+            warnings
+
+        );
+
+    }
 
 
     return {
@@ -266,9 +181,29 @@ export function validateAssessment(
         valid:
             errors.length === 0,
 
-        errors,
+        errors:
 
-        warnings
+            Array.from(
+
+                new Set(
+
+                    errors
+
+                )
+
+            ),
+
+        warnings:
+
+            Array.from(
+
+                new Set(
+
+                    warnings
+
+                )
+
+            )
 
     };
 
@@ -276,11 +211,11 @@ export function validateAssessment(
 
 
 /**
- * Backward-compatible assessment-input validation.
+ * Validate only current user-entered inputs.
  */
 export function validateAssessmentInput(
 
-    assessment:ValidatableAssessment
+    assessment:EdoriAssessmentInput
 
 ):ValidationResult {
 
@@ -292,14 +227,13 @@ export function validateAssessmentInput(
 
 }
 
+
 /**
- * Backward-compatible validation function.
- *
- * Existing services may already call validateState().
+ * Validate a completed SituationAssessment.
  */
 export function validateState(
 
-    assessment:ValidatableAssessment
+    assessment:SituationAssessment
 
 ):ValidationResult {
 
@@ -313,12 +247,11 @@ export function validateState(
 
 
 /**
- * Additional alias for callers that use the full
- * SituationAssessment terminology.
+ * Alias retained for existing callers.
  */
 export function validateSituationAssessment(
 
-    assessment:ValidatableAssessment
+    assessment:SituationAssessment
 
 ):ValidationResult {
 
@@ -332,10 +265,7 @@ export function validateSituationAssessment(
 
 
 /**
- * Return only validation error messages.
- *
- * This is useful for engine code that stores errors
- * directly in an unsuccessful result.
+ * Return only validation errors.
  */
 export function getAssessmentValidationErrors(
 
@@ -370,11 +300,17 @@ export function isAssessmentValid(
 }
 
 
-/**
- * Calculate the total number of patients assigned
- * to an ESI category.
+/*
+ * =====================================================
+ * Reusable calculation helpers
+ * =====================================================
  */
-export function calculateEsiTotal(
+
+
+/**
+ * Total explicitly entered high-acuity patients.
+ */
+export function calculateHighAcuityTotal(
 
     assessment:Pick<
 
@@ -383,12 +319,6 @@ export function calculateEsiTotal(
         | "esi1"
 
         | "esi2"
-
-        | "esi3"
-
-        | "esi4"
-
-        | "esi5"
 
     >
 
@@ -406,29 +336,35 @@ export function calculateEsiTotal(
 
         assessment.esi2
 
-    )
+    );
 
-    +
+}
 
-    normalizeForCalculation(
 
-        assessment.esi3
+/**
+ * Compatibility alias.
+ *
+ * Version 2 no longer collects ESI 3, 4, or 5.
+ * Therefore the ESI total now represents only
+ * explicitly entered ESI 1 and ESI 2 patients.
+ */
+export function calculateEsiTotal(
 
-    )
+    assessment:Pick<
 
-    +
+        EdoriAssessmentInput,
 
-    normalizeForCalculation(
+        | "esi1"
 
-        assessment.esi4
+        | "esi2"
 
-    )
+    >
 
-    +
+):number {
 
-    normalizeForCalculation(
+    return calculateHighAcuityTotal(
 
-        assessment.esi5
+        assessment
 
     );
 
@@ -436,13 +372,12 @@ export function calculateEsiTotal(
 
 
 /**
- * Calculate the number of ED patients who do not
- * have an entered ESI category.
+ * Number of ED patients who are not ESI 1 or ESI 2.
  *
- * A negative result is prevented when the ESI total
- * exceeds the ED census.
+ * These patients are assumed to be ESI 3 through
+ * ESI 5 for the Version 2 model.
  */
-export function calculateUnassignedEsiCount(
+export function calculateLowerAcuityCount(
 
     assessment:Pick<
 
@@ -453,12 +388,6 @@ export function calculateUnassignedEsiCount(
         | "esi1"
 
         | "esi2"
-
-        | "esi3"
-
-        | "esi4"
-
-        | "esi5"
 
     >
 
@@ -476,7 +405,7 @@ export function calculateUnassignedEsiCount(
 
         -
 
-        calculateEsiTotal(
+        calculateHighAcuityTotal(
 
             assessment
 
@@ -488,66 +417,118 @@ export function calculateUnassignedEsiCount(
 
 
 /**
- * Calculate current medical-bed occupancy using
- * staffed beds as the dynamic denominator.
+ * Compatibility alias retained for components that
+ * previously displayed an unassigned ESI count.
+ *
+ * In Version 2, this represents patients who are
+ * assumed to be ESI 3 through ESI 5.
  */
-export function calculateMedicalBedOccupancyPercent(
+export function calculateUnassignedEsiCount(
 
-    occupiedMedicalBeds:number,
+    assessment:Pick<
 
-    staffedMedicalBeds:number
+        EdoriAssessmentInput,
+
+        | "totalEDVolume"
+
+        | "esi1"
+
+        | "esi2"
+
+    >
 
 ):number {
 
-    if(
+    return calculateLowerAcuityCount(
 
-        !Number.isFinite(
+        assessment
 
-            occupiedMedicalBeds
-
-        )
-
-        ||
-
-        !Number.isFinite(
-
-            staffedMedicalBeds
-
-        )
-
-        ||
-
-        occupiedMedicalBeds < 0
-
-        ||
-
-        staffedMedicalBeds <= 0
-
-    ){
-
-        return 0;
-
-    }
-
-
-    return occupiedMedicalBeds
-
-        /
-
-        staffedMedicalBeds
-
-        *
-
-        100;
+    );
 
 }
 
 
 /**
- * Validate all required nonnegative assessment
- * fields.
+ * Calculate acute-care occupancy percentage.
  */
-function validateRequiredNumericFields(
+export function calculateAcuteCareOccupancyPercent(
+
+    occupiedBeds:number,
+
+    staffedBeds:number
+
+):number {
+
+    return calculateOccupancyPercent(
+
+        occupiedBeds,
+
+        staffedBeds
+
+    );
+
+}
+
+
+/**
+ * Calculate critical-care occupancy percentage.
+ */
+export function calculateCriticalCareOccupancyPercent(
+
+    occupiedBeds:number,
+
+    staffedBeds:number
+
+):number {
+
+    return calculateOccupancyPercent(
+
+        occupiedBeds,
+
+        staffedBeds
+
+    );
+
+}
+
+
+/**
+ * Compatibility helper retained temporarily.
+ *
+ * This now behaves as a generic occupancy
+ * calculation and should be replaced in UI code by
+ * the acute-care or critical-care helper.
+ */
+export function calculateMedicalBedOccupancyPercent(
+
+    occupiedBeds:number,
+
+    staffedBeds:number
+
+):number {
+
+    return calculateOccupancyPercent(
+
+        occupiedBeds,
+
+        staffedBeds
+
+    );
+
+}
+
+
+/*
+ * =====================================================
+ * Current input validation
+ * =====================================================
+ */
+
+
+/**
+ * Validate every required user-entered field.
+ */
+function validateCurrentInputFields(
 
     assessment:ValidatableAssessment,
 
@@ -555,7 +536,126 @@ function validateRequiredNumericFields(
 
 ):void {
 
-    REQUIRED_NONNEGATIVE_FIELDS.forEach(
+    const fields:Array<{
+
+        key:keyof EdoriAssessmentInput;
+
+        label:string;
+
+        positive?:boolean;
+
+    }> = [
+
+        {
+
+            key:
+                "totalEDVolume",
+
+            label:
+                "Total ED volume"
+
+        },
+
+        {
+
+            key:
+                "boardedPatients",
+
+            label:
+                "Boarding patients"
+
+        },
+
+        {
+
+            key:
+                "esi1",
+
+            label:
+                "ESI 1 patients"
+
+        },
+
+        {
+
+            key:
+                "esi2",
+
+            label:
+                "ESI 2 patients"
+
+        },
+
+        {
+
+            key:
+                "staffedAcuteCareBeds",
+
+            label:
+                "Staffed acute-care beds",
+
+            positive:
+                true
+
+        },
+
+        {
+
+            key:
+                "occupiedAcuteCareBeds",
+
+            label:
+                "Occupied acute-care beds"
+
+        },
+
+        {
+
+            key:
+                "staffedCriticalCareBeds",
+
+            label:
+                "Staffed critical-care beds",
+
+            positive:
+                true
+
+        },
+
+        {
+
+            key:
+                "occupiedCriticalCareBeds",
+
+            label:
+                "Occupied critical-care beds"
+
+        },
+
+        {
+
+            key:
+                "currentDirectAdmissions",
+
+            label:
+                "Current direct admissions"
+
+        },
+
+        {
+
+            key:
+                "currentSurgicalAdmissions",
+
+            label:
+                "Current surgical admissions"
+
+        }
+
+    ];
+
+
+    fields.forEach(
 
         field => {
 
@@ -592,11 +692,27 @@ function validateRequiredNumericFields(
             }
 
 
-            if(value < 0){
+            if(
+
+                field.positive
+
+                ?
+
+                value <= 0
+
+                :
+
+                value < 0
+
+            ){
 
                 errors.push(
 
-                    `${field.label} cannot be negative.`
+                    field.positive
+
+                        ? `${field.label} must be greater than zero.`
+
+                        : `${field.label} cannot be negative.`
 
                 );
 
@@ -621,152 +737,7 @@ function validateRequiredNumericFields(
 
 
 /**
- * Validate staffed medical-bed capacity.
- */
-function validateStaffedMedicalBeds(
-
-    assessment:ValidatableAssessment,
-
-    errors:string[],
-
-    warnings:string[]
-
-):void {
-
-    const staffedMedicalBeds =
-
-        assessment.staffedMedicalBeds;
-
-
-    const occupiedMedicalBeds =
-
-        assessment.occupiedMedicalBeds;
-
-
-    if(
-
-        typeof staffedMedicalBeds !== "number"
-
-        ||
-
-        !Number.isFinite(
-
-            staffedMedicalBeds
-
-        )
-
-    ){
-
-        errors.push(
-
-            "Staffed medical beds must be a valid number."
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(staffedMedicalBeds <= 0){
-
-        errors.push(
-
-            "Staffed medical beds must be greater than zero."
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(!Number.isInteger(staffedMedicalBeds)){
-
-        errors.push(
-
-            "Staffed medical beds must be entered as a whole number."
-
-        );
-
-    }
-
-
-    if(
-
-        Number.isFinite(
-
-            occupiedMedicalBeds
-
-        )
-
-        &&
-
-        occupiedMedicalBeds
-
-        >
-
-        staffedMedicalBeds
-
-    ){
-
-        errors.push(
-
-            "Occupied medical beds cannot exceed staffed medical beds."
-
-        );
-
-
-        return;
-
-    }
-
-
-    const occupancyPercent =
-
-        calculateMedicalBedOccupancyPercent(
-
-            occupiedMedicalBeds,
-
-            staffedMedicalBeds
-
-        );
-
-
-    if(occupancyPercent >= 100){
-
-        warnings.push(
-
-            "All staffed medical beds are currently occupied."
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(occupancyPercent >= 95){
-
-        warnings.push(
-
-            `Medical-bed occupancy is ${formatPercentage(
-                occupancyPercent
-            )}, indicating very limited staffed capacity.`
-
-        );
-
-    }
-
-}
-
-
-/**
- * Validate the relationship between ED census and
- * boarded patients.
+ * Boarding patients cannot exceed total ED census.
  */
 function validateBoardingRelationship(
 
@@ -811,7 +782,15 @@ function validateBoardingRelationship(
     }
 
 
-    if(boardedPatients > totalEDVolume){
+    if(
+
+        boardedPatients
+
+        >
+
+        totalEDVolume
+
+    ){
 
         errors.push(
 
@@ -837,9 +816,7 @@ function validateBoardingRelationship(
 
         totalEDVolume
 
-        >=
-
-        0.5
+        >= 0.50
 
     ){
 
@@ -855,9 +832,12 @@ function validateBoardingRelationship(
 
 
 /**
- * Validate ESI counts against total ED volume.
+ * Validate ESI 1 and ESI 2 counts.
+ *
+ * All remaining ED patients are assumed to be
+ * ESI 3 through ESI 5.
  */
-function validateEsiDistribution(
+function validateEsiRelationship(
 
     assessment:ValidatableAssessment,
 
@@ -867,16 +847,18 @@ function validateEsiDistribution(
 
 ):void {
 
-    const esiTotal = calculateEsiTotal(
-
-        assessment
-
-    );
-
-
     const totalEDVolume =
 
         assessment.totalEDVolume;
+
+
+    const highAcuityTotal =
+
+        calculateHighAcuityTotal(
+
+            assessment
+
+        );
 
 
     if(
@@ -898,51 +880,9 @@ function validateEsiDistribution(
     }
 
 
-    if(esiTotal > totalEDVolume){
-
-        errors.push(
-
-            `The ESI total of ${esiTotal} exceeds the total ED volume of ${totalEDVolume}.`
-
-        );
-
-
-        return;
-
-    }
-
-
-    if(esiTotal < totalEDVolume){
-
-    const unassignedCount =
-
-        totalEDVolume
-
-        -
-
-        esiTotal;
-
-
-    warnings.push(
-
-        `${unassignedCount} ED patient${unassignedCount === 1 ? " does" : "s do"} not yet have an assigned ESI category. EDORI will calculate acuity using the patients with an entered ESI.`
-
-    );
-
-}
-
-
     if(
 
-        totalEDVolume > 0
-
-        &&
-
-        assessment.esi1
-
-        +
-
-        assessment.esi2
+        highAcuityTotal
 
         >
 
@@ -952,9 +892,12 @@ function validateEsiDistribution(
 
         errors.push(
 
-            "The ESI 1 and ESI 2 total cannot exceed total ED volume."
+            "The combined ESI 1 and ESI 2 count cannot exceed total ED volume."
 
         );
+
+
+        return;
 
     }
 
@@ -965,21 +908,19 @@ function validateEsiDistribution(
 
         &&
 
-        assessment.esi1
+        highAcuityTotal
 
-        +
+        /
 
-        assessment.esi2
+        totalEDVolume
 
-        >=
-
-        totalEDVolume * 0.35
+        >= 0.30
 
     ){
 
         warnings.push(
 
-            "ESI 1 and ESI 2 patients represent at least 35% of the ED census."
+            "ESI 1 and ESI 2 patients represent at least 30% of the total ED census."
 
         );
 
@@ -989,10 +930,245 @@ function validateEsiDistribution(
 
 
 /**
- * Validate optional assessment day, hour, and time
- * when those fields are present.
+ * Validate acute-care staffed and occupied beds.
  */
-function validateAssessmentPeriod(
+function validateAcuteCareCapacity(
+
+    assessment:ValidatableAssessment,
+
+    errors:string[],
+
+    warnings:string[]
+
+):void {
+
+    const staffedBeds =
+
+        assessment.staffedAcuteCareBeds;
+
+
+    const occupiedBeds =
+
+        assessment.occupiedAcuteCareBeds;
+
+
+    if(
+
+        !Number.isFinite(
+
+            staffedBeds
+
+        )
+
+        ||
+
+        !Number.isFinite(
+
+            occupiedBeds
+
+        )
+
+        ||
+
+        staffedBeds <= 0
+
+        ||
+
+        occupiedBeds < 0
+
+    ){
+
+        return;
+
+    }
+
+
+    if(
+
+        occupiedBeds
+
+        >
+
+        staffedBeds
+
+    ){
+
+        errors.push(
+
+            "Occupied acute-care beds cannot exceed staffed acute-care beds."
+
+        );
+
+
+        return;
+
+    }
+
+
+    const occupancy =
+
+        calculateAcuteCareOccupancyPercent(
+
+            occupiedBeds,
+
+            staffedBeds
+
+        );
+
+
+    if(occupancy >= 100){
+
+        warnings.push(
+
+            "All staffed acute-care beds are currently occupied."
+
+        );
+
+
+        return;
+
+    }
+
+
+    if(occupancy >= 95){
+
+        warnings.push(
+
+            `Acute-care occupancy is ${formatPercentage(
+                occupancy
+            )}, indicating very limited staffed capacity.`
+
+        );
+
+    }
+
+}
+
+
+/**
+ * Validate critical-care staffed and occupied beds.
+ */
+function validateCriticalCareCapacity(
+
+    assessment:ValidatableAssessment,
+
+    errors:string[],
+
+    warnings:string[]
+
+):void {
+
+    const staffedBeds =
+
+        assessment.staffedCriticalCareBeds;
+
+
+    const occupiedBeds =
+
+        assessment.occupiedCriticalCareBeds;
+
+
+    if(
+
+        !Number.isFinite(
+
+            staffedBeds
+
+        )
+
+        ||
+
+        !Number.isFinite(
+
+            occupiedBeds
+
+        )
+
+        ||
+
+        staffedBeds <= 0
+
+        ||
+
+        occupiedBeds < 0
+
+    ){
+
+        return;
+
+    }
+
+
+    if(
+
+        occupiedBeds
+
+        >
+
+        staffedBeds
+
+    ){
+
+        errors.push(
+
+            "Occupied critical-care beds cannot exceed staffed critical-care beds."
+
+        );
+
+
+        return;
+
+    }
+
+
+    const occupancy =
+
+        calculateCriticalCareOccupancyPercent(
+
+            occupiedBeds,
+
+            staffedBeds
+
+        );
+
+
+    if(occupancy >= 100){
+
+        warnings.push(
+
+            "All staffed critical-care beds are currently occupied."
+
+        );
+
+
+        return;
+
+    }
+
+
+    if(occupancy >= 95){
+
+        warnings.push(
+
+            `Critical-care occupancy is ${formatPercentage(
+                occupancy
+            )}, indicating very limited staffed capacity.`
+
+        );
+
+    }
+
+}
+
+
+/**
+ * Validate known non-ED hospital inflow.
+ *
+ * Current ED admissions are intentionally excluded in
+ * Version 2.1. Existing ED-origin bed demand is
+ * represented by boardedPatients.
+ */
+function validateHospitalInflow(
 
     assessment:ValidatableAssessment,
 
@@ -1000,19 +1176,82 @@ function validateAssessmentPeriod(
 
 ):void {
 
+    const inflow =
+
+        assessment.currentDirectAdmissions
+
+        +
+
+        assessment.currentSurgicalAdmissions;
+
+
     if(
-
-        assessment.day !== undefined
-
-        &&
-
-        !isValidDay(
-
-            assessment.day
-
+        Number.isFinite(
+            assessment.staffedAcuteCareBeds
         )
-
+        &&
+        inflow
+        >
+        assessment.staffedAcuteCareBeds
     ){
+
+        errors.push(
+
+            "Known direct and surgical/procedural admissions cannot exceed the total number of staffed acute-care beds."
+
+        );
+
+    }
+
+}
+
+
+/*
+ * =====================================================
+ * Completed assessment validation
+ * =====================================================
+ */
+
+
+/**
+ * Determine whether this is a completed
+ * SituationAssessment.
+ */
+function isCompletedAssessment(
+
+    assessment:ValidatableAssessment
+
+):assessment is SituationAssessment {
+
+    return (
+
+        "assessmentTime" in assessment
+
+        ||
+
+        "expectedEDVolume" in assessment
+
+        ||
+
+        "forecastHours" in assessment
+
+    );
+
+}
+
+
+/**
+ * Validate metadata added by EdoriEngine.
+ */
+function validateAssessmentMetadata(
+
+    assessment:SituationAssessment,
+
+    errors:string[]
+
+):void {
+
+    if(!isValidDay(assessment.day)){
 
         errors.push(
 
@@ -1023,46 +1262,34 @@ function validateAssessmentPeriod(
     }
 
 
-    if(assessment.hour !== undefined){
+    if(
 
-        if(
+        !Number.isInteger(
 
-            typeof assessment.hour !== "number"
+            assessment.hour
 
-            ||
+        )
 
-            !Number.isInteger(
+        ||
 
-                assessment.hour
+        assessment.hour < 0
 
-            )
+        ||
 
-            ||
+        assessment.hour > 23
 
-            assessment.hour < 0
+    ){
 
-            ||
+        errors.push(
 
-            assessment.hour > 23
+            "Assessment hour must be a whole number from 0 through 23."
 
-        ){
-
-            errors.push(
-
-                "Assessment hour must be a whole number from 0 through 23."
-
-            );
-
-        }
+        );
 
     }
 
 
     if(
-
-        assessment.assessmentTime !== undefined
-
-        &&
 
         !isValidDateValue(
 
@@ -1080,15 +1307,39 @@ function validateAssessmentPeriod(
 
     }
 
+
+    if(
+
+        !Number.isInteger(
+
+            assessment.forecastHours
+
+        )
+
+        ||
+
+        assessment.forecastHours !== 4
+
+    ){
+
+        errors.push(
+
+            "Hospital Readiness forecast horizon must be four hours."
+
+        );
+
+    }
+
 }
 
 
 /**
- * Validate optional historical expectation values.
+ * Validate all historical values used by the
+ * completed assessment.
  */
 function validateHistoricalExpectations(
 
-    assessment:ValidatableAssessment,
+    assessment:SituationAssessment,
 
     errors:string[],
 
@@ -1096,256 +1347,103 @@ function validateHistoricalExpectations(
 
 ):void {
 
-    const historicalFields:Array<{
+    const nonnegativeFields:Array<{
 
         key:
 
-            | "expectedVolume"
-
-            | "expectedBoarders"
-
-            | "expectedArrivals"
-
-            | "expectedDepartures";
+            | "expectedEDVolume"
+            | "expectedEDBoarders"
+            | "expectedStaffedAcuteCareBeds"
+            | "expectedOccupiedAcuteCareBeds"
+            | "expectedAvailableAcuteCareBeds"
+            | "expectedEDAdmissions4h"
+            | "expectedDirectAdmissions4h"
+            | "expectedSurgicalAdmissions4h"
+            | "expectedHospitalInflow4h"
+            | "expectedInpatientDepartures4h"
+            | "historicalProjectedBedDemand4h";
 
         label:string;
+
+        positive?:boolean;
 
     }> = [
 
         {
-
-            key:
-                "expectedVolume",
-
-            label:
-                "Expected ED volume"
-
+            key:"expectedEDVolume",
+            label:"Expected ED volume"
         },
 
         {
-
-            key:
-                "expectedBoarders",
-
-            label:
-                "Expected boarding"
-
+            key:"expectedEDBoarders",
+            label:"Expected ED boarders"
         },
 
         {
-
-            key:
-                "expectedArrivals",
-
-            label:
-                "Expected arrivals"
-
+            key:"expectedStaffedAcuteCareBeds",
+            label:"Expected staffed acute-care beds",
+            positive:true
         },
 
         {
+            key:"expectedOccupiedAcuteCareBeds",
+            label:"Expected occupied acute-care beds"
+        },
 
-            key:
-                "expectedDepartures",
+        {
+            key:"expectedAvailableAcuteCareBeds",
+            label:"Expected available acute-care beds"
+        },
 
-            label:
-                "Expected departures"
+        {
+            key:"expectedEDAdmissions4h",
+            label:"Expected four-hour new ED admissions"
+        },
 
+        {
+            key:"expectedDirectAdmissions4h",
+            label:"Expected four-hour direct admissions"
+        },
+
+        {
+            key:"expectedSurgicalAdmissions4h",
+            label:"Expected four-hour surgical admissions"
+        },
+
+        {
+            key:"expectedHospitalInflow4h",
+            label:"Expected four-hour hospital inflow"
+        },
+
+        {
+            key:"expectedInpatientDepartures4h",
+            label:"Expected four-hour inpatient departures"
+        },
+
+        {
+            key:"historicalProjectedBedDemand4h",
+            label:"Historical projected four-hour bed demand"
         }
 
     ];
 
 
-    historicalFields.forEach(
+    nonnegativeFields.forEach(
 
         field => {
 
-            const value = assessment[
-
-                field.key
-
-            ];
-
-
-            if(value === undefined){
-
-                return;
-
-            }
+            const value = assessment[field.key];
 
 
             if(
-
                 typeof value !== "number"
-
                 ||
-
-                !Number.isFinite(
-
-                    value
-
-                )
-
+                !Number.isFinite(value)
             ){
 
                 errors.push(
-
                     `${field.label} must be a valid number.`
-
                 );
-
-
-                return;
-
-            }
-
-
-            if(value < 0){
-
-                errors.push(
-
-                    `${field.label} cannot be negative.`
-
-                );
-
-            }
-
-        }
-
-    );
-
-
-    if(
-
-        assessment.expectedVolume !== undefined
-
-        &&
-
-        assessment.expectedVolume === 0
-
-    ){
-
-        warnings.push(
-
-            "Expected ED volume is zero; demand comparison may be limited."
-
-        );
-
-    }
-
-
-    if(
-
-        assessment.expectedArrivals !== undefined
-
-        &&
-
-        assessment.expectedDepartures !== undefined
-
-        &&
-
-        assessment.expectedArrivals === 0
-
-        &&
-
-        assessment.expectedDepartures === 0
-
-    ){
-
-        warnings.push(
-
-            "Expected arrivals and departures are both zero; forecast movement may be limited."
-
-        );
-
-    }
-
-}
-
-
-/**
- * Validate optional RN and physician staffing
- * values if they remain part of the completed
- * assessment model.
- */
-function validateOptionalStaffingValues(
-
-    assessment:ValidatableAssessment,
-
-    errors:string[]
-
-):void {
-
-    const staffingFields:Array<{
-
-        key:
-
-            | "currentRN"
-
-            | "currentMD"
-
-            | "expectedRN"
-
-            | "expectedMD";
-
-        label:string;
-
-    }> = [
-
-        {
-
-            key:
-                "currentRN",
-
-            label:
-                "Current RN staffing"
-
-        },
-
-        {
-
-            key:
-                "currentMD",
-
-            label:
-                "Current physician staffing"
-
-        },
-
-        {
-
-            key:
-                "expectedRN",
-
-            label:
-                "Expected RN staffing"
-
-        },
-
-        {
-
-            key:
-                "expectedMD",
-
-            label:
-                "Expected physician staffing"
-
-        }
-
-    ];
-
-
-    staffingFields.forEach(
-
-        field => {
-
-            const value = assessment[
-
-                field.key
-
-            ];
-
-
-            if(value === undefined){
 
                 return;
 
@@ -1353,26 +1451,16 @@ function validateOptionalStaffingValues(
 
 
             if(
-
-                typeof value !== "number"
-
-                ||
-
-                !Number.isFinite(
-
-                    value
-
-                )
-
-                ||
-
-                value < 0
-
+                field.positive
+                    ? value <= 0
+                    : value < 0
             ){
 
                 errors.push(
 
-                    `${field.label} must be a valid nonnegative number.`
+                    field.positive
+                        ? `${field.label} must be greater than zero.`
+                        : `${field.label} cannot be negative.`
 
                 );
 
@@ -1382,12 +1470,241 @@ function validateOptionalStaffingValues(
 
     );
 
+
+    /*
+     * Historical projected bed balance may be
+     * negative and must therefore be validated as a
+     * finite signed number rather than nonnegative.
+     */
+    if(
+        !Number.isFinite(
+            assessment.historicalProjectedBedBalance4h
+        )
+    ){
+
+        errors.push(
+            "Historical projected four-hour bed balance must be a valid number."
+        );
+
+    }
+
+
+    if(
+        assessment.expectedEDBoarders
+        >
+        assessment.expectedEDVolume
+    ){
+
+        errors.push(
+            "Expected ED boarders cannot exceed expected ED volume."
+        );
+
+    }
+
+
+    if(
+        assessment.expectedOccupiedAcuteCareBeds
+        >
+        assessment.expectedStaffedAcuteCareBeds
+    ){
+
+        errors.push(
+            "Expected occupied acute-care beds cannot exceed expected staffed acute-care beds."
+        );
+
+    }
+
+
+    const calculatedExpectedAvailable =
+
+        assessment.expectedStaffedAcuteCareBeds
+
+        -
+
+        assessment.expectedOccupiedAcuteCareBeds;
+
+
+    if(
+        Math.abs(
+            calculatedExpectedAvailable
+            -
+            assessment.expectedAvailableAcuteCareBeds
+        )
+        >
+        0.05
+    ){
+
+        errors.push(
+            "Expected available acute-care beds do not equal expected staffed minus expected occupied acute-care beds."
+        );
+
+    }
+
+
+    const calculatedExpectedInflow =
+
+        assessment.expectedEDAdmissions4h
+
+        +
+
+        assessment.expectedDirectAdmissions4h
+
+        +
+
+        assessment.expectedSurgicalAdmissions4h;
+
+
+    if(
+        Math.abs(
+            calculatedExpectedInflow
+            -
+            assessment.expectedHospitalInflow4h
+        )
+        >
+        0.05
+    ){
+
+        errors.push(
+            "Expected hospital inflow does not equal the sum of expected ED, direct, and surgical admissions."
+        );
+
+    }
+
+
+    const calculatedHistoricalDemand =
+
+        assessment.expectedEDBoarders
+
+        +
+
+        assessment.expectedEDAdmissions4h
+
+        +
+
+        assessment.expectedDirectAdmissions4h
+
+        +
+
+        assessment.expectedSurgicalAdmissions4h;
+
+
+    if(
+        Math.abs(
+            calculatedHistoricalDemand
+            -
+            assessment.historicalProjectedBedDemand4h
+        )
+        >
+        0.05
+    ){
+
+        errors.push(
+            "Historical projected bed demand does not match the expected boarding and admission components."
+        );
+
+    }
+
+
+    const calculatedHistoricalBalance =
+
+        assessment.expectedAvailableAcuteCareBeds
+
+        +
+
+        assessment.expectedInpatientDepartures4h
+
+        -
+
+        assessment.historicalProjectedBedDemand4h;
+
+
+    if(
+        Math.abs(
+            calculatedHistoricalBalance
+            -
+            assessment.historicalProjectedBedBalance4h
+        )
+        >
+        0.05
+    ){
+
+        errors.push(
+            "Historical projected bed balance does not match historical available beds, expected departures, and projected demand."
+        );
+
+    }
+
+
+    if(assessment.expectedEDVolume === 0){
+
+        warnings.push(
+            "Expected ED volume is zero; ED demand comparison may be limited."
+        );
+
+    }
+
 }
 
 
-/**
- * Determine whether a value is a valid weekday.
+/*
+ * =====================================================
+ * Shared helpers
+ * =====================================================
  */
+
+
+function calculateOccupancyPercent(
+
+    occupiedBeds:number,
+
+    staffedBeds:number
+
+):number {
+
+    if(
+
+        !Number.isFinite(
+
+            occupiedBeds
+
+        )
+
+        ||
+
+        !Number.isFinite(
+
+            staffedBeds
+
+        )
+
+        ||
+
+        occupiedBeds < 0
+
+        ||
+
+        staffedBeds <= 0
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return occupiedBeds
+
+        /
+
+        staffedBeds
+
+        *
+
+        100;
+
+}
+
+
 function isValidDay(
 
     value:unknown
@@ -1423,10 +1740,6 @@ function isValidDay(
 }
 
 
-/**
- * Determine whether an unknown value can be
- * interpreted as a valid date.
- */
 function isValidDateValue(
 
     value:unknown
@@ -1469,10 +1782,6 @@ function isValidDateValue(
 }
 
 
-/**
- * Normalize an unknown numeric value for display
- * calculations.
- */
 function normalizeForCalculation(
 
     value:unknown
@@ -1507,9 +1816,6 @@ function normalizeForCalculation(
 }
 
 
-/**
- * Format a percentage to one decimal place.
- */
 function formatPercentage(
 
     value:number

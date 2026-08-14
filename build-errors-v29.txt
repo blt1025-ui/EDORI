@@ -1,0 +1,6 @@
+
+> edori@0.0.0 build
+> tsc && vite build
+
+src/components/HistoryRestoreCenter.ts(828,5): error TS2740: Type '{ id: string; timestamp: Date; schemaVersion: number; score: number; status: string; operationalState: OperationalState; day: string; hour: number; forecastHours: number; ... 33 more ...; activeTriggerTitles: string[] | undefined; }' is missing the following properties from type 'EdoriSnapshot': knownNonEDInflow, expectedNonEDInflow, expectedStaffedAcuteCareBeds, expectedOccupiedAcuteCareBeds, and 8 more.
+src/services/SnapshotService.ts(1001,11): error TS2740: Type '{ schemaVersion: number; id: string; timestamp: Date; score: number; status: string; operationalState: OperationalState; day: string; hour: number; forecastHours: number; ... 29 more ...; edAcuityScore: number; }' is missing the following properties from type 'EdoriSnapshot': knownNonEDInflow, expectedNonEDInflow, expectedStaffedAcuteCareBeds, expectedOccupiedAcuteCareBeds, and 8 more.

@@ -1,20 +1,25 @@
 /**
  * StateService
  *
+ * Version 2.1 Hospital Readiness Model
+ *
  * Persistent storage for the most recently
- * committed EDORI operational assessment.
+ * committed Hospital Readiness assessment.
  *
  * StateService is the authoritative source for
  * the latest completed SituationAssessment.
  *
- * Draft values entered in the form must not be
- * written here until EdoriEngine successfully:
+ * Draft values entered in the assessment form
+ * must not be written here until EdoriEngine has:
  *
- * - loads historical expectations;
- * - validates the assessment;
- * - calculates EDORI.
+ * - validated current operational inputs;
+ * - determined the assessment period;
+ * - loaded historical expectations;
+ * - built the complete SituationAssessment;
+ * - validated the completed assessment;
+ * - calculated Hospital Readiness.
  *
- * This service does not calculate EDORI.
+ * This service does not calculate readiness.
  */
 
 import type {
@@ -26,16 +31,27 @@ import type {
 from "../types/SituationAssessment";
 
 
+/*
+ * =====================================================
+ * Storage configuration
+ * =====================================================
+ */
+
 const STATE_STORAGE_KEY =
 
     "edori_current_assessment";
 
 
 /**
- * Increase this value when the stored assessment
- * shape changes incompatibly.
+ * Version 3 corresponds to the Version 2.1 Hospital
+ * Readiness SituationAssessment structure.
+ *
+ * Earlier state schemas are intentionally not
+ * automatically migrated because they do not contain
+ * the historical acute-care baseline and projected
+ * bed-balance fields required by Version 2.1.
  */
-const STATE_STORAGE_VERSION = 1;
+const STATE_STORAGE_VERSION = 3;
 
 
 /**
@@ -50,11 +66,28 @@ interface StoredStateEnvelope {
 }
 
 
+/*
+ * =====================================================
+ * Default state
+ * =====================================================
+ */
+
 /**
  * Default state used before the first completed
- * assessment or after stored data are rejected.
+ * Hospital Readiness assessment or after incompatible
+ * browser storage is rejected.
+ *
+ * Capacity values are zero here because the actual
+ * staffed capacity must come from the user.
+ *
+ * Validation permits these zero values only for this
+ * initial uncommitted state.
  */
 const DEFAULT_STATE:SituationAssessment = {
+
+    /*
+     * Assessment metadata
+     */
 
     assessmentTime:"",
 
@@ -62,42 +95,120 @@ const DEFAULT_STATE:SituationAssessment = {
 
     hour:0,
 
+    forecastHours:4,
+
+
+    /*
+     * Emergency Department
+     */
+
     totalEDVolume:0,
 
     boardedPatients:0,
-
-    occupiedMedicalBeds:0,
-
-    staffedMedicalBeds: 273,
 
     esi1:0,
 
     esi2:0,
 
-    esi3:0,
 
-    esi4:0,
+    /*
+     * Acute-care hospital capacity
+     */
 
-    esi5:0,
+    staffedAcuteCareBeds:0,
 
-    expectedVolume:0,
+    occupiedAcuteCareBeds:0,
 
-    expectedBoarders:0,
 
-    expectedArrivals:0,
+    /*
+     * Critical-care hospital capacity
+     */
 
-    expectedDepartures:0
+    staffedCriticalCareBeds:0,
+
+    occupiedCriticalCareBeds:0,
+
+
+    /*
+     * Known hospital inflow
+     */
+
+    currentEDAdmissions:0,
+
+    currentDirectAdmissions:0,
+
+    currentSurgicalAdmissions:0,
+
+
+    /*
+     * Historical ED expectations
+     */
+
+    expectedEDVolume:0,
+
+    expectedEDBoarders:0,
+
+
+    /*
+     * Historical acute-care baseline
+     */
+
+    expectedStaffedAcuteCareBeds:0,
+
+    expectedOccupiedAcuteCareBeds:0,
+
+    expectedAvailableAcuteCareBeds:0,
+
+
+    /*
+     * Historical projected capacity baseline
+     */
+
+    historicalProjectedBedDemand4h:0,
+
+    historicalProjectedBedBalance4h:0,
+
+    /*
+     * Historical four-hour hospital inflow
+     */
+
+    expectedEDAdmissions4h:0,
+
+    expectedDirectAdmissions4h:0,
+
+    expectedSurgicalAdmissions4h:0,
+
+    expectedHospitalInflow4h:0,
+
+
+    /*
+     * Historical four-hour hospital outflow
+     */
+
+    expectedInpatientDepartures4h:0
 
 };
 
 
+/*
+ * =====================================================
+ * In-memory state
+ * =====================================================
+ */
+
 /**
- * Current in-memory committed assessment.
+ * Current committed assessment.
  */
 let state:SituationAssessment =
 
     loadStoredState();
 
+
+/*
+ * =====================================================
+ * Public API
+ * =====================================================
+ */
 
 /**
  * Return a defensive copy of the committed state.
@@ -118,9 +229,11 @@ SituationAssessment {
 /**
  * Update part of the committed assessment.
  *
- * EdoriEngine currently passes a complete validated
- * assessment, but Partial support remains useful for
- * controlled administrative or testing workflows.
+ * EdoriEngine normally passes a complete validated
+ * assessment through setState().
+ *
+ * Partial support remains available for controlled
+ * administrative or testing workflows.
  */
 export function updateState(
 
@@ -137,18 +250,20 @@ export function updateState(
     };
 
 
-    const normalizedState = normalizeAssessment(
+    const normalizedState =
 
-        candidate
+        normalizeAssessment(
 
-    );
+            candidate
+
+        );
 
 
     if(!normalizedState){
 
         throw new Error(
 
-            "The EDORI assessment state is invalid and could not be saved."
+            "The Hospital Readiness assessment state is invalid and could not be saved."
 
         );
 
@@ -176,18 +291,20 @@ export function setState(
 
 ):void {
 
-    const normalizedState = normalizeAssessment(
+    const normalizedState =
 
-        assessment
+        normalizeAssessment(
 
-    );
+            assessment
+
+        );
 
 
     if(!normalizedState){
 
         throw new Error(
 
-            "The EDORI assessment state is invalid and could not be saved."
+            "The Hospital Readiness assessment state is invalid and could not be saved."
 
         );
 
@@ -210,7 +327,9 @@ export function setState(
  * Determine whether a completed committed
  * assessment exists.
  */
-export function hasCommittedAssessment():boolean {
+export function hasCommittedAssessment():
+
+boolean {
 
     if(!state.assessmentTime){
 
@@ -240,14 +359,14 @@ export function hasCommittedAssessment():boolean {
  *
  * This does not clear:
  *
- * - the current EDORI result;
+ * - the current calculated result;
  * - snapshot history;
- * - imported historical expectations.
- *
- * A full application reset should coordinate
- * those services explicitly.
+ * - imported historical expectations;
+ * - administrator configuration.
  */
-export function clearState():void {
+export function clearState():
+
+void {
 
     state = cloneAssessment(
 
@@ -256,11 +375,26 @@ export function clearState():void {
     );
 
 
-    localStorage.removeItem(
+    try {
 
-        STATE_STORAGE_KEY
+        localStorage.removeItem(
 
-    );
+            STATE_STORAGE_KEY
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "Unable to clear the stored Hospital Readiness assessment:",
+
+            error
+
+        );
+
+    }
 
 }
 
@@ -278,17 +412,21 @@ export function getStateServiceStatus():{
 
     hour:number;
 
+    forecastHours:number;
+
 } {
 
-    const assessmentTime = state.assessmentTime
+    const assessmentTime =
 
-        ? new Date(
+        state.assessmentTime
 
-            state.assessmentTime
+            ? new Date(
 
-        )
+                state.assessmentTime
 
-        : null;
+            )
+
+            : null;
 
 
     return {
@@ -316,17 +454,28 @@ export function getStateServiceStatus():{
             state.day,
 
         hour:
-            state.hour
+            state.hour,
+
+        forecastHours:
+            state.forecastHours
 
     };
 
 }
 
 
+/*
+ * =====================================================
+ * Persistence
+ * =====================================================
+ */
+
 /**
  * Persist the committed state.
  */
-function persistState():void {
+function persistState():
+
+void {
 
     const envelope:StoredStateEnvelope = {
 
@@ -362,7 +511,7 @@ function persistState():void {
 
         console.error(
 
-            "Unable to save the current EDORI assessment:",
+            "Unable to save the current Hospital Readiness assessment:",
 
             error
 
@@ -371,7 +520,7 @@ function persistState():void {
 
         throw new Error(
 
-            "The EDORI assessment could not be saved to browser storage."
+            "The Hospital Readiness assessment could not be saved to browser storage."
 
         );
 
@@ -389,11 +538,13 @@ SituationAssessment {
 
     try {
 
-        const stored = localStorage.getItem(
+        const stored =
 
-            STATE_STORAGE_KEY
+            localStorage.getItem(
 
-        );
+                STATE_STORAGE_KEY
+
+            );
 
 
         if(!stored){
@@ -407,11 +558,13 @@ SituationAssessment {
         }
 
 
-        const parsed = JSON.parse(
+        const parsed =
 
-            stored
+            JSON.parse(
 
-        ) as unknown;
+                stored
+
+            ) as unknown;
 
 
         const storedAssessment =
@@ -425,9 +578,21 @@ SituationAssessment {
 
         if(!storedAssessment){
 
-            throw new Error(
+            /*
+             * This commonly occurs after upgrading
+             * from Version 1 to Version 2.
+             */
 
-                "Stored EDORI assessment has an unsupported format."
+            localStorage.removeItem(
+
+                STATE_STORAGE_KEY
+
+            );
+
+
+            return cloneAssessment(
+
+                DEFAULT_STATE
 
             );
 
@@ -447,7 +612,7 @@ SituationAssessment {
 
             throw new Error(
 
-                "Stored EDORI assessment contains invalid values."
+                "Stored Hospital Readiness assessment contains invalid values."
 
             );
 
@@ -465,18 +630,33 @@ SituationAssessment {
 
         console.error(
 
-            "Unable to restore the current EDORI assessment:",
+            "Unable to restore the current Hospital Readiness assessment:",
 
             error
 
         );
 
 
-        localStorage.removeItem(
+        try {
 
-            STATE_STORAGE_KEY
+            localStorage.removeItem(
 
-        );
+                STATE_STORAGE_KEY
+
+            );
+
+        }
+        catch(storageError){
+
+            console.error(
+
+                "Unable to remove invalid Hospital Readiness browser state:",
+
+                storageError
+
+            );
+
+        }
 
 
         return cloneAssessment(
@@ -491,10 +671,16 @@ SituationAssessment {
 
 
 /**
- * Extract a stored assessment from:
+ * Extract a Version 2.1 stored assessment.
  *
- * - the current versioned format;
- * - the previous unwrapped assessment format.
+ * Version 1 state is intentionally rejected because
+ * the previous model does not contain enough
+ * information to safely reconstruct:
+ *
+ * - separate acute-care capacity;
+ * - separate critical-care capacity;
+ * - known hospital inflow;
+ * - four-hour historical hospital flow.
  */
 function extractStoredAssessment(
 
@@ -523,71 +709,56 @@ function extractStoredAssessment(
 
         assessment?:unknown;
 
-        totalEDVolume?:unknown;
-
     };
 
 
-    /*
-     * Current versioned format.
-     */
-
     if(
 
-        typeof candidate.version === "number"
+        typeof candidate.version !== "number"
 
-        &&
+        ||
 
-        candidate.assessment !== undefined
+        candidate.assessment === undefined
 
     ){
 
-        if(
-
-            candidate.version
-
-            !==
-
-            STATE_STORAGE_VERSION
-
-        ){
-
-            return null;
-
-        }
-
-
-        return candidate.assessment;
+        return null;
 
     }
 
 
-    /*
-     * Legacy unwrapped state format.
-     */
-
     if(
 
-        candidate.totalEDVolume !== undefined
+        candidate.version
+
+        !==
+
+        STATE_STORAGE_VERSION
 
     ){
 
-        return candidate;
+        return null;
 
     }
 
 
-    return null;
+    return candidate.assessment;
 
 }
 
 
+/*
+ * =====================================================
+ * Assessment normalization
+ * =====================================================
+ */
+
 /**
  * Validate and normalize one unknown assessment.
  *
- * Extra legacy properties such as currentRN,
- * currentMD, expectedRN, and expectedMD are ignored
- * because only current model fields are copied.
+ * Only Version 2.1 Hospital Readiness fields are copied.
+ *
+ * Extra legacy properties are ignored.
  */
 function normalizeAssessment(
 
@@ -618,40 +789,70 @@ function normalizeAssessment(
 
         hour?:unknown;
 
+        forecastHours?:unknown;
+
         totalEDVolume?:unknown;
 
         boardedPatients?:unknown;
-
-        occupiedMedicalBeds?:unknown;
-
-        staffedMedicalBeds?:unknown;
 
         esi1?:unknown;
 
         esi2?:unknown;
 
-        esi3?:unknown;
+        staffedAcuteCareBeds?:unknown;
 
-        esi4?:unknown;
+        occupiedAcuteCareBeds?:unknown;
 
-        esi5?:unknown;
+        staffedCriticalCareBeds?:unknown;
 
-        expectedVolume?:unknown;
+        occupiedCriticalCareBeds?:unknown;
 
-        expectedBoarders?:unknown;
+        currentEDAdmissions?:unknown;
 
-        expectedArrivals?:unknown;
+        currentDirectAdmissions?:unknown;
 
-        expectedDepartures?:unknown;
+        currentSurgicalAdmissions?:unknown;
+
+        expectedEDVolume?:unknown;
+
+        expectedEDBoarders?:unknown;
+
+        expectedStaffedAcuteCareBeds?:unknown;
+
+        expectedOccupiedAcuteCareBeds?:unknown;
+
+        expectedAvailableAcuteCareBeds?:unknown;
+
+        expectedEDAdmissions4h?:unknown;
+
+        expectedDirectAdmissions4h?:unknown;
+
+        expectedSurgicalAdmissions4h?:unknown;
+
+        expectedHospitalInflow4h?:unknown;
+
+        expectedInpatientDepartures4h?:unknown;
+
+        historicalProjectedBedDemand4h?:unknown;
+
+        historicalProjectedBedBalance4h?:unknown;
 
     };
 
 
-    const assessmentTime = normalizeAssessmentTime(
+    /*
+     * =================================================
+     * Metadata
+     * =================================================
+     */
 
-        candidate.assessmentTime
+    const assessmentTime =
 
-    );
+        normalizeAssessmentTime(
+
+            candidate.assessmentTime
+
+        );
 
 
     if(assessmentTime === null){
@@ -661,11 +862,13 @@ function normalizeAssessment(
     }
 
 
-    const day = normalizeDay(
+    const day =
 
-        candidate.day
+        normalizeDay(
 
-    );
+            candidate.day
+
+        );
 
 
     if(day === null){
@@ -675,110 +878,305 @@ function normalizeAssessment(
     }
 
 
-    const hour = normalizeHour(
+    const hour =
 
-        candidate.hour
+        normalizeHour(
 
-    );
+            candidate.hour
 
-
-    const totalEDVolume = normalizeNonNegativeNumber(
-
-        candidate.totalEDVolume
-
-    );
+        );
 
 
-    const boardedPatients = normalizeNonNegativeNumber(
+    const forecastHours =
 
-        candidate.boardedPatients
+        normalizeForecastHours(
 
-    );
+            candidate.forecastHours
 
-
-    const occupiedMedicalBeds = normalizeNonNegativeNumber(
-
-        candidate.occupiedMedicalBeds
-
-    );
-
-    const staffedMedicalBeds =
-
-        normalizePositiveNumber(
-
-            candidate.staffedMedicalBeds
-
-        )
-
-        ?? 273;
+        );
 
 
-    const esi1 = normalizeNonNegativeNumber(
+    /*
+     * =================================================
+     * Emergency Department
+     * =================================================
+     */
 
-        candidate.esi1
+    const totalEDVolume =
 
-    );
+        normalizeNonNegativeNumber(
 
+            candidate.totalEDVolume
 
-    const esi2 = normalizeNonNegativeNumber(
-
-        candidate.esi2
-
-    );
-
-
-    const esi3 = normalizeNonNegativeNumber(
-
-        candidate.esi3
-
-    );
+        );
 
 
-    const esi4 = normalizeNonNegativeNumber(
+    const boardedPatients =
 
-        candidate.esi4
+        normalizeNonNegativeNumber(
 
-    );
+            candidate.boardedPatients
 
-
-    const esi5 = normalizeNonNegativeNumber(
-
-        candidate.esi5
-
-    );
+        );
 
 
-    const expectedVolume = normalizeNonNegativeNumber(
+    const esi1 =
 
-        candidate.expectedVolume
+        normalizeNonNegativeNumber(
 
-    );
+            candidate.esi1
 
-
-    const expectedBoarders = normalizeNonNegativeNumber(
-
-        candidate.expectedBoarders
-
-    );
+        );
 
 
-    const expectedArrivals = normalizeNonNegativeNumber(
+    const esi2 =
 
-        candidate.expectedArrivals
+        normalizeNonNegativeNumber(
 
-    );
+            candidate.esi2
+
+        );
 
 
-    const expectedDepartures = normalizeNonNegativeNumber(
+    /*
+     * =================================================
+     * Acute-care capacity
+     * =================================================
+     */
 
-        candidate.expectedDepartures
+    const staffedAcuteCareBeds =
 
-    );
+        normalizeNonNegativeNumber(
 
+            candidate.staffedAcuteCareBeds
+
+        );
+
+
+    const occupiedAcuteCareBeds =
+
+        normalizeNonNegativeNumber(
+
+            candidate.occupiedAcuteCareBeds
+
+        );
+
+
+    /*
+     * =================================================
+     * Critical-care capacity
+     * =================================================
+     */
+
+    const staffedCriticalCareBeds =
+
+        normalizeNonNegativeNumber(
+
+            candidate.staffedCriticalCareBeds
+
+        );
+
+
+    const occupiedCriticalCareBeds =
+
+        normalizeNonNegativeNumber(
+
+            candidate.occupiedCriticalCareBeds
+
+        );
+
+
+    /*
+     * =================================================
+     * Known hospital inflow
+     * =================================================
+     */
+
+    /*
+     * Version 2.1 compatibility field.
+     *
+     * Current ED Admissions is no longer a user input.
+     * Existing ED-origin inpatient demand is represented
+     * by boardedPatients. Any legacy stored value is
+     * intentionally ignored.
+     */
+    const currentEDAdmissions = 0;
+
+
+    const currentDirectAdmissions =
+
+        normalizeNonNegativeNumber(
+
+            candidate.currentDirectAdmissions
+
+        );
+
+
+    const currentSurgicalAdmissions =
+
+        normalizeNonNegativeNumber(
+
+            candidate.currentSurgicalAdmissions
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical ED expectations
+     * =================================================
+     */
+
+    const expectedEDVolume =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedEDVolume
+
+        );
+
+
+    const expectedEDBoarders =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedEDBoarders
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical acute-care baseline
+     * =================================================
+     */
+
+    const expectedStaffedAcuteCareBeds =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedStaffedAcuteCareBeds
+
+        );
+
+
+    const expectedOccupiedAcuteCareBeds =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedOccupiedAcuteCareBeds
+
+        );
+
+
+    const expectedAvailableAcuteCareBeds =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedAvailableAcuteCareBeds
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical four-hour hospital inflow
+     * =================================================
+     */
+
+    const expectedEDAdmissions4h =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedEDAdmissions4h
+
+        );
+
+
+    const expectedDirectAdmissions4h =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedDirectAdmissions4h
+
+        );
+
+
+    const expectedSurgicalAdmissions4h =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedSurgicalAdmissions4h
+
+        );
+
+
+    const expectedHospitalInflow4h =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedHospitalInflow4h
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical four-hour hospital outflow
+     * =================================================
+     */
+
+    const expectedInpatientDepartures4h =
+
+        normalizeNonNegativeNumber(
+
+            candidate.expectedInpatientDepartures4h
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical projected capacity baseline
+     * =================================================
+     */
+
+    const historicalProjectedBedDemand4h =
+
+        normalizeNonNegativeNumber(
+
+            candidate.historicalProjectedBedDemand4h
+
+        );
+
+
+    /*
+     * Historical projected bed balance may be
+     * negative, so it must be normalized as a signed
+     * finite number.
+     */
+    const historicalProjectedBedBalance4h =
+
+        normalizeSignedNumber(
+
+            candidate.historicalProjectedBedBalance4h
+
+        );
+
+
+    /*
+     * =================================================
+     * Reject invalid values
+     * =================================================
+     */
 
     if(
 
         hour === null
+
+        ||
+
+        forecastHours === null
 
         ||
 
@@ -790,10 +1188,6 @@ function normalizeAssessment(
 
         ||
 
-        occupiedMedicalBeds === null
-
-        ||
-
         esi1 === null
 
         ||
@@ -802,31 +1196,75 @@ function normalizeAssessment(
 
         ||
 
-        esi3 === null
+        staffedAcuteCareBeds === null
 
         ||
 
-        esi4 === null
+        occupiedAcuteCareBeds === null
 
         ||
 
-        esi5 === null
+        staffedCriticalCareBeds === null
 
         ||
 
-        expectedVolume === null
+        occupiedCriticalCareBeds === null
 
         ||
 
-        expectedBoarders === null
+        currentDirectAdmissions === null
 
         ||
 
-        expectedArrivals === null
+        currentSurgicalAdmissions === null
 
         ||
 
-        expectedDepartures === null
+        expectedEDVolume === null
+
+        ||
+
+        expectedEDBoarders === null
+
+        ||
+
+        expectedStaffedAcuteCareBeds === null
+
+        ||
+
+        expectedOccupiedAcuteCareBeds === null
+
+        ||
+
+        expectedAvailableAcuteCareBeds === null
+
+        ||
+
+        expectedEDAdmissions4h === null
+
+        ||
+
+        expectedDirectAdmissions4h === null
+
+        ||
+
+        expectedSurgicalAdmissions4h === null
+
+        ||
+
+        expectedHospitalInflow4h === null
+
+        ||
+
+        expectedInpatientDepartures4h === null
+
+        ||
+
+        historicalProjectedBedDemand4h === null
+
+        ||
+
+        historicalProjectedBedBalance4h === null
 
     ){
 
@@ -836,7 +1274,9 @@ function normalizeAssessment(
 
 
     /*
-     * Default pre-assessment state is permitted.
+     * =================================================
+     * Initial-state exception
+     * =================================================
      */
 
     const isDefaultState =
@@ -864,23 +1304,46 @@ function normalizeAssessment(
 
         }
 
+
+        /*
+         * A completed assessment must have real
+         * staffed capacity denominators.
+         */
+
+        if(
+
+            staffedAcuteCareBeds <= 0
+
+            ||
+
+            staffedCriticalCareBeds <= 0
+
+        ){
+
+            return null;
+
+        }
+
     }
 
 
-    if(boardedPatients > totalEDVolume){
+    /*
+     * =================================================
+     * Cross-field validation
+     * =================================================
+     */
 
-        return null;
 
-    }
-
-
+    /**
+     * Boarding cannot exceed total ED census.
+     */
     if(
 
-        occupiedMedicalBeds
+        boardedPatients
 
         >
 
-        staffedMedicalBeds
+        totalEDVolume
 
     ){
 
@@ -889,7 +1352,15 @@ function normalizeAssessment(
     }
 
 
-    const esiTotal =
+    /**
+     * Explicitly entered high-acuity patients
+     * cannot exceed the total ED census.
+     *
+     * ESI 3 through ESI 5 are inferred as:
+     *
+     * totalEDVolume - esi1 - esi2
+     */
+    if(
 
         esi1
 
@@ -897,32 +1368,262 @@ function normalizeAssessment(
 
         esi2
 
-        +
+        >
 
-        esi3
+        totalEDVolume
 
-        +
-
-        esi4
-
-        +
-
-        esi5;
-
-
-    if(esiTotal > totalEDVolume){
+    ){
 
         return null;
 
     }
 
 
-    if(expectedBoarders > expectedVolume){
+    /**
+     * Occupied acute-care beds cannot exceed the
+     * currently staffed acute-care denominator.
+     */
+    if(
+
+        occupiedAcuteCareBeds
+
+        >
+
+        staffedAcuteCareBeds
+
+    ){
 
         return null;
 
     }
 
+
+    /**
+     * Occupied critical-care beds cannot exceed the
+     * currently staffed critical-care denominator.
+     */
+    if(
+
+        occupiedCriticalCareBeds
+
+        >
+
+        staffedCriticalCareBeds
+
+    ){
+
+        return null;
+
+    }
+
+
+    /**
+     * Historical ED boarding cannot exceed the
+     * historical expected ED census.
+     */
+    if(
+
+        expectedEDBoarders
+
+        >
+
+        expectedEDVolume
+
+    ){
+
+        return null;
+
+    }
+
+
+    /**
+     * Historical occupied acute-care beds cannot
+     * exceed historical staffed acute-care beds.
+     */
+    if(
+
+        expectedOccupiedAcuteCareBeds
+
+        >
+
+        expectedStaffedAcuteCareBeds
+
+    ){
+
+        return null;
+
+    }
+
+
+    /**
+     * Historical available acute-care beds must equal
+     * historical staffed minus historical occupied.
+     */
+    const calculatedHistoricalAvailableBeds =
+
+        expectedStaffedAcuteCareBeds
+
+        -
+
+        expectedOccupiedAcuteCareBeds;
+
+
+    if(
+
+        Math.abs(
+
+            calculatedHistoricalAvailableBeds
+
+            -
+
+            expectedAvailableAcuteCareBeds
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    /**
+     * Verify the stored four-hour inflow total.
+     *
+     * Historical expectations may contain decimal
+     * averages, so floating-point tolerance is used.
+     */
+    const calculatedHistoricalInflow =
+
+        expectedEDAdmissions4h
+
+        +
+
+        expectedDirectAdmissions4h
+
+        +
+
+        expectedSurgicalAdmissions4h;
+
+
+    if(
+
+        Math.abs(
+
+            calculatedHistoricalInflow
+
+            -
+
+            expectedHospitalInflow4h
+
+        )
+
+        >
+
+        0.001
+
+    ){
+
+        return null;
+
+    }
+
+
+    /**
+     * Historical projected bed demand includes the
+     * existing expected ED boarding backlog plus NEW
+     * ED-origin, direct, and surgical/procedural
+     * admissions expected during the four-hour window.
+     */
+    const calculatedHistoricalBedDemand =
+
+        expectedEDBoarders
+
+        +
+
+        expectedEDAdmissions4h
+
+        +
+
+        expectedDirectAdmissions4h
+
+        +
+
+        expectedSurgicalAdmissions4h;
+
+
+    if(
+
+        Math.abs(
+
+            calculatedHistoricalBedDemand
+
+            -
+
+            historicalProjectedBedDemand4h
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    /**
+     * Historical projected bed balance may
+     * legitimately be negative.
+     */
+    const calculatedHistoricalBedBalance =
+
+        expectedAvailableAcuteCareBeds
+
+        +
+
+        expectedInpatientDepartures4h
+
+        -
+
+        historicalProjectedBedDemand4h;
+
+
+    if(
+
+        Math.abs(
+
+            calculatedHistoricalBedBalance
+
+            -
+
+            historicalProjectedBedBalance4h
+
+        )
+
+        >
+
+        0.05
+
+    ){
+
+        return null;
+
+    }
+
+
+    /*
+     * =================================================
+     * Return normalized Version 2.1 state
+     * =================================================
+     */
 
     return {
 
@@ -932,36 +1633,64 @@ function normalizeAssessment(
 
         hour,
 
+        forecastHours,
+
         totalEDVolume,
 
         boardedPatients,
-
-        occupiedMedicalBeds,
-
-        staffedMedicalBeds,
 
         esi1,
 
         esi2,
 
-        esi3,
+        staffedAcuteCareBeds,
 
-        esi4,
+        occupiedAcuteCareBeds,
 
-        esi5,
+        staffedCriticalCareBeds,
 
-        expectedVolume,
+        occupiedCriticalCareBeds,
 
-        expectedBoarders,
+        currentEDAdmissions,
 
-        expectedArrivals,
+        currentDirectAdmissions,
 
-        expectedDepartures
+        currentSurgicalAdmissions,
+
+        expectedEDVolume,
+
+        expectedEDBoarders,
+
+        expectedStaffedAcuteCareBeds,
+
+        expectedOccupiedAcuteCareBeds,
+
+        expectedAvailableAcuteCareBeds,
+
+        expectedEDAdmissions4h,
+
+        expectedDirectAdmissions4h,
+
+        expectedSurgicalAdmissions4h,
+
+        expectedHospitalInflow4h,
+
+        expectedInpatientDepartures4h,
+
+        historicalProjectedBedDemand4h,
+
+        historicalProjectedBedBalance4h
 
     };
 
 }
 
+
+/*
+ * =====================================================
+ * Primitive normalization helpers
+ * =====================================================
+ */
 
 /**
  * Normalize an assessment timestamp.
@@ -988,7 +1717,9 @@ function normalizeAssessmentTime(
     }
 
 
-    const trimmedValue = value.trim();
+    const trimmedValue =
+
+        value.trim();
 
 
     if(trimmedValue.length === 0){
@@ -998,18 +1729,24 @@ function normalizeAssessmentTime(
     }
 
 
-    const timestamp = new Date(
+    const timestamp =
 
-        trimmedValue
+        new Date(
 
-    );
+            trimmedValue
+
+        );
 
 
-    if(Number.isNaN(
+    if(
 
-        timestamp.getTime()
+        Number.isNaN(
 
-    )){
+            timestamp.getTime()
+
+        )
+
+    ){
 
         return null;
 
@@ -1046,7 +1783,9 @@ function normalizeDay(
     }
 
 
-    const trimmedValue = value.trim();
+    const trimmedValue =
+
+        value.trim();
 
 
     if(trimmedValue.length === 0){
@@ -1075,17 +1814,19 @@ function normalizeDay(
     ];
 
 
-    const match = days.find(
+    const match =
 
-        day =>
+        days.find(
 
-            day.toLowerCase()
+            day =>
 
-            ===
+                day.toLowerCase()
 
-            trimmedValue.toLowerCase()
+                ===
 
-    );
+                trimmedValue.toLowerCase()
+
+        );
 
 
     return match ?? null;
@@ -1094,7 +1835,7 @@ function normalizeDay(
 
 
 /**
- * Normalize an hour to an integer from 0–23.
+ * Normalize an hour to an integer from 0 through 23.
  */
 function normalizeHour(
 
@@ -1143,12 +1884,11 @@ function normalizeHour(
 
 
 /**
- * Normalize a positive finite number.
+ * Normalize the Hospital Readiness forecast horizon.
  *
- * Used for capacity values that must be greater
- * than zero.
+ * Version 2.1 currently uses exactly four hours.
  */
-function normalizePositiveNumber(
+function normalizeForecastHours(
 
     value:unknown
 
@@ -1168,7 +1908,15 @@ function normalizePositiveNumber(
 
         ||
 
-        value <= 0
+        !Number.isInteger(
+
+            value
+
+        )
+
+        ||
+
+        value !== 4
 
     ){
 
@@ -1185,9 +1933,7 @@ function normalizePositiveNumber(
 /**
  * Normalize a nonnegative finite number.
  *
- * Current operational assessment values should be
- * whole numbers, but historical expectations may
- * contain decimals.
+ * Historical expectations may contain decimals.
  */
 function normalizeNonNegativeNumber(
 
@@ -1224,7 +1970,53 @@ function normalizeNonNegativeNumber(
 
 
 /**
+ * Normalize a finite signed number.
+ *
+ * Negative values are intentionally accepted for
+ * historical projected bed balance.
+ */
+function normalizeSignedNumber(
+
+    value:unknown
+
+):number | null {
+
+    if(
+
+        typeof value !== "number"
+
+        ||
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+    ){
+
+        return null;
+
+    }
+
+
+    return value;
+
+}
+
+
+/*
+ * =====================================================
+ * Defensive cloning
+ * =====================================================
+ */
+
+/**
  * Return a defensive assessment copy.
+ *
+ * SituationAssessment currently contains only
+ * primitive values, so explicit copying keeps this
+ * function easy to audit when fields change.
  */
 function cloneAssessment(
 
@@ -1243,17 +2035,14 @@ function cloneAssessment(
         hour:
             assessment.hour,
 
+        forecastHours:
+            assessment.forecastHours,
+
         totalEDVolume:
             assessment.totalEDVolume,
 
         boardedPatients:
             assessment.boardedPatients,
-
-        occupiedMedicalBeds:
-            assessment.occupiedMedicalBeds,
-
-        staffedMedicalBeds:
-            assessment.staffedMedicalBeds,
 
         esi1:
             assessment.esi1,
@@ -1261,26 +2050,62 @@ function cloneAssessment(
         esi2:
             assessment.esi2,
 
-        esi3:
-            assessment.esi3,
+        staffedAcuteCareBeds:
+            assessment.staffedAcuteCareBeds,
 
-        esi4:
-            assessment.esi4,
+        occupiedAcuteCareBeds:
+            assessment.occupiedAcuteCareBeds,
 
-        esi5:
-            assessment.esi5,
+        staffedCriticalCareBeds:
+            assessment.staffedCriticalCareBeds,
 
-        expectedVolume:
-            assessment.expectedVolume,
+        occupiedCriticalCareBeds:
+            assessment.occupiedCriticalCareBeds,
 
-        expectedBoarders:
-            assessment.expectedBoarders,
+        currentEDAdmissions:
+            assessment.currentEDAdmissions,
 
-        expectedArrivals:
-            assessment.expectedArrivals,
+        currentDirectAdmissions:
+            assessment.currentDirectAdmissions,
 
-        expectedDepartures:
-            assessment.expectedDepartures
+        currentSurgicalAdmissions:
+            assessment.currentSurgicalAdmissions,
+
+        expectedEDVolume:
+            assessment.expectedEDVolume,
+
+        expectedEDBoarders:
+            assessment.expectedEDBoarders,
+
+        expectedStaffedAcuteCareBeds:
+            assessment.expectedStaffedAcuteCareBeds,
+
+        expectedOccupiedAcuteCareBeds:
+            assessment.expectedOccupiedAcuteCareBeds,
+
+        expectedAvailableAcuteCareBeds:
+            assessment.expectedAvailableAcuteCareBeds,
+
+        expectedEDAdmissions4h:
+            assessment.expectedEDAdmissions4h,
+
+        expectedDirectAdmissions4h:
+            assessment.expectedDirectAdmissions4h,
+
+        expectedSurgicalAdmissions4h:
+            assessment.expectedSurgicalAdmissions4h,
+
+        expectedHospitalInflow4h:
+            assessment.expectedHospitalInflow4h,
+
+        expectedInpatientDepartures4h:
+            assessment.expectedInpatientDepartures4h,
+
+        historicalProjectedBedDemand4h:
+            assessment.historicalProjectedBedDemand4h,
+
+        historicalProjectedBedBalance4h:
+            assessment.historicalProjectedBedBalance4h
 
     };
 

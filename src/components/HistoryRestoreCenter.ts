@@ -1,12 +1,12 @@
-/**
+﻿/**
  * HistoryRestoreCenter
  *
- * Validates and restores EDORI snapshot-history
+ * Validates and restores Hospital Readiness snapshot-history
  * backups exported by DataExportCenter.
  *
  * Restoring history:
  *
- * - Does not recalculate EDORI
+ * - Does not recalculate Hospital Readiness
  * - Does not alter the current form
  * - Does not alter the current result
  * - Replaces only saved snapshot history
@@ -99,7 +99,7 @@ export function HistoryRestoreCenter():string {
                     </h3>
 
                     <p class="panel-description">
-                        Validate and restore a previously exported EDORI JSON backup
+                        Validate and restore a previously exported Hospital Readiness JSON backup
                     </p>
 
                 </div>
@@ -121,7 +121,7 @@ export function HistoryRestoreCenter():string {
                     class="history-restore-file-label"
                     for="historyRestoreFileInput"
                 >
-                    Select EDORI history backup
+                    Select Hospital Readiness history backup
                 </label>
 
 
@@ -134,7 +134,7 @@ export function HistoryRestoreCenter():string {
 
 
                 <p class="history-restore-help">
-                    Select a JSON backup created by the EDORI Data Export Center.
+                    Select a JSON backup created by the Hospital Readiness Data Export Center.
                     The file will be validated before any saved history is changed.
                 </p>
 
@@ -300,7 +300,7 @@ async function handleRestoreFileSelection(
 
         showRestoreMessage(
 
-            "Select a JSON file created by the EDORI Data Export Center.",
+            "Select a JSON file created by the Hospital Readiness Data Export Center.",
 
             "error"
 
@@ -340,7 +340,7 @@ async function handleRestoreFileSelection(
 
             showRestoreMessage(
 
-                "The selected backup does not contain any valid EDORI snapshots.",
+                "The selected backup does not contain any valid Hospital Readiness snapshots.",
 
                 "error"
 
@@ -398,7 +398,7 @@ async function handleRestoreFileSelection(
 
         console.error(
 
-            "Unable to validate EDORI backup:",
+            "Unable to validate Hospital Readiness backup:",
 
             error
 
@@ -407,7 +407,7 @@ async function handleRestoreFileSelection(
 
         showRestoreMessage(
 
-            "The selected file is not a valid EDORI history backup.",
+            "The selected file is not a valid Hospital Readiness history backup.",
 
             "error"
 
@@ -573,80 +573,74 @@ function normalizeSnapshot(
     }
 
 
-    const candidate = value as {
+    const candidate =
 
-        id?:unknown;
-
-        timestamp?:unknown;
-
-        score?:unknown;
-
-        status?:unknown;
-
-        operationalState?:unknown;
-
-        totalEDVolume?:unknown;
-
-        boardedPatients?:unknown;
-
-        occupiedMedicalBeds?:unknown;
-
-        staffedMedicalBeds?:unknown;
-
-        esi1?:unknown;
-
-        esi2?:unknown;
-
-        esi3?:unknown;
-
-        esi4?:unknown;
-
-        esi5?:unknown;
-
-        expectedVolume?:unknown;
-
-        expectedBoarders?:unknown;
-
-        expectedArrivals?:unknown;
-
-        expectedDepartures?:unknown;
-
-        demandScore?:unknown;
-
-        boardingScore?:unknown;
-
-        hospitalScore?:unknown;
-
-        acuityScore?:unknown;
-
-        forecastScore?:unknown;
-
-        day?:unknown;
-
-        hour?:unknown;
-
-    };
+        value as Record<string, unknown>;
 
 
-    const timestamp = normalizeDate(
+    /*
+     * =================================================
+     * Version 2.1 snapshot schema
+     * =================================================
+     *
+     * Version 2.1 uses snapshot schema 3.
+     *
+     * Older schema records are intentionally not
+     * reconstructed because doing so could reintroduce
+     * the obsolete projected-inflow model.
+     */
 
-        candidate.timestamp
+    const schemaVersion =
 
-    );
+        normalizeNumber(
 
+            candidate.schemaVersion
 
-    const score = normalizeNumber(
-
-        candidate.score
-
-    );
+        );
 
 
-    const operationalState = normalizeOperationalState(
+    if(
 
-        candidate.operationalState
+        schemaVersion !== 3
 
-    );
+    ){
+
+        return null;
+
+    }
+
+
+    /*
+     * =================================================
+     * Required core values
+     * =================================================
+     */
+
+    const timestamp =
+
+        normalizeDate(
+
+            candidate.timestamp
+
+        );
+
+
+    const score =
+
+        normalizeNumber(
+
+            candidate.score
+
+        );
+
+
+    const operationalState =
+
+        normalizeOperationalState(
+
+            candidate.operationalState
+
+        );
 
 
     if(
@@ -668,16 +662,512 @@ function normalizeSnapshot(
     }
 
 
+    /*
+     * =================================================
+     * Current non-ED hospital inflow
+     * =================================================
+     */
+
+    const currentDirectAdmissions =
+
+        normalizeNonnegativeNumber(
+
+            candidate.currentDirectAdmissions
+
+        )
+
+        ?? 0;
+
+
+    const currentSurgicalAdmissions =
+
+        normalizeNonnegativeNumber(
+
+            candidate.currentSurgicalAdmissions
+
+        )
+
+        ?? 0;
+
+
+    const knownNonEDInflow =
+
+        normalizeNonnegativeNumber(
+
+            candidate.knownNonEDInflow
+
+        )
+
+        ??
+
+        (
+
+            currentDirectAdmissions
+
+            +
+
+            currentSurgicalAdmissions
+
+        );
+
+
+    /*
+     * =================================================
+     * Current acute-care capacity
+     * =================================================
+     */
+
+    const staffedAcuteCareBeds =
+
+        normalizePositiveNumber(
+
+            candidate.staffedAcuteCareBeds
+
+        )
+
+        ?? 1;
+
+
+    const occupiedAcuteCareBeds =
+
+        normalizeNonnegativeNumber(
+
+            candidate.occupiedAcuteCareBeds
+
+        )
+
+        ?? 0;
+
+
+    const currentAvailableAcuteCareBeds =
+
+        normalizeNumber(
+
+            candidate.currentAvailableAcuteCareBeds
+
+        )
+
+        ??
+
+        (
+
+            staffedAcuteCareBeds
+
+            -
+
+            occupiedAcuteCareBeds
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical ED expectations
+     * =================================================
+     */
+
+    const expectedEDVolume =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedEDVolume
+
+        )
+
+        ?? 0;
+
+
+    const expectedEDBoarders =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedEDBoarders
+
+        )
+
+        ?? 0;
+
+
+    /*
+     * =================================================
+     * Historical acute-care baseline
+     * =================================================
+     */
+
+    const expectedStaffedAcuteCareBeds =
+
+        normalizePositiveNumber(
+
+            candidate.expectedStaffedAcuteCareBeds
+
+        )
+
+        ?? staffedAcuteCareBeds;
+
+
+    const expectedOccupiedAcuteCareBeds =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedOccupiedAcuteCareBeds
+
+        )
+
+        ?? occupiedAcuteCareBeds;
+
+
+    const expectedAvailableAcuteCareBeds =
+
+        normalizeNumber(
+
+            candidate.expectedAvailableAcuteCareBeds
+
+        )
+
+        ??
+
+        (
+
+            expectedStaffedAcuteCareBeds
+
+            -
+
+            expectedOccupiedAcuteCareBeds
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical four-hour flow
+     * =================================================
+     */
+
+    const expectedEDAdmissions4h =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedEDAdmissions4h
+
+        )
+
+        ?? 0;
+
+
+    const expectedDirectAdmissions4h =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedDirectAdmissions4h
+
+        )
+
+        ?? 0;
+
+
+    const expectedSurgicalAdmissions4h =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedSurgicalAdmissions4h
+
+        )
+
+        ?? 0;
+
+
+    const expectedNonEDInflow =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedNonEDInflow
+
+        )
+
+        ??
+
+        (
+
+            expectedDirectAdmissions4h
+
+            +
+
+            expectedSurgicalAdmissions4h
+
+        );
+
+
+    const expectedHospitalInflow4h =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedHospitalInflow4h
+
+        )
+
+        ??
+
+        (
+
+            expectedEDAdmissions4h
+
+            +
+
+            expectedDirectAdmissions4h
+
+            +
+
+            expectedSurgicalAdmissions4h
+
+        );
+
+
+    const expectedInpatientDepartures4h =
+
+        normalizeNonnegativeNumber(
+
+            candidate.expectedInpatientDepartures4h
+
+        )
+
+        ?? 0;
+
+
+    /*
+     * =================================================
+     * Current ED boarding
+     * =================================================
+     */
+
+    const boardedPatients =
+
+        normalizeNonnegativeNumber(
+
+            candidate.boardedPatients
+
+        )
+
+        ?? 0;
+
+
+    /*
+     * =================================================
+     * Version 2.1 projected new admissions
+     * =================================================
+     */
+
+    const projectedDirectAdmissions =
+
+        normalizeNonnegativeNumber(
+
+            candidate.projectedDirectAdmissions
+
+        )
+
+        ?? currentDirectAdmissions;
+
+
+    const projectedSurgicalAdmissions =
+
+        normalizeNonnegativeNumber(
+
+            candidate.projectedSurgicalAdmissions
+
+        )
+
+        ?? currentSurgicalAdmissions;
+
+
+    const projectedNewAdmissions =
+
+        normalizeNonnegativeNumber(
+
+            candidate.projectedNewAdmissions
+
+        )
+
+        ??
+
+        (
+
+            expectedEDAdmissions4h
+
+            +
+
+            projectedDirectAdmissions
+
+            +
+
+            projectedSurgicalAdmissions
+
+        );
+
+
+    /*
+     * Existing ED boarders are already current bed
+     * demand.
+     *
+     * They are added exactly once to new admissions.
+     */
+    const projectedTotalBedDemand =
+
+        normalizeNonnegativeNumber(
+
+            candidate.projectedTotalBedDemand
+
+        )
+
+        ??
+
+        (
+
+            boardedPatients
+
+            +
+
+            projectedNewAdmissions
+
+        );
+
+
+    /*
+     * =================================================
+     * Historical projected demand
+     * =================================================
+     */
+
+    const historicalProjectedBedDemand4h =
+
+        normalizeNonnegativeNumber(
+
+            candidate.historicalProjectedBedDemand4h
+
+        )
+
+        ??
+
+        (
+
+            expectedEDBoarders
+
+            +
+
+            expectedEDAdmissions4h
+
+            +
+
+            expectedDirectAdmissions4h
+
+            +
+
+            expectedSurgicalAdmissions4h
+
+        );
+
+
+    /*
+     * =================================================
+     * Projected capacity
+     * =================================================
+     */
+
+    const projectedAvailableAcuteCareBeds =
+
+        normalizeNumber(
+
+            candidate.projectedAvailableAcuteCareBeds
+
+        )
+
+        ??
+
+        (
+
+            currentAvailableAcuteCareBeds
+
+            +
+
+            expectedInpatientDepartures4h
+
+            -
+
+            projectedTotalBedDemand
+
+        );
+
+
+    /*
+     * Historical balance may be negative.
+     */
+    const historicalProjectedBedBalance4h =
+
+        normalizeNumber(
+
+            candidate.historicalProjectedBedBalance4h
+
+        )
+
+        ??
+
+        (
+
+            expectedAvailableAcuteCareBeds
+
+            +
+
+            expectedInpatientDepartures4h
+
+            -
+
+            historicalProjectedBedDemand4h
+
+        );
+
+
+    /*
+     * Negative variance means today's projection is
+     * worse than historical expectation.
+     */
+    const projectedCapacityVariance =
+
+        normalizeNumber(
+
+            candidate.projectedCapacityVariance
+
+        )
+
+        ??
+
+        (
+
+            projectedAvailableAcuteCareBeds
+
+            -
+
+            historicalProjectedBedBalance4h
+
+        );
+
+
+    /*
+     * =================================================
+     * Return Version 2.1 snapshot
+     * =================================================
+     */
+
     return {
 
         id:
+
             normalizeString(
 
                 candidate.id
 
             )
 
-            ?? createRestoredSnapshotId(
+            ??
+
+            createRestoredSnapshotId(
 
                 timestamp
 
@@ -685,7 +1175,10 @@ function normalizeSnapshot(
 
         timestamp,
 
+        schemaVersion:3,
+
         score:
+
             clampScore(
 
                 score
@@ -693,17 +1186,64 @@ function normalizeSnapshot(
             ),
 
         status:
+
             normalizeString(
 
                 candidate.status
 
             )
 
-            ?? operationalState.title,
+            ??
+
+            operationalState.title,
 
         operationalState,
 
+        day:
+
+            normalizeString(
+
+                candidate.day
+
+            )
+
+            ??
+
+            getDayName(
+
+                timestamp
+
+            ),
+
+        hour:
+
+            normalizeHour(
+
+                candidate.hour
+
+            )
+
+            ??
+
+            timestamp.getHours(),
+
+        forecastHours:
+
+            normalizePositiveInteger(
+
+                candidate.forecastHours
+
+            )
+
+            ?? 4,
+
+
+        /*
+         * Emergency Department
+         */
+
         totalEDVolume:
+
             normalizeNonnegativeNumber(
 
                 candidate.totalEDVolume
@@ -712,34 +1252,10 @@ function normalizeSnapshot(
 
             ?? 0,
 
-        boardedPatients:
-            normalizeNonnegativeNumber(
-
-                candidate.boardedPatients
-
-            )
-
-            ?? 0,
-
-        occupiedMedicalBeds:
-            normalizeNonnegativeNumber(
-
-                candidate.occupiedMedicalBeds
-
-            )
-
-            ?? 0,
-
-        staffedMedicalBeds:
-            normalizePositiveNumber(
-
-                candidate.staffedMedicalBeds
-
-            )
-
-            ?? 273,
+        boardedPatients,
 
         esi1:
+
             normalizeNonnegativeNumber(
 
                 candidate.esi1
@@ -749,6 +1265,7 @@ function normalizeSnapshot(
             ?? 0,
 
         esi2:
+
             normalizeNonnegativeNumber(
 
                 candidate.esi2
@@ -757,145 +1274,272 @@ function normalizeSnapshot(
 
             ?? 0,
 
-        esi3:
+
+        /*
+         * Current hospital capacity
+         */
+
+        staffedAcuteCareBeds,
+
+        occupiedAcuteCareBeds,
+
+        staffedCriticalCareBeds:
+
+            normalizePositiveNumber(
+
+                candidate.staffedCriticalCareBeds
+
+            )
+
+            ?? 1,
+
+        occupiedCriticalCareBeds:
+
             normalizeNonnegativeNumber(
 
-                candidate.esi3
+                candidate.occupiedCriticalCareBeds
 
             )
 
             ?? 0,
 
-        esi4:
-            normalizeNonnegativeNumber(
 
-                candidate.esi4
+        /*
+         * Current non-ED inflow
+         */
 
-            )
+        currentDirectAdmissions,
 
-            ?? 0,
+        currentSurgicalAdmissions,
 
-        esi5:
-            normalizeNonnegativeNumber(
+        knownNonEDInflow,
 
-                candidate.esi5
+        expectedNonEDInflow,
 
-            )
 
-            ?? 0,
+        /*
+         * Historical ED expectations
+         */
 
-        expectedVolume:
-            normalizeNonnegativeNumber(
+        expectedEDVolume,
 
-                candidate.expectedVolume
+        expectedEDBoarders,
 
-            )
 
-            ?? 0,
+        /*
+         * Historical acute-care baseline
+         */
 
-        expectedBoarders:
-            normalizeNonnegativeNumber(
+        expectedStaffedAcuteCareBeds,
 
-                candidate.expectedBoarders
+        expectedOccupiedAcuteCareBeds,
 
-            )
+        expectedAvailableAcuteCareBeds,
 
-            ?? 0,
 
-        expectedArrivals:
-            normalizeNonnegativeNumber(
+        /*
+         * Historical four-hour flow
+         */
 
-                candidate.expectedArrivals
+        expectedEDAdmissions4h,
 
-            )
+        expectedDirectAdmissions4h,
 
-            ?? 0,
+        expectedSurgicalAdmissions4h,
 
-        expectedDepartures:
-            normalizeNonnegativeNumber(
+        expectedHospitalInflow4h,
 
-                candidate.expectedDepartures
+        expectedInpatientDepartures4h,
 
-            )
 
-            ?? 0,
+        /*
+         * Four-hour projected demand
+         */
 
-        demandScore:
+        projectedDirectAdmissions,
+
+        projectedSurgicalAdmissions,
+
+        projectedNewAdmissions,
+
+        projectedTotalBedDemand,
+
+        historicalProjectedBedDemand4h,
+
+
+        /*
+         * Four-hour projected capacity
+         */
+
+        currentAvailableAcuteCareBeds,
+
+        projectedAvailableAcuteCareBeds,
+
+        historicalProjectedBedBalance4h,
+
+        projectedCapacityVariance,
+
+
+        /*
+         * Hospital Readiness domains
+         */
+
+        edPressureScore:
+
             normalizeOptionalScore(
 
-                candidate.demandScore
+                candidate.edPressureScore
 
             )
 
             ?? 0,
 
-        boardingScore:
+        acuteCapacityScore:
+
             normalizeOptionalScore(
 
-                candidate.boardingScore
+                candidate.acuteCapacityScore
 
             )
 
             ?? 0,
 
-        hospitalScore:
+        criticalCapacityScore:
+
             normalizeOptionalScore(
 
-                candidate.hospitalScore
+                candidate.criticalCapacityScore
 
             )
 
             ?? 0,
 
-        acuityScore:
+        inflowScore:
+
             normalizeOptionalScore(
 
-                candidate.acuityScore
+                candidate.inflowScore
 
             )
 
             ?? 0,
 
-        forecastScore:
+        projectedCapacityScore:
+
             normalizeOptionalScore(
 
-                candidate.forecastScore
+                candidate.projectedCapacityScore
 
             )
 
             ?? 0,
 
-        day:
-            normalizeString(
 
-                candidate.day
+        /*
+         * ED subdomains
+         */
+
+        edVolumeScore:
+
+            normalizeOptionalScore(
+
+                candidate.edVolumeScore
 
             )
 
-            ?? getDayName(
+            ?? 0,
 
-                timestamp
+        edBoardingScore:
+
+            normalizeOptionalScore(
+
+                candidate.edBoardingScore
+
+            )
+
+            ?? 0,
+
+        edAcuityScore:
+
+            normalizeOptionalScore(
+
+                candidate.edAcuityScore
+
+            )
+
+            ?? 0,
+
+
+        /*
+         * Temporary compatibility fields
+         */
+
+        currentEDAdmissions:0,
+
+        currentHospitalInflow:
+
+            normalizeNonnegativeNumber(
+
+                candidate.currentHospitalInflow
+
+            )
+
+            ??
+
+            knownNonEDInflow,
+
+        projectedHospitalInflow:
+
+            normalizeNonnegativeNumber(
+
+                candidate.projectedHospitalInflow
+
+            )
+
+            ??
+
+            projectedNewAdmissions,
+
+
+        /*
+         * Optional trend metadata
+         */
+
+        scoreChange:
+
+            normalizeOptionalScoreChange(
+
+                candidate.scoreChange
 
             ),
 
-        hour:
-            normalizeHour(
+        trendDirection:
 
-                candidate.hour
+            normalizeString(
+
+                candidate.trendDirection
+
+            ),
+
+        activeTriggerIds:
+
+            normalizeStringArray(
+
+                candidate.activeTriggerIds
+
+            ),
+
+        activeTriggerTitles:
+
+            normalizeStringArray(
+
+                candidate.activeTriggerTitles
 
             )
 
-            ?? timestamp.getHours()
-
     };
 
-}
-
-
-/**
- * Normalize an operational state from backup data.
- */
-/**
+}/**
  * Normalize an operational state from backup data.
  */
 function normalizeOperationalState(
@@ -1070,7 +1714,7 @@ function applyPendingRestore():void {
 
         console.error(
 
-            "Unable to restore EDORI history:",
+            "Unable to restore Hospital Readiness history:",
 
             error
 
@@ -1257,7 +1901,7 @@ function renderRestorePreview(
         <div class="history-restore-warning">
 
             Applying this backup will replace the currently saved assessment history.
-            The current EDORI form and calculated result will not be changed.
+            The current Hospital Readiness form and calculated result will not be changed.
 
         </div>
 
@@ -1443,7 +2087,7 @@ function updateCurrentHistoryCount():void {
 
 
 /**
- * Normalize an Alpha–Echo title.
+ * Normalize an Alphaâ€“Echo title.
  */
 function normalizeOperationalTitle(
 
@@ -1733,6 +2377,97 @@ function normalizeOptionalScore(
 
 
 /**
+ * Normalize a positive integer.
+ */
+function normalizePositiveInteger(
+
+    value:unknown
+
+):number | undefined {
+
+    const normalized = normalizeNumber(
+        value
+    );
+
+
+    if(
+        normalized === null
+        ||
+        normalized <= 0
+    ){
+
+        return undefined;
+
+    }
+
+
+    return Math.round(
+        normalized
+    );
+
+}
+
+
+/**
+ * Normalize an optional signed score change.
+ */
+function normalizeOptionalScoreChange(
+
+    value:unknown
+
+):number | undefined {
+
+    const normalized = normalizeNumber(
+        value
+    );
+
+
+    return normalized === null
+        ? undefined
+        : normalized;
+
+}
+
+
+/**
+ * Normalize an optional string array.
+ */
+function normalizeStringArray(
+
+    value:unknown
+
+):string[] | undefined {
+
+    if(!Array.isArray(value)){
+
+        return undefined;
+
+    }
+
+
+    const normalized = value
+
+        .map(
+            item => normalizeString(
+                item
+            )
+        )
+
+        .filter(
+            (
+                item
+            ):item is string => item !== undefined
+        );
+
+
+    return normalized.length > 0
+        ? normalized
+        : undefined;
+
+}
+
+
+/**
  * Normalize an optional hour.
  */
 function normalizeHour(
@@ -1804,7 +2539,7 @@ function normalizeString(
 
 
 /**
- * Clamp score to 0–100.
+ * Clamp score to 0â€“100.
  */
 function clampScore(
 

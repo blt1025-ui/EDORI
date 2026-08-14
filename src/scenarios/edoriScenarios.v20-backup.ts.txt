@@ -1,7 +1,7 @@
-﻿/**
+/**
  * Hospital Readiness Scenario Library
  *
- * Version 2.1 Hospital Readiness Model
+ * Version 2 Hospital Readiness Model
  *
  * Development scenarios used to evaluate and
  * calibrate the scoring model.
@@ -93,21 +93,6 @@ EdoriScenario[] = [
 
             expectedEDBoarders:
                 7,
-
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                205,
-
-            expectedAvailableAcuteCareBeds:
-                68,
-
-            historicalProjectedBedDemand4h:
-                13,
-
-            historicalProjectedBedBalance4h:
-                63,
 
             expectedEDAdmissions4h:
                 4,
@@ -212,21 +197,6 @@ EdoriScenario[] = [
             expectedEDBoarders:
                 17,
 
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                230,
-
-            expectedAvailableAcuteCareBeds:
-                43,
-
-            historicalProjectedBedDemand4h:
-                35,
-
-            historicalProjectedBedBalance4h:
-                26,
-
             expectedEDAdmissions4h:
                 11,
 
@@ -329,21 +299,6 @@ EdoriScenario[] = [
 
             expectedEDBoarders:
                 24,
-
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                240,
-
-            expectedAvailableAcuteCareBeds:
-                33,
-
-            historicalProjectedBedDemand4h:
-                47,
-
-            historicalProjectedBedBalance4h:
-                2,
 
             expectedEDAdmissions4h:
                 16,
@@ -448,21 +403,6 @@ EdoriScenario[] = [
             expectedEDBoarders:
                 28,
 
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                245,
-
-            expectedAvailableAcuteCareBeds:
-                28,
-
-            historicalProjectedBedDemand4h:
-                56,
-
-            historicalProjectedBedBalance4h:
-                -14,
-
             expectedEDAdmissions4h:
                 19,
 
@@ -565,21 +505,6 @@ EdoriScenario[] = [
 
             expectedEDBoarders:
                 30,
-
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                250,
-
-            expectedAvailableAcuteCareBeds:
-                23,
-
-            historicalProjectedBedDemand4h:
-                63,
-
-            historicalProjectedBedBalance4h:
-                -30,
 
             expectedEDAdmissions4h:
                 22,
@@ -684,21 +609,6 @@ EdoriScenario[] = [
             expectedEDBoarders:
                 17,
 
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                225,
-
-            expectedAvailableAcuteCareBeds:
-                48,
-
-            historicalProjectedBedDemand4h:
-                34,
-
-            historicalProjectedBedBalance4h:
-                31,
-
             expectedEDAdmissions4h:
                 10,
 
@@ -799,21 +709,6 @@ EdoriScenario[] = [
             expectedEDBoarders:
                 23,
 
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                240,
-
-            expectedAvailableAcuteCareBeds:
-                33,
-
-            historicalProjectedBedDemand4h:
-                40,
-
-            historicalProjectedBedBalance4h:
-                10,
-
             expectedEDAdmissions4h:
                 10,
 
@@ -913,21 +808,6 @@ EdoriScenario[] = [
 
             expectedEDBoarders:
                 34,
-
-            expectedStaffedAcuteCareBeds:
-                273,
-
-            expectedOccupiedAcuteCareBeds:
-                245,
-
-            expectedAvailableAcuteCareBeds:
-                28,
-
-            historicalProjectedBedDemand4h:
-                54,
-
-            historicalProjectedBedBalance4h:
-                -7,
 
             expectedEDAdmissions4h:
                 14,

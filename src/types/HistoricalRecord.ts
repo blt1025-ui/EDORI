@@ -1,7 +1,12 @@
 /**
- * One historical baseline record.
- * These values are loaded from historical.json
- * based on the selected day and hour.
+ * HistoricalRecord
+ *
+ * Version 2 Hospital Readiness Model
+ *
+ * Represents one hourly historical baseline record.
+ *
+ * This type mirrors the historical data fields used
+ * by the Hospital Readiness calculation model.
  */
 
 export interface HistoricalRecord {
@@ -9,41 +14,56 @@ export interface HistoricalRecord {
     /**
      * Monday, Tuesday, etc.
      */
-    day: string;
+    day:string;
+
 
     /**
-     * Hour of day (0-23)
+     * Hour of day from 0 through 23.
      */
-    hour: number;
+    hour:number;
+
 
     /**
-     * Historical average total ED census
+     * Historical average total ED census during
+     * this weekday/hour period.
      */
-    expectedVolume: number;
+    expectedEDVolume:number;
+
 
     /**
-     * Historical average boarded patients
+     * Historical average ED boarding population
+     * during this weekday/hour period.
      */
-    expectedBoarders: number;
+    expectedEDBoarders:number;
+
 
     /**
-     * Historical average RN staffing
+     * Historical average number of inpatient
+     * admissions originating from the ED during
+     * this hour.
      */
-    expectedRN: number;
+    expectedEDAdmissions:number;
+
 
     /**
-     * Historical average physician/APP staffing
+     * Historical average number of direct hospital
+     * admissions during this hour.
      */
-    expectedMD: number;
+    expectedDirectAdmissions:number;
+
 
     /**
-     * Historical average arrivals during this hour
+     * Historical average number of inpatient
+     * admissions originating from surgical or
+     * procedural areas during this hour.
      */
-    expectedArrivals: number;
+    expectedSurgicalAdmissions:number;
+
 
     /**
-     * Historical average departures during this hour
+     * Historical average number of inpatient
+     * hospital departures during this hour.
      */
-    expectedDepartures: number;
+    expectedInpatientDepartures:number;
 
 }

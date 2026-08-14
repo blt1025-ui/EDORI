@@ -1,8 +1,10 @@
 /**
  * OperationalTrigger
  *
- * Configuration model for one EDORI operational
- * trigger rule.
+ * Version 2 Hospital Readiness Model
+ *
+ * Configuration model for one hospital
+ * operational trigger rule.
  */
 
 import type {
@@ -13,15 +15,22 @@ import type {
 
 from "./OperationalStateTitle";
 
+
+/**
+ * High-level trigger categories used for
+ * organization, display, and administration.
+ */
 export type OperationalTriggerCategory =
 
-    | "Demand"
+    | "ED Operational Pressure"
 
-    | "Boarding"
+    | "Acute-Care Capacity"
 
-    | "Hospital Throughput"
+    | "Critical-Care Capacity"
 
-    | "Clinical Complexity"
+    | "Hospital Flow"
+
+    | "Projected Capacity"
 
     | "Operational Momentum";
 
@@ -50,7 +59,21 @@ export type OperationalTriggerOperator =
     | "equal";
 
 
+/**
+ * Metrics available to the operational trigger
+ * engine.
+ *
+ * Trigger thresholds remain configuration values.
+ * The trigger service calculates the metric and
+ * evaluates it against the configured threshold.
+ */
 export type OperationalTriggerMetric =
+
+    /*
+     * =================================================
+     * Emergency Department
+     * =================================================
+     */
 
     | "totalEDVolume"
 
@@ -64,17 +87,84 @@ export type OperationalTriggerMetric =
 
     | "boardingPercentOfVolume"
 
-    | "occupiedMedicalBeds"
-
-    | "hospitalOccupancyPercent"
-
-    | "expectedNetFlow"
-
     | "highAcuityCount"
 
     | "highAcuityPercent"
 
-    | "edoriScore"
+    | "edPressureScore"
+
+
+    /*
+     * =================================================
+     * Acute-Care Capacity
+     * =================================================
+     */
+
+    | "occupiedAcuteCareBeds"
+
+    | "availableAcuteCareBeds"
+
+    | "acuteCareOccupancyPercent"
+
+    | "acuteCapacityScore"
+
+
+    /*
+     * =================================================
+     * Critical-Care Capacity
+     * =================================================
+     */
+
+    | "occupiedCriticalCareBeds"
+
+    | "availableCriticalCareBeds"
+
+    | "criticalCareOccupancyPercent"
+
+    | "criticalCapacityScore"
+
+
+    /*
+     * =================================================
+     * Hospital Inflow
+     * =================================================
+     */
+
+    | "currentHospitalInflow"
+
+    | "expectedHospitalInflow"
+
+    | "hospitalInflowAboveExpected"
+
+    | "hospitalInflowPercentOfExpected"
+
+    | "inflowScore"
+
+
+    /*
+     * =================================================
+     * Four-Hour Projected Capacity
+     * =================================================
+     */
+
+    | "expectedInpatientDepartures"
+
+    | "projectedHospitalInflow"
+
+    | "projectedAvailableAcuteCareBeds"
+
+    | "projectedAcuteCareCapacityChange"
+
+    | "projectedCapacityScore"
+
+
+    /*
+     * =================================================
+     * Overall Hospital Readiness
+     * =================================================
+     */
+
+    | "hospitalReadinessScore"
 
     | "consecutiveScoreIncreases"
 
@@ -146,7 +236,7 @@ export interface OperationalTrigger {
      * All conditions required to activate
      * the trigger.
      *
-     * Version 2.0 initially uses AND logic.
+     * Multiple conditions currently use AND logic.
      */
     conditions:OperationalTriggerCondition[];
 
@@ -158,8 +248,8 @@ export interface OperationalTrigger {
      * Null means the trigger provides information
      * but does not force state escalation.
      */
-   minimumOperationalState:
-    OperationalStateTitle | null;
+    minimumOperationalState:
+        OperationalStateTitle | null;
 
 
     /**

@@ -2,7 +2,7 @@
  * ExecutiveAssessmentReport
  *
  * Creates a printable leadership report from the
- * authoritative EDORI OperationalAssessment.
+ * authoritative Hospital Readiness OperationalAssessment.
  *
  * The report uses the browser print dialog, which
  * allows the user to print the report or save it as
@@ -10,7 +10,7 @@
  *
  * This component does not:
  *
- * - Calculate EDORI
+ * - Calculate Hospital Readiness
  * - Modify application state
  * - Save assessment history
  * - Reevaluate operational triggers
@@ -23,15 +23,6 @@ import {
 }
 
 from "../config/appEvents";
-
-
-import {
-
-    HOSPITAL
-
-}
-
-from "../config/constants";
 
 
 import {
@@ -111,6 +102,13 @@ from "../types/OperationalRecommendation";
 
 
 /**
+ * Physical ED treatment-bed capacity used only for
+ * contextual ED capacity-use reporting.
+ */
+const ED_TREATMENT_BEDS = 63;
+
+
+/**
  * Maximum number of condensed report items.
  */
 const MAXIMUM_REPORT_DRIVERS = 5;
@@ -138,7 +136,7 @@ export function ExecutiveAssessmentReport():string {
                     </h3>
 
                     <p class="panel-description">
-                        Printable leadership summary of the current EDORI assessment
+                        Printable leadership summary of the current Hospital Readiness assessment
                     </p>
 
                 </div>
@@ -416,180 +414,91 @@ function createExecutiveReportMarkup(
 ):string {
 
     const assessment =
-
         operationalAssessment.assessment;
 
+    const result =
+        operationalAssessment.scoreResult;
 
     const finalState =
-
         operationalAssessment.finalOperationalState;
 
-
     const baseState =
-
         operationalAssessment.baseOperationalState;
 
-
     const score = Math.round(
-
-        operationalAssessment
-            .scoreResult
-            .score
-
+        result.score
     );
-
 
     const scoreChange = determineScoreChange(
-
         snapshots,
-
         score
-
     );
-
 
     const edCapacityPercent = calculatePercentage(
-
         assessment.totalEDVolume,
-
-        HOSPITAL.ED_BEDS
-
+        ED_TREATMENT_BEDS
     );
-
 
     const boardingShare = calculatePercentage(
-
         assessment.boardedPatients,
-
         assessment.totalEDVolume
-
     );
 
-
-    const medicalOccupancy = calculatePercentage(
-
-        assessment.occupiedMedicalBeds,
-
-        HOSPITAL.MEDICAL_BEDS
-
+    const acuteOccupancy = calculatePercentage(
+        assessment.occupiedAcuteCareBeds,
+        assessment.staffedAcuteCareBeds
     );
 
-
-    const availableMedicalBeds = Math.max(
-
-        0,
-
-        HOSPITAL.MEDICAL_BEDS
-
-        -
-
-        assessment.occupiedMedicalBeds
-
+    const criticalOccupancy = calculatePercentage(
+        assessment.occupiedCriticalCareBeds,
+        assessment.staffedCriticalCareBeds
     );
-
-
-    const expectedNetFlow =
-
-        assessment.expectedArrivals
-
-        -
-
-        assessment.expectedDepartures;
-
 
     const highAcuityCount =
+        assessment.esi1 + assessment.esi2;
 
-        assessment.esi1
-
-        +
-
-        assessment.esi2;
-
-
-    const highAcuityPercent = calculatePercentage(
-
-        highAcuityCount,
-
-        assessment.totalEDVolume
-
+    const lowerAcuityCount = Math.max(
+        0,
+        assessment.totalEDVolume - highAcuityCount
     );
 
+    const highAcuityPercent = calculatePercentage(
+        highAcuityCount,
+        assessment.totalEDVolume
+    );
 
     const leadingDrivers =
-
         operationalAssessment.primaryDrivers
-
             .slice()
-
             .sort(
-
-                (
-
-                    first,
-
-                    second
-
-                ) =>
-
-                    second.severity
-
-                    -
-
-                    first.severity
-
+                (first, second) =>
+                    second.severity - first.severity
             )
-
             .slice(
-
                 0,
-
                 MAXIMUM_REPORT_DRIVERS
-
             );
-
 
     const activeTriggers =
-
         operationalAssessment.activeTriggers
-
             .slice(
-
                 0,
-
                 MAXIMUM_REPORT_TRIGGERS
-
             );
-
 
     const recommendations =
-
         operationalAssessment.recommendations
-
             .slice()
-
             .sort(
-
                 compareRecommendations
-
             )
-
             .slice(
-
                 0,
-
                 MAXIMUM_REPORT_ACTIONS
-
             );
 
-
     const levelWasEscalated =
-
-        finalState.title
-
-        !==
-
-        baseState.title;
-
+        finalState.title !== baseState.title;
 
     return `
 
@@ -603,7 +512,7 @@ function createExecutiveReportMarkup(
                 <div>
 
                     <span class="executive-report-eyebrow">
-                        ED Operational Readiness Index
+                        Hospital Readiness Index
                     </span>
 
                     <h2>
@@ -611,19 +520,15 @@ function createExecutiveReportMarkup(
                     </h2>
 
                     <p>
-
                         Assessment completed
-
                         ${escapeHtml(
                             formatAssessmentTime(
                                 assessment.assessmentTime
                             )
                         )}
-
                     </p>
 
                 </div>
-
 
                 <div class="executive-report-header-meta">
 
@@ -632,13 +537,11 @@ function createExecutiveReportMarkup(
                     </span>
 
                     <strong>
-
                         ${escapeHtml(
                             formatAssessmentTime(
                                 new Date()
                             )
                         )}
-
                     </strong>
 
                 </div>
@@ -662,13 +565,10 @@ function createExecutiveReportMarkup(
                         class="executive-report-status-icon"
                         aria-hidden="true"
                     >
-
                         ${escapeHtml(
                             finalState.icon
                         )}
-
                     </span>
-
 
                     <div>
 
@@ -677,11 +577,9 @@ function createExecutiveReportMarkup(
                         </span>
 
                         <strong>
-
                             ${escapeHtml(
                                 finalState.title
                             )}
-
                         </strong>
 
                     </div>
@@ -692,7 +590,7 @@ function createExecutiveReportMarkup(
                 <div class="executive-report-score">
 
                     <span>
-                        EDORI Score
+                        Hospital Readiness Score
                     </span>
 
                     <strong>
@@ -709,11 +607,9 @@ function createExecutiveReportMarkup(
                     </span>
 
                     <strong>
-
                         ${escapeHtml(
                             operationalAssessment.riskDirection
                         )}
-
                     </strong>
 
                 </div>
@@ -726,11 +622,9 @@ function createExecutiveReportMarkup(
                     </span>
 
                     <strong>
-
                         ${escapeHtml(
                             operationalAssessment.confidence
                         )}
-
                     </strong>
 
                 </div>
@@ -741,85 +635,45 @@ function createExecutiveReportMarkup(
             <div class="executive-report-context-row">
 
                 <div>
-
-                    <span>
-                        Score-Derived Level
-                    </span>
-
+                    <span>Score-Derived Level</span>
                     <strong>
-
                         ${escapeHtml(
                             baseState.title
                         )}
-
                     </strong>
-
                 </div>
 
-
                 <div>
-
-                    <span>
-                        Score Change
-                    </span>
-
+                    <span>Score Change</span>
                     <strong>
-
                         ${scoreChange === null
-
                             ? "No prior comparison"
-
                             : formatSignedNumber(
                                 scoreChange
                             )
-
                         }
-
                     </strong>
-
                 </div>
 
-
                 <div>
-
-                    <span>
-                        Active Triggers
-                    </span>
-
+                    <span>Active Triggers</span>
                     <strong>
-
-                        ${operationalAssessment
-                            .activeTriggers
-                            .length}
-
+                        ${operationalAssessment.activeTriggers.length}
                     </strong>
-
                 </div>
 
-
                 <div>
-
-                    <span>
-                        Priority Actions
-                    </span>
-
+                    <span>Priority Actions</span>
                     <strong>
-
-                        ${operationalAssessment
-                            .recommendations
-                            .length}
-
+                        ${operationalAssessment.recommendations.length}
                     </strong>
-
                 </div>
 
             </div>
 
 
             ${levelWasEscalated
-
                 ? `
-
                     <div class="executive-report-alert">
 
                         <strong>
@@ -827,28 +681,93 @@ function createExecutiveReportMarkup(
                         </strong>
 
                         <p>
-
                             The numerical score corresponded to
-
-                            ${escapeHtml(
-                                baseState.title
-                            )},
-
-                            but active operational triggers elevated the final level to
-
-                            ${escapeHtml(
-                                finalState.title
-                            )}.
-
+                            ${escapeHtml(baseState.title)},
+                            but active operational triggers elevated
+                            the final level to
+                            ${escapeHtml(finalState.title)}.
                         </p>
 
                     </div>
-
                 `
-
                 : ""
-
             }
+
+
+            <section class="executive-report-section">
+
+                <div class="executive-report-section-heading">
+
+                    <span>
+                        Hospital Readiness Domains
+                    </span>
+
+                    <h3>
+                        Current Operational Pressure
+                    </h3>
+
+                </div>
+
+                <div class="executive-report-metric-grid">
+
+                    ${createReportMetric({
+                        label:
+                            "ED Operational Pressure",
+                        value:
+                            `${formatNumber(
+                                result.edPressureScore
+                            )} / 100`,
+                        detail:
+                            "35% of the Hospital Readiness score"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Acute-Care Capacity",
+                        value:
+                            `${formatNumber(
+                                result.acuteCapacityScore
+                            )} / 100`,
+                        detail:
+                            "20% of the Hospital Readiness score"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Critical-Care Capacity",
+                        value:
+                            `${formatNumber(
+                                result.criticalCapacityScore
+                            )} / 100`,
+                        detail:
+                            "15% of the Hospital Readiness score"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Hospital Inflow",
+                        value:
+                            `${formatNumber(
+                                result.inflowScore
+                            )} / 100`,
+                        detail:
+                            "15% of the Hospital Readiness score"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Projected Capacity",
+                        value:
+                            `${formatNumber(
+                                result.projectedCapacityScore
+                            )} / 100`,
+                        detail:
+                            "15% of the Hospital Readiness score"
+                    })}
+
+                </div>
+
+            </section>
 
 
             <section class="executive-report-section">
@@ -860,149 +779,113 @@ function createExecutiveReportMarkup(
                     </span>
 
                     <h3>
-                        Operational Capacity and Demand
+                        ED and Hospital Capacity
                     </h3>
 
                 </div>
 
-
                 <div class="executive-report-metric-grid">
 
                     ${createReportMetric({
-
                         label:
                             "Total ED Volume",
-
                         value:
                             formatNumber(
                                 assessment.totalEDVolume
                             ),
-
                         detail:
                             `${formatNumber(
                                 edCapacityPercent
-                            )}% of ${HOSPITAL.ED_BEDS}-bed capacity`
-
+                            )}% of ${ED_TREATMENT_BEDS}-bed ED treatment capacity`
                     })}
 
-
                     ${createReportMetric({
-
                         label:
                             "Boarding Patients",
-
                         value:
                             formatNumber(
                                 assessment.boardedPatients
                             ),
-
                         detail:
                             `${formatNumber(
                                 boardingShare
                             )}% of ED census`
-
                     })}
 
-
                     ${createReportMetric({
-
                         label:
-                            "Occupied Medical Beds",
-
+                            "Acute-Care Beds",
                         value:
                             `${formatNumber(
-                                assessment.occupiedMedicalBeds
-                            )} / ${HOSPITAL.MEDICAL_BEDS}`,
-
+                                assessment.occupiedAcuteCareBeds
+                            )} / ${formatNumber(
+                                assessment.staffedAcuteCareBeds
+                            )}`,
                         detail:
                             `${formatNumber(
-                                medicalOccupancy
+                                acuteOccupancy
                             )}% occupied`
-
                     })}
 
-
                     ${createReportMetric({
-
                         label:
-                            "Available Medical Beds",
-
+                            "Critical-Care Beds",
                         value:
-                            formatNumber(
-                                availableMedicalBeds
-                            ),
-
-                        detail:
-                            "Calculated from configured medical capacity"
-
-                    })}
-
-
-                    ${createReportMetric({
-
-                        label:
-                            "Expected Arrivals",
-
-                        value:
-                            formatNumber(
-                                assessment.expectedArrivals
-                            ),
-
-                        detail:
-                            "Historical expected hourly arrivals"
-
-                    })}
-
-
-                    ${createReportMetric({
-
-                        label:
-                            "Expected Departures",
-
-                        value:
-                            formatNumber(
-                                assessment.expectedDepartures
-                            ),
-
-                        detail:
-                            "Historical expected hourly departures"
-
-                    })}
-
-
-                    ${createReportMetric({
-
-                        label:
-                            "Expected Net Flow",
-
-                        value:
-                            formatSignedNumber(
-                                expectedNetFlow
-                            ),
-
-                        detail:
-                            createNetFlowDescription(
-                                expectedNetFlow
-                            )
-
-                    })}
-
-
-                    ${createReportMetric({
-
-                        label:
-                            "High-Acuity Patients",
-
-                        value:
-                            formatNumber(
-                                highAcuityCount
-                            ),
-
+                            `${formatNumber(
+                                assessment.occupiedCriticalCareBeds
+                            )} / ${formatNumber(
+                                assessment.staffedCriticalCareBeds
+                            )}`,
                         detail:
                             `${formatNumber(
-                                highAcuityPercent
-                            )}% ESI 1–2`
+                                criticalOccupancy
+                            )}% occupied`
+                    })}
 
+                    ${createReportMetric({
+                        label:
+                            "Current Hospital Inflow",
+                        value:
+                            formatNumber(
+                                result.currentHospitalInflow
+                            ),
+                        detail:
+                            "Known ED, direct, and surgical/procedural admissions"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Expected Hospital Inflow",
+                        value:
+                            formatNumber(
+                                result.expectedHospitalInflow
+                            ),
+                        detail:
+                            "Historical four-hour inpatient inflow"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Expected Inpatient Departures",
+                        value:
+                            formatNumber(
+                                result.expectedInpatientDepartures
+                            ),
+                        detail:
+                            "Historical four-hour inpatient departures"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Projected Available Acute-Care Beds",
+                        value:
+                            formatBedAvailability(
+                                result.projectedAvailableAcuteCareBeds
+                            ),
+                        detail:
+                            createProjectedCapacityDescription(
+                                result.projectedAvailableAcuteCareBeds
+                            )
                     })}
 
                 </div>
@@ -1024,7 +907,6 @@ function createExecutiveReportMarkup(
 
                 </div>
 
-
                 <div class="executive-report-esi-grid">
 
                     ${createEsiMetric(
@@ -1039,25 +921,20 @@ function createExecutiveReportMarkup(
                         assessment.totalEDVolume
                     )}
 
-                    ${createEsiMetric(
-                        3,
-                        assessment.esi3,
-                        assessment.totalEDVolume
-                    )}
-
-                    ${createEsiMetric(
-                        4,
-                        assessment.esi4,
-                        assessment.totalEDVolume
-                    )}
-
-                    ${createEsiMetric(
-                        5,
-                        assessment.esi5,
+                    ${createGroupedEsiMetric(
+                        lowerAcuityCount,
                         assessment.totalEDVolume
                     )}
 
                 </div>
+
+                <p>
+                    High-acuity patients:
+                    ${formatNumber(highAcuityCount)}
+                    (${formatNumber(highAcuityPercent)}% of ED census).
+                    All patients not entered as ESI 1 or ESI 2 are
+                    grouped as ESI 3-5.
+                </p>
 
             </section>
 
@@ -1088,37 +965,31 @@ function createExecutiveReportMarkup(
                     </span>
 
                     <h3>
-                        Near-Term Outlook
+                        Four-Hour Capacity Outlook
                     </h3>
 
                 </div>
 
-
                 <div class="executive-report-outlook">
 
                     <strong>
-
                         ${escapeHtml(
                             createOutlookHeading(
-                                expectedNetFlow,
+                                result.projectedAvailableAcuteCareBeds,
                                 operationalAssessment.riskDirection
                             )
                         )}
-
                     </strong>
 
-
                     <p>
-
                         ${escapeHtml(
                             createOutlookDescription(
-                                expectedNetFlow,
+                                result.projectedAvailableAcuteCareBeds,
                                 assessment.boardedPatients,
-                                assessment.expectedBoarders,
+                                assessment.expectedEDBoarders,
                                 operationalAssessment.riskDirection
                             )
                         )}
-
                     </p>
 
                 </div>
@@ -1129,7 +1000,10 @@ function createExecutiveReportMarkup(
             <footer class="executive-report-footer">
 
                 <p>
-                    EDORI is an operational decision-support tool. Results should be interpreted with clinical and administrative judgment and local surge policies.
+                    The Hospital Readiness Index is an operational
+                    decision-support tool. Results should be interpreted
+                    with clinical and administrative judgment and local
+                    surge policies.
                 </p>
 
             </footer>
@@ -1237,6 +1111,45 @@ function createEsiMetric(
 
 
 /**
+ * Create the inferred ESI 3-5 report metric.
+ */
+function createGroupedEsiMetric(
+
+    patientCount:number,
+
+    totalEDVolume:number
+
+):string {
+
+    return `
+
+        <article class="executive-report-esi-item">
+
+            <span>
+                ESI 3-5
+            </span>
+
+            <strong>
+                ${formatNumber(patientCount)}
+            </strong>
+
+            <small>
+                ${formatNumber(
+                    calculatePercentage(
+                        patientCount,
+                        totalEDVolume
+                    )
+                )}% · inferred
+            </small>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
  * Create the driver report section.
  */
 function createDriverReportSection(
@@ -1266,7 +1179,7 @@ function createDriverReportSection(
 
                 ? createReportEmptyState(
 
-                    "No dominant EDORI drivers were identified."
+                    "No dominant Hospital Readiness drivers were identified."
 
                 )
 
@@ -1579,7 +1492,7 @@ function handlePrintExecutiveReport():void {
 
         showReportMessage(
 
-            "A current calculated EDORI assessment is required before printing.",
+            "A current calculated Hospital Readiness assessment is required before printing.",
 
             "error"
 
@@ -1888,100 +1801,117 @@ function normalizeReassessmentInterval(
 
 
 /**
- * Describe expected net flow.
+ * Format current or projected bed availability.
+ *
+ * Negative values are intentionally preserved.
  */
-function createNetFlowDescription(
+function formatBedAvailability(
 
-    expectedNetFlow:number
+    value:number
 
 ):string {
 
-    if(expectedNetFlow > 0){
+    if(!Number.isFinite(value)){
 
-        return "Arrivals exceed departures";
-
-    }
-
-
-    if(expectedNetFlow < 0){
-
-        return "Departures exceed arrivals";
+        return "--";
 
     }
 
+    if(value < 0){
 
-    return "Expected flow is balanced";
+        return `${formatNumber(value)} beds (deficit)`;
+
+    }
+
+    if(value === 1){
+
+        return "1 bed";
+
+    }
+
+    return `${formatNumber(value)} beds`;
 
 }
 
 
 /**
- * Create the outlook heading.
+ * Explain projected acute-care capacity.
+ */
+function createProjectedCapacityDescription(
+
+    projectedAvailableBeds:number
+
+):string {
+
+    if(projectedAvailableBeds < 0){
+
+        return `Projected demand exceeds staffed acute-care capacity by approximately ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds.`;
+
+    }
+
+    if(projectedAvailableBeds === 0){
+
+        return "Projected four-hour flow fully utilizes staffed acute-care capacity.";
+
+    }
+
+    return `${formatNumber(
+        projectedAvailableBeds
+    )} staffed acute-care beds are projected to remain available.`;
+
+}
+
+
+/**
+ * Create the four-hour outlook heading.
  */
 function createOutlookHeading(
 
-    expectedNetFlow:number,
+    projectedAvailableBeds:number,
 
     riskDirection:OperationalAssessment["riskDirection"]
 
 ):string {
 
     if(
-
+        projectedAvailableBeds < 0
+        ||
         riskDirection === "Rapidly Worsening"
-
-        ||
-
-        expectedNetFlow >= 8
-
     ){
 
-        return "Significant worsening pressure expected";
+        return "Significant hospital capacity pressure expected";
 
     }
 
-
     if(
-
+        projectedAvailableBeds === 0
+        ||
         riskDirection === "Increasing"
-
-        ||
-
-        expectedNetFlow > 0
-
     ){
 
-        return "Continued operational pressure expected";
+        return "Continued hospital capacity pressure expected";
 
     }
 
-
-    if(
-
-        riskDirection === "Improving"
-
-        &&
-
-        expectedNetFlow < 0
-
-    ){
+    if(riskDirection === "Improving"){
 
         return "Conditions may improve";
 
     }
 
-
-    return "Conditions expected to remain relatively stable";
+    return "Near-term capacity remains available";
 
 }
 
 
 /**
- * Create a transparent outlook explanation.
+ * Create a transparent four-hour outlook explanation.
  */
 function createOutlookDescription(
 
-    expectedNetFlow:number,
+    projectedAvailableBeds:number,
 
     boardedPatients:number,
 
@@ -1992,69 +1922,53 @@ function createOutlookDescription(
 ):string {
 
     const boardingDifference =
+        boardedPatients - expectedBoarders;
 
-        boardedPatients
+    if(projectedAvailableBeds < 0){
 
-        -
+        return `The four-hour forecast projects an acute-care capacity deficit of approximately ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds. Known or historically expected hospital inflow is projected to exceed currently available capacity after expected inpatient departures.`;
 
-        expectedBoarders;
-
+    }
 
     if(
-
-        expectedNetFlow > 0
-
+        projectedAvailableBeds === 0
         &&
-
         boardingDifference > 0
-
     ){
 
-        return `Expected arrivals exceed departures by ${formatNumber(
-            expectedNetFlow
-        )} per hour while boarding remains ${formatNumber(
+        return `The four-hour forecast projects complete utilization of staffed acute-care capacity while ED boarding remains ${formatNumber(
             boardingDifference
-        )} patients above baseline. Continued census and throughput pressure is likely if conditions persist.`;
+        )} patients above baseline. Inpatient throughput remains an important operational constraint.`;
 
     }
-
-
-    if(expectedNetFlow > 0){
-
-        return `Expected arrivals exceed departures by ${formatNumber(
-            expectedNetFlow
-        )} per hour. ED census may continue to increase if actual flow follows the historical expectation.`;
-
-    }
-
 
     if(
-
-        expectedNetFlow < 0
-
+        projectedAvailableBeds > 0
         &&
-
         riskDirection === "Improving"
-
     ){
 
-        return `Expected departures exceed arrivals by ${formatNumber(
-            Math.abs(expectedNetFlow)
-        )} per hour and the recent EDORI trend is improving. Operational pressure may decrease if departures occur as expected.`;
+        return `Approximately ${formatNumber(
+            projectedAvailableBeds
+        )} staffed acute-care beds are projected to remain available at the end of the four-hour horizon, and the recent operational trend is improving.`;
 
     }
-
 
     if(boardingDifference > 0){
 
-        return `Expected arrivals and departures are relatively balanced, but boarding remains ${formatNumber(
+        return `Approximately ${formatNumber(
+            projectedAvailableBeds
+        )} staffed acute-care beds are projected to remain available, but ED boarding remains ${formatNumber(
             boardingDifference
-        )} patients above baseline. Inpatient flow remains an important operational constraint.`;
+        )} patients above baseline. Continue monitoring inpatient throughput and active triggers.`;
 
     }
 
-
-    return "Expected arrivals and departures are relatively balanced. Continue monitoring census movement, boarding, and operational triggers.";
+    return `Approximately ${formatNumber(
+        projectedAvailableBeds
+    )} staffed acute-care beds are projected to remain available after projected inflow and historical expected inpatient departures.`;
 
 }
 
@@ -2329,7 +2243,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to generate the executive assessment report.
+                Calculate Hospital Readiness to generate the executive assessment report.
             </p>
 
         </div>

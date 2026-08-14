@@ -1,19 +1,30 @@
 /**
  * HistoricalCsvService
  *
- * Parses EDORI historical-expectation CSV files.
+ * Version 2.1 Hospital Readiness Model
+ *
+ * Parses Hospital Readiness historical-expectation
+ * CSV files.
  *
  * Required CSV headers:
  *
  * day
  * hour
- * expectedVolume
- * expectedBoarders
- * expectedArrivals
- * expectedDepartures
+ * expectedEDVolume
+ * expectedEDBoarders
+ * expectedStaffedAcuteCareBeds
+ * expectedOccupiedAcuteCareBeds
+ * expectedEDAdmissions
+ * expectedDirectAdmissions
+ * expectedSurgicalAdmissions
+ * expectedInpatientDepartures
  *
- * This service parses and validates candidate data.
- * It does not save data to localStorage.
+ * IMPORTANT:
+ *
+ * expectedEDAdmissions means NEW ED-origin inpatient
+ * admissions during that hourly interval. It does not
+ * mean ED arrivals and does not include patients who
+ * were already boarding at the start of the interval.
  */
 
 import {
@@ -22,7 +33,7 @@ import {
 
 }
 
-from "./HistoricalDataValidationService";
+from "./HistoricalDataValidator";
 
 
 import type {
@@ -31,13 +42,12 @@ import type {
 
 }
 
-from "./HistoricalDataValidationService";
+from "./HistoricalDataValidator";
 
 
 import type {
 
     DayOfWeek,
-
     HistoricalExpectation
 
 }
@@ -45,114 +55,57 @@ import type {
 from "../types/HistoricalExpectation";
 
 
-/**
- * Required column names.
- */
 const REQUIRED_HEADERS = [
 
     "day",
-
     "hour",
-
-    "expectedVolume",
-
-    "expectedBoarders",
-
-    "expectedArrivals",
-
-    "expectedDepartures"
+    "expectedEDVolume",
+    "expectedEDBoarders",
+    "expectedStaffedAcuteCareBeds",
+    "expectedOccupiedAcuteCareBeds",
+    "expectedEDAdmissions",
+    "expectedDirectAdmissions",
+    "expectedSurgicalAdmissions",
+    "expectedInpatientDepartures"
 
 ] as const;
 
 
-/**
- * Valid weekday values.
- */
 const DAYS:DayOfWeek[] = [
 
     "Sunday",
-
     "Monday",
-
     "Tuesday",
-
     "Wednesday",
-
     "Thursday",
-
     "Friday",
-
     "Saturday"
 
 ];
 
 
-/**
- * One parsed CSV row before conversion.
- */
-type CsvRow = Record<
-
-    string,
-
-    string
-
->;
+type CsvRow = Record<string, string>;
 
 
-/**
- * Result returned by CSV parsing.
- */
 export interface HistoricalCsvParseResult {
 
-    /**
-     * True only when:
-     *
-     * - CSV syntax is valid
-     * - required headers exist
-     * - every row can be converted
-     * - the complete weekly dataset validates
-     */
     valid:boolean;
 
-
-    /**
-     * Parsed historical records.
-     *
-     * Empty when parsing fails.
-     */
     records:HistoricalExpectation[];
 
-
-    /**
-     * CSV syntax, header, and row errors.
-     */
     errors:string[];
 
-
-    /**
-     * Warnings that do not necessarily make
-     * the CSV unusable.
-     */
     warnings:string[];
 
-
-    /**
-     * Full weekly-dataset validation result.
-     *
-     * Null when parsing fails before records
-     * can be validated.
-     */
     validation:
-
         HistoricalDataValidationResult
-
         | null;
 
 }
 
 
 /**
- * Parse a CSV string into EDORI historical records.
+ * Parse a CSV string into Version 2.1 records.
  */
 export function parseHistoricalCsv(
 
@@ -166,143 +119,74 @@ export function parseHistoricalCsv(
 
 
     const normalizedText = normalizeCsvText(
-
         csvText
-
     );
 
 
     if(normalizedText.trim().length === 0){
 
-        return {
-
-            valid:false,
-
-            records:[],
-
-            errors:[
-
-                "The CSV file is empty."
-
-            ],
-
-            warnings,
-
-            validation:null
-
-        };
+        return failure(
+            ["The CSV file is empty."],
+            warnings
+        );
 
     }
 
 
     const rawRows = parseCsvRows(
-
         normalizedText,
-
         errors
-
     );
 
 
     if(errors.length > 0){
 
-        return {
-
-            valid:false,
-
-            records:[],
-
+        return failure(
             errors,
-
-            warnings,
-
-            validation:null
-
-        };
+            warnings
+        );
 
     }
 
 
     if(rawRows.length === 0){
 
-        return {
-
-            valid:false,
-
-            records:[],
-
-            errors:[
-
-                "The CSV file does not contain any rows."
-
-            ],
-
-            warnings,
-
-            validation:null
-
-        };
+        return failure(
+            ["The CSV file does not contain any rows."],
+            warnings
+        );
 
     }
 
 
-    const headerRow = rawRows[0];
-
-
-    const headers = headerRow.map(
-
-        header => normalizeHeader(
-
-            header
-
-        )
-
+    const headers = rawRows[0].map(
+        normalizeHeader
     );
 
 
     validateHeaders(
-
         headers,
-
         errors,
-
         warnings
-
     );
 
 
     if(errors.length > 0){
 
-        return {
-
-            valid:false,
-
-            records:[],
-
+        return failure(
             errors,
-
-            warnings,
-
-            validation:null
-
-        };
+            warnings
+        );
 
     }
 
 
-    const dataRows = rawRows.slice(
-
-        1
-
-    );
+    const dataRows = rawRows.slice(1);
 
 
     const mappedRows = mapRowsToObjects(
-
         headers,
-
         dataRows
-
     );
 
 
@@ -312,21 +196,9 @@ export function parseHistoricalCsv(
     mappedRows.forEach(
 
         (
-
             row,
-
             index
-
         ) => {
-
-            const csvRowNumber =
-
-                index + 2;
-
-
-            /*
-             * Ignore completely blank rows.
-             */
 
             if(isBlankRow(row)){
 
@@ -338,9 +210,7 @@ export function parseHistoricalCsv(
             const record = parseHistoricalRow(
 
                 row,
-
-                csvRowNumber,
-
+                index + 2,
                 errors
 
             );
@@ -349,9 +219,7 @@ export function parseHistoricalCsv(
             if(record){
 
                 records.push(
-
                     record
-
                 );
 
             }
@@ -363,63 +231,34 @@ export function parseHistoricalCsv(
 
     if(errors.length > 0){
 
-        return {
-
-            valid:false,
-
-            records:[],
-
+        return failure(
             errors,
-
-            warnings,
-
-            validation:null
-
-        };
+            warnings
+        );
 
     }
 
 
     if(records.length === 0){
 
-        return {
-
-            valid:false,
-
-            records:[],
-
-            errors:[
-
-                "The CSV file does not contain any historical expectation records."
-
-            ],
-
-            warnings,
-
-            validation:null
-
-        };
+        return failure(
+            ["The CSV file does not contain any historical expectation records."],
+            warnings
+        );
 
     }
 
 
-    const validation =
-
-        validateHistoricalDataset(
-
-            records
-
-        );
+    const validation = validateHistoricalDataset(
+        records
+    );
 
 
     if(!validation.valid){
 
         addValidationErrors(
-
             validation,
-
             errors
-
         );
 
     }
@@ -428,23 +267,13 @@ export function parseHistoricalCsv(
     return {
 
         valid:
-
             errors.length === 0
-
             &&
-
             validation.valid,
 
         records:
-
             errors.length === 0
-
-                ? sortRecords(
-
-                    records
-
-                )
-
+                ? sortRecords(records)
                 : [],
 
         errors,
@@ -469,35 +298,21 @@ export async function parseHistoricalCsvFile(
 
     if(!isCsvFile(file)){
 
-        return {
+        return failure(
 
-            valid:false,
+            ["Select a CSV file with a .csv extension."],
+            []
 
-            records:[],
-
-            errors:[
-
-                "Select a CSV file with a .csv extension."
-
-            ],
-
-            warnings:[],
-
-            validation:null
-
-        };
+        );
 
     }
 
 
     try {
 
-        const csvText = await file.text();
-
-
         return parseHistoricalCsv(
 
-            csvText
+            await file.text()
 
         );
 
@@ -513,38 +328,45 @@ export async function parseHistoricalCsvFile(
         );
 
 
-        return {
+        return failure(
 
-            valid:false,
+            ["The selected CSV file could not be read."],
+            []
 
-            records:[],
-
-            errors:[
-
-                "The selected CSV file could not be read."
-
-            ],
-
-            warnings:[],
-
-            validation:null
-
-        };
+        );
 
     }
 
 }
 
 
+function failure(
+
+    errors:string[],
+
+    warnings:string[]
+
+):HistoricalCsvParseResult {
+
+    return {
+
+        valid:false,
+
+        records:[],
+
+        errors,
+
+        warnings,
+
+        validation:null
+
+    };
+
+}
+
+
 /**
- * Parse CSV into a two-dimensional string array.
- *
- * Supports:
- *
- * - quoted fields
- * - commas inside quoted values
- * - escaped double quotes
- * - CRLF and LF line endings
+ * Parse CSV with quoted-field support.
  */
 function parseCsvRows(
 
@@ -564,35 +386,22 @@ function parseCsvRows(
 
 
     for(
-
         let index = 0;
-
         index < csvText.length;
-
         index += 1
-
     ){
 
-        const character =
+        const character = csvText[index];
 
-            csvText[index];
-
-
-        const nextCharacter =
-
-            csvText[index + 1];
+        const nextCharacter = csvText[index + 1];
 
 
         if(character === "\""){
 
             if(
-
                 insideQuotes
-
                 &&
-
                 nextCharacter === "\""
-
             ){
 
                 currentValue += "\"";
@@ -602,9 +411,7 @@ function parseCsvRows(
             }
             else{
 
-                insideQuotes =
-
-                    !insideQuotes;
+                insideQuotes = !insideQuotes;
 
             }
 
@@ -615,21 +422,14 @@ function parseCsvRows(
 
 
         if(
-
             character === ","
-
             &&
-
             !insideQuotes
-
         ){
 
             currentRow.push(
-
                 currentValue
-
             );
-
 
             currentValue = "";
 
@@ -639,28 +439,18 @@ function parseCsvRows(
 
 
         if(
-
             character === "\n"
-
             &&
-
             !insideQuotes
-
         ){
 
             currentRow.push(
-
                 currentValue
-
             );
-
 
             rows.push(
-
                 currentRow
-
             );
-
 
             currentRow = [];
 
@@ -671,9 +461,7 @@ function parseCsvRows(
         }
 
 
-        currentValue +=
-
-            character;
+        currentValue += character;
 
     }
 
@@ -681,11 +469,8 @@ function parseCsvRows(
     if(insideQuotes){
 
         errors.push(
-
             "The CSV contains an unclosed quoted field."
-
         );
-
 
         return [];
 
@@ -693,26 +478,17 @@ function parseCsvRows(
 
 
     if(
-
         currentValue.length > 0
-
         ||
-
         currentRow.length > 0
-
     ){
 
         currentRow.push(
-
             currentValue
-
         );
 
-
         rows.push(
-
             currentRow
-
         );
 
     }
@@ -723,9 +499,6 @@ function parseCsvRows(
 }
 
 
-/**
- * Validate required and additional headers.
- */
 function validateHeaders(
 
     headers:string[],
@@ -739,9 +512,7 @@ function validateHeaders(
     const duplicateHeaders = findDuplicates(
 
         headers.filter(
-
             header => header.length > 0
-
         )
 
     );
@@ -762,15 +533,7 @@ function validateHeaders(
 
         requiredHeader => {
 
-            if(
-
-                !headers.includes(
-
-                    requiredHeader
-
-                )
-
-            ){
+            if(!headers.includes(requiredHeader)){
 
                 errors.push(
 
@@ -788,15 +551,10 @@ function validateHeaders(
     const additionalHeaders = headers.filter(
 
         header =>
-
             header.length > 0
-
             &&
-
             !REQUIRED_HEADERS.includes(
-
                 header as typeof REQUIRED_HEADERS[number]
-
             )
 
     );
@@ -815,9 +573,6 @@ function validateHeaders(
 }
 
 
-/**
- * Convert each row into a header/value object.
- */
 function mapRowsToObjects(
 
     headers:string[],
@@ -836,11 +591,8 @@ function mapRowsToObjects(
             headers.forEach(
 
                 (
-
                     header,
-
                     index
-
                 ) => {
 
                     if(header.length === 0){
@@ -851,9 +603,7 @@ function mapRowsToObjects(
 
 
                     result[header] =
-
                         row[index]
-
                         ?? "";
 
                 }
@@ -871,7 +621,7 @@ function mapRowsToObjects(
 
 
 /**
- * Convert one CSV row into a historical record.
+ * Convert one CSV row into a Version 2.1 record.
  */
 function parseHistoricalRow(
 
@@ -884,140 +634,147 @@ function parseHistoricalRow(
 ):HistoricalExpectation | null {
 
     const day = parseDay(
-
         row.day,
-
         rowNumber,
-
         errors
-
     );
 
 
     const hour = parseNumber(
-
         row.hour,
-
         "hour",
-
         rowNumber,
-
         errors,
-
         {
-
             integer:true,
-
             minimum:0,
-
             maximum:23
-
         }
-
     );
 
 
-    const expectedVolume = parseNumber(
-
-        row.expectedVolume,
-
-        "expectedVolume",
-
+    const expectedEDVolume = parseRequiredHistoricalNumber(
+        row,
+        "expectedEDVolume",
         rowNumber,
-
-        errors,
-
-        {
-
-            minimum:0
-
-        }
-
+        errors
     );
 
 
-    const expectedBoarders = parseNumber(
-
-        row.expectedBoarders,
-
-        "expectedBoarders",
-
+    const expectedEDBoarders = parseRequiredHistoricalNumber(
+        row,
+        "expectedEDBoarders",
         rowNumber,
-
-        errors,
-
-        {
-
-            minimum:0
-
-        }
-
+        errors
     );
 
 
-    const expectedArrivals = parseNumber(
-
-        row.expectedArrivals,
-
-        "expectedArrivals",
-
+    const expectedStaffedAcuteCareBeds = parseNumber(
+        row.expectedStaffedAcuteCareBeds,
+        "expectedStaffedAcuteCareBeds",
         rowNumber,
-
         errors,
-
         {
-
-            minimum:0
-
+            minimum:0.01
         }
-
     );
 
 
-    const expectedDepartures = parseNumber(
-
-        row.expectedDepartures,
-
-        "expectedDepartures",
-
+    const expectedOccupiedAcuteCareBeds = parseRequiredHistoricalNumber(
+        row,
+        "expectedOccupiedAcuteCareBeds",
         rowNumber,
+        errors
+    );
 
-        errors,
 
-        {
+    const expectedEDAdmissions = parseRequiredHistoricalNumber(
+        row,
+        "expectedEDAdmissions",
+        rowNumber,
+        errors
+    );
 
-            minimum:0
 
-        }
+    const expectedDirectAdmissions = parseRequiredHistoricalNumber(
+        row,
+        "expectedDirectAdmissions",
+        rowNumber,
+        errors
+    );
 
+
+    const expectedSurgicalAdmissions = parseRequiredHistoricalNumber(
+        row,
+        "expectedSurgicalAdmissions",
+        rowNumber,
+        errors
+    );
+
+
+    const expectedInpatientDepartures = parseRequiredHistoricalNumber(
+        row,
+        "expectedInpatientDepartures",
+        rowNumber,
+        errors
     );
 
 
     if(
-
         day === null
-
         ||
-
         hour === null
-
         ||
-
-        expectedVolume === null
-
+        expectedEDVolume === null
         ||
-
-        expectedBoarders === null
-
+        expectedEDBoarders === null
         ||
-
-        expectedArrivals === null
-
+        expectedStaffedAcuteCareBeds === null
         ||
-
-        expectedDepartures === null
-
+        expectedOccupiedAcuteCareBeds === null
+        ||
+        expectedEDAdmissions === null
+        ||
+        expectedDirectAdmissions === null
+        ||
+        expectedSurgicalAdmissions === null
+        ||
+        expectedInpatientDepartures === null
     ){
+
+        return null;
+
+    }
+
+
+    if(
+        expectedEDBoarders
+        >
+        expectedEDVolume
+    ){
+
+        errors.push(
+
+            `Row ${rowNumber}: expectedEDBoarders cannot exceed expectedEDVolume.`
+
+        );
+
+        return null;
+
+    }
+
+
+    if(
+        expectedOccupiedAcuteCareBeds
+        >
+        expectedStaffedAcuteCareBeds
+    ){
+
+        errors.push(
+
+            `Row ${rowNumber}: expectedOccupiedAcuteCareBeds cannot exceed expectedStaffedAcuteCareBeds.`
+
+        );
 
         return null;
 
@@ -1030,22 +787,59 @@ function parseHistoricalRow(
 
         hour,
 
-        expectedVolume,
+        expectedEDVolume,
 
-        expectedBoarders,
+        expectedEDBoarders,
 
-        expectedArrivals,
+        expectedStaffedAcuteCareBeds,
 
-        expectedDepartures
+        expectedOccupiedAcuteCareBeds,
+
+        expectedEDAdmissions,
+
+        expectedDirectAdmissions,
+
+        expectedSurgicalAdmissions,
+
+        expectedInpatientDepartures
 
     };
 
 }
 
 
-/**
- * Parse and normalize a weekday.
- */
+function parseRequiredHistoricalNumber(
+
+    row:CsvRow,
+
+    fieldName:
+        | "expectedEDVolume"
+        | "expectedEDBoarders"
+        | "expectedOccupiedAcuteCareBeds"
+        | "expectedEDAdmissions"
+        | "expectedDirectAdmissions"
+        | "expectedSurgicalAdmissions"
+        | "expectedInpatientDepartures",
+
+    rowNumber:number,
+
+    errors:string[]
+
+):number | null {
+
+    return parseNumber(
+        row[fieldName],
+        fieldName,
+        rowNumber,
+        errors,
+        {
+            minimum:0
+        }
+    );
+
+}
+
+
 function parseDay(
 
     value:string | undefined,
@@ -1057,20 +851,15 @@ function parseDay(
 ):DayOfWeek | null {
 
     const normalizedValue =
-
         value?.trim().toLowerCase()
-
         ?? "";
 
 
     const match = DAYS.find(
 
         day =>
-
             day.toLowerCase()
-
             ===
-
             normalizedValue
 
     );
@@ -1084,7 +873,6 @@ function parseDay(
 
         );
 
-
         return null;
 
     }
@@ -1095,9 +883,6 @@ function parseDay(
 }
 
 
-/**
- * Parse one numeric CSV field.
- */
 function parseNumber(
 
     value:string | undefined,
@@ -1121,9 +906,7 @@ function parseNumber(
 ):number | null {
 
     const trimmedValue =
-
         value?.trim()
-
         ?? "";
 
 
@@ -1135,16 +918,13 @@ function parseNumber(
 
         );
 
-
         return null;
 
     }
 
 
     const parsedValue = Number(
-
         trimmedValue
-
     );
 
 
@@ -1156,20 +936,15 @@ function parseNumber(
 
         );
 
-
         return null;
 
     }
 
 
     if(
-
         options.integer
-
         &&
-
         !Number.isInteger(parsedValue)
-
     ){
 
         errors.push(
@@ -1178,20 +953,15 @@ function parseNumber(
 
         );
 
-
         return null;
 
     }
 
 
     if(
-
         options.minimum !== undefined
-
         &&
-
         parsedValue < options.minimum
-
     ){
 
         errors.push(
@@ -1200,20 +970,15 @@ function parseNumber(
 
         );
 
-
         return null;
 
     }
 
 
     if(
-
         options.maximum !== undefined
-
         &&
-
         parsedValue > options.maximum
-
     ){
 
         errors.push(
@@ -1221,7 +986,6 @@ function parseNumber(
             `Row ${rowNumber}: ${fieldName} cannot exceed ${options.maximum}.`
 
         );
-
 
         return null;
 
@@ -1233,10 +997,6 @@ function parseNumber(
 }
 
 
-/**
- * Add complete-dataset validation problems
- * to the parser error list.
- */
 function addValidationErrors(
 
     validation:HistoricalDataValidationResult,
@@ -1291,9 +1051,6 @@ function addValidationErrors(
 }
 
 
-/**
- * Normalize line endings and remove a UTF-8 BOM.
- */
 function normalizeCsvText(
 
     value:string
@@ -1303,36 +1060,23 @@ function normalizeCsvText(
     return value
 
         .replace(
-
             /^\uFEFF/,
-
             ""
-
         )
 
         .replaceAll(
-
             "\r\n",
-
             "\n"
-
         )
 
         .replaceAll(
-
             "\r",
-
             "\n"
-
         );
 
 }
 
 
-/**
- * Normalize a header while preserving required
- * camel-case names.
- */
 function normalizeHeader(
 
     value:string
@@ -1340,34 +1084,22 @@ function normalizeHeader(
 ):string {
 
     return value
-
         .trim()
-
         .replace(
-
             /^\uFEFF/,
-
             ""
-
         );
 
 }
 
 
-/**
- * Determine whether every CSV field is blank.
- */
 function isBlankRow(
 
     row:CsvRow
 
 ):boolean {
 
-    return Object.values(
-
-        row
-
-    ).every(
+    return Object.values(row).every(
 
         value => value.trim().length === 0
 
@@ -1376,10 +1108,6 @@ function isBlankRow(
 }
 
 
-/**
- * Determine whether the browser File looks
- * like a CSV.
- */
 function isCsvFile(
 
     file:File
@@ -1387,21 +1115,14 @@ function isCsvFile(
 ):boolean {
 
     return file.name
-
         .toLowerCase()
-
         .endsWith(
-
             ".csv"
-
         );
 
 }
 
 
-/**
- * Sort records in weekday/hour order.
- */
 function sortRecords(
 
     records:HistoricalExpectation[]
@@ -1409,34 +1130,18 @@ function sortRecords(
 ):HistoricalExpectation[] {
 
     return [
-
         ...records
-
     ].sort(
 
         (
-
             first,
-
             second
-
         ) => {
 
             const dayDifference =
-
-                DAYS.indexOf(
-
-                    first.day
-
-                )
-
+                DAYS.indexOf(first.day)
                 -
-
-                DAYS.indexOf(
-
-                    second.day
-
-                );
+                DAYS.indexOf(second.day);
 
 
             if(dayDifference !== 0){
@@ -1446,9 +1151,7 @@ function sortRecords(
             }
 
 
-            return first.hour -
-
-                second.hour;
+            return first.hour - second.hour;
 
         }
 
@@ -1457,22 +1160,13 @@ function sortRecords(
 }
 
 
-/**
- * Find duplicate strings.
- */
 function findDuplicates(
 
     values:string[]
 
 ):string[] {
 
-    const counts = new Map<
-
-        string,
-
-        number
-
-    >();
+    const counts = new Map<string, number>();
 
 
     values.forEach(
@@ -1484,18 +1178,11 @@ function findDuplicates(
                 value,
 
                 (
-
-                    counts.get(
-
-                        value
-
-                    )
-
+                    counts.get(value)
                     ?? 0
-
                 )
-
-                + 1
+                +
+                1
 
             );
 
@@ -1505,39 +1192,18 @@ function findDuplicates(
 
 
     return Array.from(
-
         counts.entries()
-
     )
-
         .filter(
-
-            (
-
-                [,
-
-                count]
-
-            ) => count > 1
-
+            ([, count]) => count > 1
         )
-
         .map(
-
-            (
-
-                [value]
-
-            ) => value
-
+            ([value]) => value
         );
 
 }
 
 
-/**
- * Limit lengthy validation messages.
- */
 function formatLimitedList(
 
     values:string[],
@@ -1547,27 +1213,21 @@ function formatLimitedList(
 ):string {
 
     const visibleValues = values.slice(
-
         0,
-
         maximumItems
-
     );
 
 
     const remainingCount =
-
-        values.length -
-
+        values.length
+        -
         visibleValues.length;
 
 
     if(remainingCount <= 0){
 
         return visibleValues.join(
-
             ", "
-
         );
 
     }

@@ -1,40 +1,21 @@
 /**
  * SituationAssessment
  *
- * Main EDORI operational data-entry panel.
+ * Version 2 Hospital Readiness Model
+ *
+ * Main hospital-readiness operational data-entry panel.
  *
  * Responsibilities:
  *
- * - Render assessment inputs
+ * - Render current operational inputs
  * - Restore the latest committed values
  * - Maintain draft input values
- * - Display ESI totals
- * - Display historical expectations
- * - Call EdoriEngine when the user selects
- *   Calculate EDORI
+ * - Display high-acuity ED context
+ * - Display automatic historical expectations
+ * - Call EdoriEngine when the user calculates
  *
- * This component does not:
- *
- * - Validate the completed assessment
- * - Calculate EDORI
- * - Persist committed state
- * - Persist the result
- * - Save snapshots
- * - Emit resultChanged
- *
- * Those responsibilities belong to EdoriEngine.
+ * Historical values are never entered manually.
  */
-
-
-import {
-
-    calculateEsiTotal,
-
-    calculateUnassignedEsiCount
-
-}
-
-from "../../services/ValidationService";
 
 import {
 
@@ -43,6 +24,7 @@ import {
 }
 
 from "../../config/appEvents";
+
 
 import {
 
@@ -113,11 +95,12 @@ import type {
 from "../../types/HistoricalExpectation";
 
 
-
-
-/**
- * Current operational inputs shown in the form.
+/*
+ * =====================================================
+ * Current operational fields
+ * =====================================================
  */
+
 const CURRENT_VALUE_FIELDS:Array<
 
     keyof EdoriAssessmentInput
@@ -128,29 +111,34 @@ const CURRENT_VALUE_FIELDS:Array<
 
     "boardedPatients",
 
-    "occupiedMedicalBeds",
-
-    "staffedMedicalBeds",
-
     "esi1",
 
     "esi2",
 
-    "esi3",
+    "staffedAcuteCareBeds",
 
-    "esi4",
+    "occupiedAcuteCareBeds",
 
-    "esi5"
+    "staffedCriticalCareBeds",
+
+    "occupiedCriticalCareBeds",
+
+    "currentEDAdmissions",
+
+    "currentDirectAdmissions",
+
+    "currentSurgicalAdmissions"
 
 ];
 
 
-/**
- * Assessment fields monitored for completion.
+/*
+ * Every current operational field must contain a
+ * valid numeric value before calculation.
  *
- * Historical expectations are read automatically
- * when EDORI is calculated and are not editable
- * required fields.
+ * Zero is valid for census/admission values.
+ *
+ * Staffed bed counts must be greater than zero.
  */
 const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
 
@@ -158,64 +146,49 @@ const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
 
     "boardedPatients",
 
-    "occupiedMedicalBeds",
-
-    "staffedMedicalBeds",
-
     "esi1",
 
     "esi2",
 
-    "esi3",
+    "staffedAcuteCareBeds",
 
-    "esi4",
+    "occupiedAcuteCareBeds",
 
-    "esi5"
+    "staffedCriticalCareBeds",
+
+    "occupiedCriticalCareBeds",
+
+    "currentEDAdmissions",
+
+    "currentDirectAdmissions",
+
+    "currentSurgicalAdmissions"
 
 ];
 
 
-/**
- * CSS class applied to inputs that have changed
- * since the most recent successful calculation.
- */
 const CHANGED_FIELD_CLASS =
 
     "assessment-input-changed";
 
 
-/**
- * Local draft maintained by this component.
- *
- * The committed StateService assessment is not
- * modified while the user types.
+/*
+ * =====================================================
+ * Draft state
+ * =====================================================
  */
-let draftInput:EdoriAssessmentInput = {
 
-    totalEDVolume:0,
+let draftInput:EdoriAssessmentInput =
 
-    boardedPatients:0,
-
-    occupiedMedicalBeds:0,
-
-    staffedMedicalBeds:273,
-
-    esi1:0,
-
-    esi2:0,
-
-    esi3:0,
-
-    esi4:0,
-
-    esi5:0
-
-};
+    createEmptyDraft();
 
 
-/**
- * Render the Situation Assessment form.
+/*
+ * =====================================================
+ * Rendering
+ * =====================================================
  */
+
 export function SituationAssessment():string {
 
     return `
@@ -225,11 +198,11 @@ export function SituationAssessment():string {
             <div class="section-header">
 
                 <h2>
-                    Situation Assessment
+                    Hospital Readiness Assessment
                 </h2>
 
                 <p>
-                    Enter the current operational data set, then calculate EDORI.
+                    Enter current hospital operational conditions, then calculate the Hospital Readiness Index.
                 </p>
 
             </div>
@@ -277,281 +250,15 @@ export function SituationAssessment():string {
             </div>
 
 
-            <div class="assessment-section">
+            ${createEmergencyDepartmentSection()}
 
-                <div class="assessment-section-heading">
+            ${createAcuteCareSection()}
 
-                    <div class="assessment-section-icon">
-                        🚑
-                    </div>
+            ${createCriticalCareSection()}
 
-                    <div>
+            ${createKnownInflowSection()}
 
-                        <h3>
-                            ED Demand
-                        </h3>
-
-                        <p>
-                            Enter the total number of patients currently in the emergency department, including admitted boarders.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div class="input-grid">
-
-                    ${createNumberInput(
-
-                        "totalEDVolume",
-
-                        "Total ED Volume",
-
-                        0
-
-                    )}
-
-
-                    ${createNumberInput(
-
-                        "boardedPatients",
-
-                        "Boarding Patients",
-
-                        0
-
-                    )}
-
-                </div>
-
-            </div>
-
-
-            <div class="assessment-section">
-
-                <div class="assessment-section-heading">
-
-                    <div class="assessment-section-icon">
-                        🏥
-                    </div>
-
-                    <div>
-
-                        <h3>
-                            Hospital Capacity
-                        </h3>
-
-                        <p>
-                            Enter the number of occupied medical beds out of the configured 273-bed medical capacity.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div class="input-grid">
-
-                    ${createNumberInput(
-
-                        "occupiedMedicalBeds",
-
-                        "Occupied Medical Beds",
-
-                        0
-
-                    )}
-
-
-                    ${createNumberInput(
-
-                        "staffedMedicalBeds",
-
-                        "Staffed Medical Beds",
-
-                        1
-
-                    )}
-
-                </div>
-
-            </div>
-
-
-            <div class="assessment-section">
-
-                <div class="assessment-section-heading">
-
-                    <div class="assessment-section-icon">
-                        🩺
-                    </div>
-
-                    <div>
-
-                        <h3>
-                            Patient Acuity Distribution
-                        </h3>
-
-                        <p>
-                            Enter the number of current ED patients in each Emergency Severity Index category.
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div class="input-grid">
-
-                    ${createNumberInput(
-
-                        "esi1",
-
-                        "ESI 1",
-
-                        0
-
-                    )}
-
-
-                    ${createNumberInput(
-
-                        "esi2",
-
-                        "ESI 2",
-
-                        0
-
-                    )}
-
-
-                    ${createNumberInput(
-
-                        "esi3",
-
-                        "ESI 3",
-
-                        0
-
-                    )}
-
-
-                    ${createNumberInput(
-
-                        "esi4",
-
-                        "ESI 4",
-
-                        0
-
-                    )}
-
-
-                    ${createNumberInput(
-
-                        "esi5",
-
-                        "ESI 5",
-
-                        0
-
-                    )}
-
-                </div>
-
-
-                <div
-                    id="esiTotalSummary"
-                    class="esi-total-summary"
-                    aria-live="polite"
-                >
-                    ESI Total: 0
-                </div>
-
-            </div>
-
-
-            <div
-                class="
-                    assessment-section
-                    historical-expectations-section
-                "
-            >
-
-                <div class="historical-section-header">
-
-                    <div class="assessment-section-heading">
-
-                        <div class="assessment-section-icon">
-                            📈
-                        </div>
-
-                        <div>
-
-                            <h3>
-                                Historical Expectations
-                            </h3>
-
-                            <p id="historicalPeriodDisplay">
-                                Based on the weekday and hour when EDORI is calculated.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    <span
-                        id="historicalDataStatus"
-                        class="historical-data-status"
-                    >
-                        Awaiting calculation
-                    </span>
-
-                </div>
-
-
-                <div class="historical-expectations-grid">
-
-                    ${createExpectationDisplay(
-
-                        "expectedVolumeDisplay",
-
-                        "Expected ED Volume"
-
-                    )}
-
-
-                    ${createExpectationDisplay(
-
-                        "expectedBoardersDisplay",
-
-                        "Expected Boarding"
-
-                    )}
-
-
-                    ${createExpectationDisplay(
-
-                        "expectedArrivalsDisplay",
-
-                        "Expected Arrivals"
-
-                    )}
-
-
-                    ${createExpectationDisplay(
-
-                        "expectedDeparturesDisplay",
-
-                        "Expected Departures"
-
-                    )}
-
-                </div>
-
-            </div>
+            ${createHistoricalSection()}
 
 
             <div class="assessment-action-footer">
@@ -573,7 +280,7 @@ export function SituationAssessment():string {
                         </strong>
 
                         <small id="assessmentActionStatusDescription">
-                            Complete the operational inputs before calculating EDORI.
+                            Complete the operational inputs before calculating Hospital Readiness.
                         </small>
 
                     </div>
@@ -595,7 +302,7 @@ export function SituationAssessment():string {
                     class="calculate-button assessment-calculate-button"
                     type="button"
                 >
-                    Calculate EDORI
+                    Calculate Hospital Readiness
                 </button>
 
             </div>
@@ -619,9 +326,418 @@ export function SituationAssessment():string {
 }
 
 
-/**
- * Create a reusable numeric input.
+/*
+ * =====================================================
+ * Form sections
+ * =====================================================
  */
+
+function createEmergencyDepartmentSection():string {
+
+    return `
+
+        <div class="assessment-section">
+
+            <div class="assessment-section-heading">
+
+                <div class="assessment-section-icon">
+                    🚑
+                </div>
+
+                <div>
+
+                    <h3>
+                        Emergency Department
+                    </h3>
+
+                    <p>
+                        Enter the current ED census, boarding population, and high-acuity patient counts.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="input-grid">
+
+                ${createNumberInput(
+
+                    "totalEDVolume",
+
+                    "Total ED Volume",
+
+                    0
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "boardedPatients",
+
+                    "Boarding Patients",
+
+                    0
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "esi1",
+
+                    "ESI 1 Patients",
+
+                    0
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "esi2",
+
+                    "ESI 2 Patients",
+
+                    0
+
+                )}
+
+            </div>
+
+
+            <div
+                id="esiTotalSummary"
+                class="esi-total-summary"
+                aria-live="polite"
+            >
+                High-acuity ED patients: 0
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function createAcuteCareSection():string {
+
+    return `
+
+        <div class="assessment-section">
+
+            <div class="assessment-section-heading">
+
+                <div class="assessment-section-icon">
+                    🏥
+                </div>
+
+                <div>
+
+                    <h3>
+                        Acute-Care Capacity
+                    </h3>
+
+                    <p>
+                        Enter currently staffed acute-care capacity and the number of those beds currently occupied.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="input-grid">
+
+                ${createNumberInput(
+
+                    "staffedAcuteCareBeds",
+
+                    "Staffed Acute-Care Beds",
+
+                    1
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "occupiedAcuteCareBeds",
+
+                    "Occupied Acute-Care Beds",
+
+                    0
+
+                )}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function createCriticalCareSection():string {
+
+    return `
+
+        <div class="assessment-section">
+
+            <div class="assessment-section-heading">
+
+                <div class="assessment-section-icon">
+                    🫀
+                </div>
+
+                <div>
+
+                    <h3>
+                        Critical-Care Capacity
+                    </h3>
+
+                    <p>
+                        Enter currently staffed critical-care capacity and the number of those beds currently occupied.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="input-grid">
+
+                ${createNumberInput(
+
+                    "staffedCriticalCareBeds",
+
+                    "Staffed Critical-Care Beds",
+
+                    1
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "occupiedCriticalCareBeds",
+
+                    "Occupied Critical-Care Beds",
+
+                    0
+
+                )}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function createKnownInflowSection():string {
+
+    return `
+
+        <div class="assessment-section">
+
+            <div class="assessment-section-heading">
+
+                <div class="assessment-section-icon">
+                    ↘
+                </div>
+
+                <div>
+
+                    <h3>
+                        Known Hospital Inflow
+                    </h3>
+
+                    <p>
+                        Enter patients currently known or anticipated to require inpatient beds during the assessment horizon.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="input-grid">
+
+                ${createNumberInput(
+
+                    "currentEDAdmissions",
+
+                    "Current ED Admissions",
+
+                    0
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "currentDirectAdmissions",
+
+                    "Current Direct Admissions",
+
+                    0
+
+                )}
+
+
+                ${createNumberInput(
+
+                    "currentSurgicalAdmissions",
+
+                    "Current Surgical / Procedural Admissions",
+
+                    0
+
+                )}
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+function createHistoricalSection():string {
+
+    return `
+
+        <div
+            class="
+                assessment-section
+                historical-expectations-section
+            "
+        >
+
+            <div class="historical-section-header">
+
+                <div class="assessment-section-heading">
+
+                    <div class="assessment-section-icon">
+                        📈
+                    </div>
+
+                    <div>
+
+                        <h3>
+                            Automatic Historical Context
+                        </h3>
+
+                        <p id="historicalPeriodDisplay">
+                            Based on the weekday and hour when Hospital Readiness is calculated.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <span
+                    id="historicalDataStatus"
+                    class="historical-data-status"
+                >
+                    Awaiting calculation
+                </span>
+
+            </div>
+
+
+            <div class="historical-expectations-grid">
+
+                ${createExpectationDisplay(
+
+                    "expectedEDVolumeDisplay",
+
+                    "Expected ED Volume"
+
+                )}
+
+
+                ${createExpectationDisplay(
+
+                    "expectedEDBoardersDisplay",
+
+                    "Expected ED Boarders"
+
+                )}
+
+
+                ${createExpectationDisplay(
+
+                    "expectedEDAdmissions4hDisplay",
+
+                    "Expected ED Admissions — Next 4 Hours"
+
+                )}
+
+
+                ${createExpectationDisplay(
+
+                    "expectedDirectAdmissions4hDisplay",
+
+                    "Expected Direct Admissions — Next 4 Hours"
+
+                )}
+
+
+                ${createExpectationDisplay(
+
+                    "expectedSurgicalAdmissions4hDisplay",
+
+                    "Expected Surgical / Procedural Admissions — Next 4 Hours"
+
+                )}
+
+
+                ${createExpectationDisplay(
+
+                    "expectedHospitalInflow4hDisplay",
+
+                    "Expected Total Hospital Inflow — Next 4 Hours"
+
+                )}
+
+
+                ${createExpectationDisplay(
+
+                    "expectedInpatientDepartures4hDisplay",
+
+                    "Expected Inpatient Departures — Next 4 Hours"
+
+                )}
+
+            </div>
+
+
+            <p class="historical-expectation-note">
+                Historical expectations are loaded automatically and are not entered by the user.
+            </p>
+
+        </div>
+
+    `;
+
+}
+
+
+/*
+ * =====================================================
+ * Reusable rendering
+ * =====================================================
+ */
+
 function createNumberInput(
 
     id:keyof EdoriAssessmentInput,
@@ -669,9 +785,6 @@ function createNumberInput(
 }
 
 
-/**
- * Create a read-only historical expectation card.
- */
 function createExpectationDisplay(
 
     id:string,
@@ -703,9 +816,12 @@ function createExpectationDisplay(
 }
 
 
-/**
- * Initialize all form behavior.
+/*
+ * =====================================================
+ * Initialization
+ * =====================================================
  */
+
 export function initializeSituationAssessment():void {
 
     restoreDraftInput();
@@ -716,7 +832,7 @@ export function initializeSituationAssessment():void {
 
     restoreHistoricalDisplay();
 
-    updateEsiTotalSummary();
+    updateHighAcuitySummary();
 
     updateInitialAssessmentMessage();
 
@@ -727,10 +843,12 @@ export function initializeSituationAssessment():void {
 }
 
 
-/**
- * Restore the last committed assessment into
- * the component draft.
+/*
+ * =====================================================
+ * Draft restoration
+ * =====================================================
  */
+
 function restoreDraftInput():void {
 
     if(!hasCommittedAssessment()){
@@ -761,22 +879,6 @@ function restoreDraftInput():void {
 
             ),
 
-        occupiedMedicalBeds:
-            normalizeStoredNumber(
-
-                state.occupiedMedicalBeds
-
-            ),
-
-        staffedMedicalBeds:
-            normalizeStoredPositiveNumber(
-
-                state.staffedMedicalBeds,
-
-                273
-
-            ),
-
         esi1:
             normalizeStoredNumber(
 
@@ -791,24 +893,56 @@ function restoreDraftInput():void {
 
             ),
 
-        esi3:
-            normalizeStoredNumber(
+        staffedAcuteCareBeds:
+            normalizeStoredPositiveNumber(
 
-                state.esi3
+                state.staffedAcuteCareBeds,
 
-            ),
-
-        esi4:
-            normalizeStoredNumber(
-
-                state.esi4
+                1
 
             ),
 
-        esi5:
+        occupiedAcuteCareBeds:
             normalizeStoredNumber(
 
-                state.esi5
+                state.occupiedAcuteCareBeds
+
+            ),
+
+        staffedCriticalCareBeds:
+            normalizeStoredPositiveNumber(
+
+                state.staffedCriticalCareBeds,
+
+                1
+
+            ),
+
+        occupiedCriticalCareBeds:
+            normalizeStoredNumber(
+
+                state.occupiedCriticalCareBeds
+
+            ),
+
+        currentEDAdmissions:
+            normalizeStoredNumber(
+
+                state.currentEDAdmissions
+
+            ),
+
+        currentDirectAdmissions:
+            normalizeStoredNumber(
+
+                state.currentDirectAdmissions
+
+            ),
+
+        currentSurgicalAdmissions:
+            normalizeStoredNumber(
+
+                state.currentSurgicalAdmissions
 
             )
 
@@ -817,9 +951,12 @@ function restoreDraftInput():void {
 }
 
 
-/**
- * Initialize form fields and local draft updates.
+/*
+ * =====================================================
+ * Input behavior
+ * =====================================================
  */
+
 function initializeCurrentValueInputs():void {
 
     CURRENT_VALUE_FIELDS.forEach(
@@ -883,9 +1020,9 @@ function initializeCurrentValueInputs():void {
                     };
 
 
-                    if(isEsiRelatedField(field)){
+                    if(isHighAcuityRelatedField(field)){
 
-                        updateEsiTotalSummary();
+                        updateHighAcuitySummary();
 
                     }
 
@@ -903,9 +1040,12 @@ function initializeCurrentValueInputs():void {
 }
 
 
-/**
- * Initialize the Calculate EDORI button.
+/*
+ * =====================================================
+ * Calculation
+ * =====================================================
  */
+
 function initializeCalculateButton():void {
 
     const button = document.getElementById(
@@ -939,9 +1079,6 @@ function initializeCalculateButton():void {
 }
 
 
-/**
- * Send the current local draft to EdoriEngine.
- */
 function submitAssessmentToEngine():void {
 
     const button = document.getElementById(
@@ -962,22 +1099,8 @@ function submitAssessmentToEngine():void {
 
     try {
 
-        /*
-         * Capture one timestamp for:
-         *
-         * - weekday/hour lookup
-         * - assessmentTime
-         * - snapshot timestamp
-         */
-
         const calculationTime = new Date();
 
-
-        /*
-         * Update the historical display before
-         * calling the engine so the user can see
-         * the period being evaluated.
-         */
 
         previewHistoricalExpectation(
 
@@ -1019,11 +1142,6 @@ function submitAssessmentToEngine():void {
         }
 
 
-        /*
-         * Keep the draft synchronized with the
-         * authoritative committed assessment.
-         */
-
         draftInput = {
 
             totalEDVolume:
@@ -1032,26 +1150,32 @@ function submitAssessmentToEngine():void {
             boardedPatients:
                 engineResult.assessment.boardedPatients,
 
-            occupiedMedicalBeds:
-                engineResult.assessment.occupiedMedicalBeds,
-
-            staffedMedicalBeds:
-                engineResult.assessment.staffedMedicalBeds,
-
             esi1:
                 engineResult.assessment.esi1,
 
             esi2:
                 engineResult.assessment.esi2,
 
-            esi3:
-                engineResult.assessment.esi3,
+            staffedAcuteCareBeds:
+                engineResult.assessment.staffedAcuteCareBeds,
 
-            esi4:
-                engineResult.assessment.esi4,
+            occupiedAcuteCareBeds:
+                engineResult.assessment.occupiedAcuteCareBeds,
 
-            esi5:
-                engineResult.assessment.esi5
+            staffedCriticalCareBeds:
+                engineResult.assessment.staffedCriticalCareBeds,
+
+            occupiedCriticalCareBeds:
+                engineResult.assessment.occupiedCriticalCareBeds,
+
+            currentEDAdmissions:
+                engineResult.assessment.currentEDAdmissions,
+
+            currentDirectAdmissions:
+                engineResult.assessment.currentDirectAdmissions,
+
+            currentSurgicalAdmissions:
+                engineResult.assessment.currentSurgicalAdmissions
 
         };
 
@@ -1067,7 +1191,7 @@ function submitAssessmentToEngine():void {
 
         showAssessmentMessage(
 
-            `EDORI calculated successfully for ${engineResult.assessment.day} at ${formatHour(engineResult.assessment.hour)}. Score: ${Math.round(engineResult.result.score)}.${snapshotMessage}`,
+            `Hospital Readiness calculated successfully for ${engineResult.assessment.day} at ${formatHour(engineResult.assessment.hour)}. Score: ${Math.round(engineResult.result.score)}.${snapshotMessage}`,
 
             "success"
 
@@ -1076,7 +1200,6 @@ function submitAssessmentToEngine():void {
 
         showAssessmentCalculatedStatus();
 
-
         clearChangedFieldIndicators();
 
     }
@@ -1084,7 +1207,7 @@ function submitAssessmentToEngine():void {
 
         console.error(
 
-            "Unable to submit EDORI assessment:",
+            "Unable to submit Hospital Readiness assessment:",
 
             error
 
@@ -1093,7 +1216,7 @@ function submitAssessmentToEngine():void {
 
         showAssessmentMessage(
 
-            "Unable to calculate EDORI. Check the browser console for details.",
+            "Unable to calculate Hospital Readiness. Check the browser console for details.",
 
             "error"
 
@@ -1115,10 +1238,12 @@ function submitAssessmentToEngine():void {
 }
 
 
-/**
- * Preview the historical expectation that the
- * engine will use for the submitted time.
+/*
+ * =====================================================
+ * Historical display
+ * =====================================================
  */
+
 function previewHistoricalExpectation(
 
     calculationTime:Date
@@ -1179,11 +1304,11 @@ function previewHistoricalExpectation(
 
     setElementText(
 
-        "expectedVolumeDisplay",
+        "expectedEDVolumeDisplay",
 
         formatHistoricalValue(
 
-            expectedValues.expectedVolume
+            expectedValues.expectedEDVolume
 
         )
 
@@ -1192,11 +1317,11 @@ function previewHistoricalExpectation(
 
     setElementText(
 
-        "expectedBoardersDisplay",
+        "expectedEDBoardersDisplay",
 
         formatHistoricalValue(
 
-            expectedValues.expectedBoarders
+            expectedValues.expectedEDBoarders
 
         )
 
@@ -1205,11 +1330,11 @@ function previewHistoricalExpectation(
 
     setElementText(
 
-        "expectedArrivalsDisplay",
+        "expectedEDAdmissions4hDisplay",
 
         formatHistoricalValue(
 
-            expectedValues.expectedArrivals
+            expectedValues.expectedEDAdmissions4h
 
         )
 
@@ -1218,11 +1343,50 @@ function previewHistoricalExpectation(
 
     setElementText(
 
-        "expectedDeparturesDisplay",
+        "expectedDirectAdmissions4hDisplay",
 
         formatHistoricalValue(
 
-            expectedValues.expectedDepartures
+            expectedValues.expectedDirectAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedSurgicalAdmissions4hDisplay",
+
+        formatHistoricalValue(
+
+            expectedValues.expectedSurgicalAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedHospitalInflow4hDisplay",
+
+        formatHistoricalValue(
+
+            expectedValues.expectedHospitalInflow4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedInpatientDepartures4hDisplay",
+
+        formatHistoricalValue(
+
+            expectedValues.expectedInpatientDepartures4h
 
         )
 
@@ -1231,10 +1395,6 @@ function previewHistoricalExpectation(
 }
 
 
-/**
- * Restore historical values associated with the
- * most recently committed assessment.
- */
 function restoreHistoricalDisplay():void {
 
     if(!hasCommittedAssessment()){
@@ -1276,11 +1436,11 @@ function restoreHistoricalDisplay():void {
 
     setElementText(
 
-        "expectedVolumeDisplay",
+        "expectedEDVolumeDisplay",
 
         formatHistoricalValue(
 
-            state.expectedVolume
+            state.expectedEDVolume
 
         )
 
@@ -1289,11 +1449,11 @@ function restoreHistoricalDisplay():void {
 
     setElementText(
 
-        "expectedBoardersDisplay",
+        "expectedEDBoardersDisplay",
 
         formatHistoricalValue(
 
-            state.expectedBoarders
+            state.expectedEDBoarders
 
         )
 
@@ -1302,11 +1462,11 @@ function restoreHistoricalDisplay():void {
 
     setElementText(
 
-        "expectedArrivalsDisplay",
+        "expectedEDAdmissions4hDisplay",
 
         formatHistoricalValue(
 
-            state.expectedArrivals
+            state.expectedEDAdmissions4h
 
         )
 
@@ -1315,11 +1475,50 @@ function restoreHistoricalDisplay():void {
 
     setElementText(
 
-        "expectedDeparturesDisplay",
+        "expectedDirectAdmissions4hDisplay",
 
         formatHistoricalValue(
 
-            state.expectedDepartures
+            state.expectedDirectAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedSurgicalAdmissions4hDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedSurgicalAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedHospitalInflow4hDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedHospitalInflow4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedInpatientDepartures4hDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedInpatientDepartures4h
 
         )
 
@@ -1341,24 +1540,20 @@ function restoreHistoricalDisplay():void {
 }
 
 
-/**
- * Respond when historical data are imported
- * or restored.
- */
 function subscribeToHistoricalDataChanges():void {
 
     subscribe(
 
-    APP_EVENTS.HISTORICAL_DATA_CHANGED,
+        APP_EVENTS.HISTORICAL_DATA_CHANGED,
 
-    () => {
+        () => {
 
             resetHistoricalDisplay();
 
 
             showAssessmentMessage(
 
-                "Historical expectations changed. Review the current values and select Calculate EDORI to create an updated result.",
+                "Historical expectations changed. Review the current values and calculate Hospital Readiness to create an updated result.",
 
                 "draft"
 
@@ -1374,9 +1569,6 @@ function subscribeToHistoricalDataChanges():void {
 }
 
 
-/**
- * Update the historical period label.
- */
 function updateHistoricalPeriodDisplay(
 
     day:DayOfWeek,
@@ -1389,16 +1581,13 @@ function updateHistoricalPeriodDisplay(
 
         "historicalPeriodDisplay",
 
-        `Based on ${day} at ${formatHour(hour)}`
+        `Based on ${day} at ${formatHour(hour)} with a four-hour hospital-flow forecast`
 
     );
 
 }
 
 
-/**
- * Update historical-data availability.
- */
 function updateHistoricalDataStatus(
 
     available:boolean
@@ -1461,16 +1650,13 @@ function updateHistoricalDataStatus(
 }
 
 
-/**
- * Reset the historical panel.
- */
 function resetHistoricalDisplay():void {
 
     setElementText(
 
         "historicalPeriodDisplay",
 
-        "Based on the weekday and hour when EDORI is calculated."
+        "Based on the weekday and hour when Hospital Readiness is calculated."
 
     );
 
@@ -1508,20 +1694,23 @@ function resetHistoricalDisplay():void {
 }
 
 
-/**
- * Clear expectation values.
- */
 function clearExpectedValueDisplays():void {
 
     [
 
-        "expectedVolumeDisplay",
+        "expectedEDVolumeDisplay",
 
-        "expectedBoardersDisplay",
+        "expectedEDBoardersDisplay",
 
-        "expectedArrivalsDisplay",
+        "expectedEDAdmissions4hDisplay",
 
-        "expectedDeparturesDisplay"
+        "expectedDirectAdmissions4hDisplay",
+
+        "expectedSurgicalAdmissions4hDisplay",
+
+        "expectedHospitalInflow4hDisplay",
+
+        "expectedInpatientDepartures4hDisplay"
 
     ].forEach(
 
@@ -1542,16 +1731,34 @@ function clearExpectedValueDisplays():void {
 }
 
 
-/**
- * Update the displayed ESI total.
+/*
+ * =====================================================
+ * High-acuity summary
+ * =====================================================
  */
-function updateEsiTotalSummary():void {
 
-    const esiTotal = calculateEsiTotal(
+function updateHighAcuitySummary():void {
 
-    draftInput
+    const highAcuityTotal =
 
-);
+        draftInput.esi1
+
+        +
+
+        draftInput.esi2;
+
+
+    const lowerAcuityTotal = Math.max(
+
+        0,
+
+        draftInput.totalEDVolume
+
+        -
+
+        highAcuityTotal
+
+    );
 
 
     const element = document.getElementById(
@@ -1577,30 +1784,26 @@ function updateEsiTotalSummary():void {
     );
 
 
-    if(draftInput.totalEDVolume <= 0){
+    if(
 
-        element.textContent =
+        highAcuityTotal
 
-            `ESI Total: ${esiTotal}`;
+        >
 
+        draftInput.totalEDVolume
 
-        return;
-
-    }
-
-
-    if(esiTotal === draftInput.totalEDVolume){
+    ){
 
         element.classList.add(
 
-            "esi-total-matched"
+            "esi-total-mismatch"
 
         );
 
 
         element.textContent =
 
-            `ESI Total: ${esiTotal} — matches total ED volume`;
+            `ESI 1 + ESI 2 = ${highAcuityTotal}, which exceeds the total ED volume of ${draftInput.totalEDVolume}.`;
 
 
         return;
@@ -1610,32 +1813,24 @@ function updateEsiTotalSummary():void {
 
     element.classList.add(
 
-        "esi-total-mismatch"
+        "esi-total-matched"
 
     );
 
 
-    if(esiTotal > draftInput.totalEDVolume){
-
-        element.textContent =
-
-            `ESI Total: ${esiTotal} — exceeds total ED volume of ${draftInput.totalEDVolume}`;
-
-        return;
-
-    }
-
-
     element.textContent =
 
-    `ESI Total: ${esiTotal} — ${calculateUnassignedEsiCount(draftInput)} patients do not have an entered ESI category`
+        `High acuity: ${highAcuityTotal} ESI 1–2 patients. Remaining ED census: ${lowerAcuityTotal} patients assumed ESI 3–5.`;
 
 }
 
 
-/**
- * Display the appropriate initial message.
+/*
+ * =====================================================
+ * Initial messaging
+ * =====================================================
  */
+
 function updateInitialAssessmentMessage():void {
 
     const invalidationReason =
@@ -1647,11 +1842,12 @@ function updateInitialAssessmentMessage():void {
 
         showAssessmentMessage(
 
-            "Historical expectations changed. Review the current values and select Calculate EDORI to create an updated result.",
+            "Historical expectations changed. Review the current values and calculate Hospital Readiness to create an updated result.",
 
             "draft"
 
         );
+
 
         return;
 
@@ -1662,11 +1858,12 @@ function updateInitialAssessmentMessage():void {
 
         showAssessmentMessage(
 
-            "The most recently submitted assessment has been restored. Change values as needed, then select Calculate EDORI.",
+            "The most recently submitted assessment has been restored. Change values as needed, then calculate Hospital Readiness.",
 
             "default"
 
         );
+
 
         return;
 
@@ -1675,7 +1872,7 @@ function updateInitialAssessmentMessage():void {
 
     showAssessmentMessage(
 
-        "Enter all operational data, then calculate.",
+        "Enter all current operational data, then calculate.",
 
         "default"
 
@@ -1684,9 +1881,12 @@ function updateInitialAssessmentMessage():void {
 }
 
 
-/**
- * Create an empty draft.
+/*
+ * =====================================================
+ * Draft creation and normalization
+ * =====================================================
  */
+
 function createEmptyDraft():EdoriAssessmentInput {
 
     return {
@@ -1695,28 +1895,29 @@ function createEmptyDraft():EdoriAssessmentInput {
 
         boardedPatients:0,
 
-        occupiedMedicalBeds:0,
-
-        staffedMedicalBeds:273,
-
         esi1:0,
 
         esi2:0,
 
-        esi3:0,
+        staffedAcuteCareBeds:1,
 
-        esi4:0,
+        occupiedAcuteCareBeds:0,
 
-        esi5:0
+        staffedCriticalCareBeds:1,
+
+        occupiedCriticalCareBeds:0,
+
+        currentEDAdmissions:0,
+
+        currentDirectAdmissions:0,
+
+        currentSurgicalAdmissions:0
 
     };
 
 }
 
 
-/**
- * Normalize a stored numeric value.
- */
 function normalizeStoredNumber(
 
     value:unknown
@@ -1747,10 +1948,6 @@ function normalizeStoredNumber(
 }
 
 
-/**
- * Normalize a stored positive number with a
- * fallback value.
- */
 function normalizeStoredPositiveNumber(
 
     value:unknown,
@@ -1783,9 +1980,6 @@ function normalizeStoredPositiveNumber(
 }
 
 
-/**
- * Parse one numeric input.
- */
 function parseInputValue(
 
     value:string
@@ -1817,11 +2011,7 @@ function parseInputValue(
 }
 
 
-/**
- * Determine whether changing a field requires
- * recalculating the ESI summary.
- */
-function isEsiRelatedField(
+function isHighAcuityRelatedField(
 
     field:keyof EdoriAssessmentInput
 
@@ -1835,26 +2025,17 @@ function isEsiRelatedField(
 
         ||
 
-        field === "esi2"
-
-        ||
-
-        field === "esi3"
-
-        ||
-
-        field === "esi4"
-
-        ||
-
-        field === "esi5";
+        field === "esi2";
 
 }
 
 
-/**
- * Normalize a stored weekday.
+/*
+ * =====================================================
+ * Formatting
+ * =====================================================
  */
+
 function normalizeDay(
 
     value:string
@@ -1891,9 +2072,6 @@ function normalizeDay(
 }
 
 
-/**
- * Format an hourly bucket.
- */
 function formatHour(
 
     hour:number
@@ -1938,9 +2116,6 @@ function formatHour(
 }
 
 
-/**
- * Format an expectation value.
- */
 function formatHistoricalValue(
 
     value:number
@@ -1980,9 +2155,6 @@ function formatHistoricalValue(
 }
 
 
-/**
- * Safely update element text.
- */
 function setElementText(
 
     elementId:string,
@@ -2007,14 +2179,17 @@ function setElementText(
 }
 
 
-/**
- * Show that draft values changed.
+/*
+ * =====================================================
+ * Draft status
+ * =====================================================
  */
+
 function showDraftChangedMessage():void {
 
     showAssessmentMessage(
 
-        "Assessment values changed. Select Calculate EDORI to update the dashboard.",
+        "Assessment values changed. Select Calculate Hospital Readiness to update the dashboard.",
 
         "draft"
 
@@ -2026,9 +2201,6 @@ function showDraftChangedMessage():void {
 }
 
 
-/**
- * Update the assessment message.
- */
 function showAssessmentMessage(
 
     message:string,
@@ -2084,9 +2256,12 @@ function showAssessmentMessage(
 }
 
 
-/**
- * Initialize assessment-completion monitoring.
+/*
+ * =====================================================
+ * Completion monitoring
+ * =====================================================
  */
+
 function initializeAssessmentProgress():void {
 
     REQUIRED_ASSESSMENT_FIELD_IDS.forEach(
@@ -2138,10 +2313,6 @@ function initializeAssessmentProgress():void {
 }
 
 
-/**
- * Update the completion display and calculation
- * action state.
- */
 function updateAssessmentProgress():void {
 
     const completedFieldCount =
@@ -2221,10 +2392,6 @@ function updateAssessmentProgress():void {
 }
 
 
-/**
- * Determine whether one required input contains a
- * valid nonnegative number.
- */
 function isAssessmentFieldComplete(
 
     fieldId:string
@@ -2263,7 +2430,15 @@ function isAssessmentFieldComplete(
     );
 
 
-    if(fieldId === "staffedMedicalBeds"){
+    if(
+
+        fieldId === "staffedAcuteCareBeds"
+
+        ||
+
+        fieldId === "staffedCriticalCareBeds"
+
+    ){
 
         return Number.isFinite(value)
 
@@ -2283,9 +2458,12 @@ function isAssessmentFieldComplete(
 }
 
 
-/**
- * Update the persistent calculation-area status.
+/*
+ * =====================================================
+ * Action status
+ * =====================================================
  */
+
 function updateAssessmentActionStatus(
 
     completionPercent:number
@@ -2309,7 +2487,7 @@ function updateAssessmentActionStatus(
 
                 "Assessment ready",
 
-                "Review the entered values, then calculate the current EDORI result.",
+                "Review the entered values, then calculate the current Hospital Readiness result.",
 
                 "ready"
 
@@ -2343,7 +2521,7 @@ function updateAssessmentActionStatus(
 
         "Assessment incomplete",
 
-        "Complete all required operational inputs before calculating EDORI.",
+        "Complete all required operational inputs before calculating Hospital Readiness.",
 
         "incomplete"
 
@@ -2359,9 +2537,6 @@ function updateAssessmentActionStatus(
 }
 
 
-/**
- * Display a successful committed-assessment state.
- */
 function showAssessmentCalculatedStatus():void {
 
     setAssessmentActionStatus(
@@ -2370,7 +2545,7 @@ function showAssessmentCalculatedStatus():void {
 
         "Assessment calculated",
 
-        "The dashboard now reflects the committed operational assessment.",
+        "The dashboard now reflects the committed Hospital Readiness assessment.",
 
         "calculated"
 
@@ -2386,9 +2561,6 @@ function showAssessmentCalculatedStatus():void {
 }
 
 
-/**
- * Display a changed-draft state.
- */
 function showAssessmentDraftStatus():void {
 
     setAssessmentActionStatus(
@@ -2397,7 +2569,7 @@ function showAssessmentDraftStatus():void {
 
         "Changes not calculated",
 
-        "Select Calculate EDORI to update the dashboard with the current values.",
+        "Select Calculate Hospital Readiness to update the dashboard with the current values.",
 
         "draft"
 
@@ -2413,9 +2585,6 @@ function showAssessmentDraftStatus():void {
 }
 
 
-/**
- * Apply action-status content and visual state.
- */
 function setAssessmentActionStatus(
 
     icon:string,
@@ -2499,9 +2668,6 @@ function setAssessmentActionStatus(
 }
 
 
-/**
- * Show or hide the draft-change indicator.
- */
 function setDraftIndicatorVisibility(
 
     visible:boolean
@@ -2524,10 +2690,12 @@ function setDraftIndicatorVisibility(
 }
 
 
-/**
- * Remove changed-field highlighting after a
- * successful committed calculation.
+/*
+ * =====================================================
+ * Changed-field state
+ * =====================================================
  */
+
 function clearChangedFieldIndicators():void {
 
     CURRENT_VALUE_FIELDS.forEach(
@@ -2562,9 +2730,12 @@ function clearChangedFieldIndicators():void {
 }
 
 
-/**
- * Update Calculate button state.
+/*
+ * =====================================================
+ * Submission state
+ * =====================================================
  */
+
 function setSubmissionState(
 
     button:HTMLButtonElement | null,
@@ -2587,6 +2758,6 @@ function setSubmissionState(
 
         ? "Calculating..."
 
-        : "Calculate EDORI";
+        : "Calculate Hospital Readiness";
 
 }

@@ -1,68 +1,122 @@
 /**
- * EDORI scoring-domain weights.
+ * Hospital Readiness scoring-domain weights.
  *
- * Staffing is intentionally excluded from
- * the EDORI scoring model.
+ * Version 2
  *
- * Active domains:
+ * Overall Hospital Readiness:
  *
- * - ED demand
- * - Boarding
- * - Hospital capacity
- * - Patient acuity
- * - Near-term forecast
+ * 35% Emergency Department Operational Pressure
+ * 20% Acute-Care Capacity
+ * 15% Critical-Care Capacity
+ * 15% Hospital Inflow
+ * 15% Projected Capacity
  */
 
 export const WEIGHTS = {
 
-    demand:0.20,
+    edPressure:
+        0.35,
 
-    boarding:0.25,
+    acuteCapacity:
+        0.20,
 
-    hospital:0.20,
+    criticalCapacity:
+        0.15,
 
-    acuity:0.15,
+    inflow:
+        0.15,
 
-    forecast:0.20
+    projectedCapacity:
+        0.15
 
 } as const;
 
 
 /**
- * Sum of all active EDORI weights.
+ * ED Operational Pressure is itself composed of:
+ *
+ * 30% ED census pressure
+ * 50% ED boarding pressure
+ * 20% high-acuity pressure
  */
-export const TOTAL_WEIGHT =
+export const ED_PRESSURE_WEIGHTS = {
 
-    WEIGHTS.demand
+    volume:
+        0.30,
 
-    +
+    boarding:
+        0.50,
 
-    WEIGHTS.boarding
+    acuity:
+        0.20
 
-    +
-
-    WEIGHTS.hospital
-
-    +
-
-    WEIGHTS.acuity
-
-    +
-
-    WEIGHTS.forecast;
+} as const;
 
 
 /**
- * Determine whether the configured weights
+ * Sum of all Hospital Readiness domain weights.
+ */
+export const TOTAL_WEIGHT =
+
+    WEIGHTS.edPressure
+
+    +
+
+    WEIGHTS.acuteCapacity
+
+    +
+
+    WEIGHTS.criticalCapacity
+
+    +
+
+    WEIGHTS.inflow
+
+    +
+
+    WEIGHTS.projectedCapacity;
+
+
+/**
+ * Sum of all ED Operational Pressure
+ * subdomain weights.
+ */
+export const TOTAL_ED_PRESSURE_WEIGHT =
+
+    ED_PRESSURE_WEIGHTS.volume
+
+    +
+
+    ED_PRESSURE_WEIGHTS.boarding
+
+    +
+
+    ED_PRESSURE_WEIGHTS.acuity;
+
+
+/**
+ * Determine whether all configured weights
  * total exactly 1.00 within floating-point
  * tolerance.
  */
 export function areWeightsValid():boolean {
 
-    return Math.abs(
+    return (
 
-        TOTAL_WEIGHT - 1
+        Math.abs(
 
-    ) < 0.000001;
+            TOTAL_WEIGHT - 1
+
+        ) < 0.000001
+
+        &&
+
+        Math.abs(
+
+            TOTAL_ED_PRESSURE_WEIGHT - 1
+
+        ) < 0.000001
+
+    );
 
 }

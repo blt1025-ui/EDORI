@@ -1,17 +1,15 @@
 /**
  * HistoricalDataValidator
  *
+ * Version 2.1 Hospital Readiness Model
+ *
  * Pure validation functions for a candidate
  * historical-expectation dataset.
- *
- * This file does not import the repository and
- * does not access localStorage.
  */
 
 import type {
 
     DayOfWeek,
-
     HistoricalExpectation
 
 }
@@ -22,25 +20,17 @@ from "../types/HistoricalExpectation";
 const DAYS:DayOfWeek[] = [
 
     "Sunday",
-
     "Monday",
-
     "Tuesday",
-
     "Wednesday",
-
     "Thursday",
-
     "Friday",
-
     "Saturday"
 
 ];
 
 
-const EXPECTED_RECORD_COUNT =
-
-    DAYS.length * 24;
+const EXPECTED_RECORD_COUNT = DAYS.length * 24;
 
 
 export interface HistoricalDataValidationResult {
@@ -80,45 +70,36 @@ export function validateHistoricalDataset(
     );
 
 
-    const missingRecords =
+    const missingRecords = findMissingRecords(
 
-        findMissingRecords(
+        copiedDataset
 
-            copiedDataset
-
-        );
+    );
 
 
-    const duplicateRecords =
+    const duplicateRecords = findDuplicateRecords(
 
-        findDuplicateRecords(
+        copiedDataset
 
-            copiedDataset
-
-        );
+    );
 
 
-    const invalidRecords =
+    const invalidRecords = findInvalidRecords(
 
-        findInvalidRecords(
+        copiedDataset
 
-            copiedDataset
-
-        );
+    );
 
 
     return {
 
         valid:
-
+            copiedDataset.length === EXPECTED_RECORD_COUNT
+            &&
             missingRecords.length === 0
-
             &&
-
             duplicateRecords.length === 0
-
             &&
-
             invalidRecords.length === 0,
 
         expectedRecordCount:
@@ -155,23 +136,16 @@ function findMissingRecords(
         day => {
 
             for(
-
                 let hour = 0;
-
                 hour < 24;
-
                 hour += 1
-
             ){
 
                 const exists = dataset.some(
 
                     record =>
-
                         record.day === day
-
                         &&
-
                         record.hour === hour
 
                 );
@@ -182,11 +156,8 @@ function findMissingRecords(
                     missingRecords.push(
 
                         createRecordKey(
-
                             day,
-
                             hour
-
                         )
 
                     );
@@ -214,13 +185,7 @@ function findDuplicateRecords(
 
 ):string[] {
 
-    const counts = new Map<
-
-        string,
-
-        number
-
-    >();
+    const counts = new Map<string, number>();
 
 
     dataset.forEach(
@@ -230,7 +195,6 @@ function findDuplicateRecords(
             const key = createRecordKey(
 
                 record.day,
-
                 record.hour
 
             );
@@ -241,18 +205,11 @@ function findDuplicateRecords(
                 key,
 
                 (
-
-                    counts.get(
-
-                        key
-
-                    )
-
+                    counts.get(key)
                     ?? 0
-
                 )
-
-                + 1
+                +
+                1
 
             );
 
@@ -262,33 +219,14 @@ function findDuplicateRecords(
 
 
     return Array.from(
-
         counts.entries()
-
     )
-
         .filter(
-
-            (
-
-                [,
-
-                count]
-
-            ) => count > 1
-
+            ([, count]) => count > 1
         )
-
         .map(
-
-            (
-
-                [key]
-
-            ) => key
-
+            ([key]) => key
         )
-
         .sort();
 
 }
@@ -309,11 +247,8 @@ function findInvalidRecords(
     dataset.forEach(
 
         (
-
             record,
-
             index
-
         ) => {
 
             const errors = validateRecord(
@@ -331,27 +266,13 @@ function findInvalidRecords(
 
 
             const label =
-
-                DAYS.includes(
-
-                    record.day
-
-                )
-
+                DAYS.includes(record.day)
                 &&
-
-                Number.isInteger(
-
-                    record.hour
-
-                )
+                Number.isInteger(record.hour)
 
                     ? createRecordKey(
-
                         record.day,
-
                         record.hour
-
                     )
 
                     : `Record ${index + 1}`;
@@ -374,7 +295,7 @@ function findInvalidRecords(
 
 
 /**
- * Validate one record.
+ * Validate one Version 2.1 historical record.
  */
 function validateRecord(
 
@@ -388,115 +309,110 @@ function validateRecord(
     if(!DAYS.includes(record.day)){
 
         errors.push(
-
             "invalid day"
-
         );
 
     }
 
 
     if(
-
-        !Number.isInteger(
-
-            record.hour
-
-        )
-
+        !Number.isInteger(record.hour)
         ||
-
         record.hour < 0
-
         ||
-
         record.hour > 23
-
     ){
 
         errors.push(
-
             "hour must be an integer from 0 through 23"
-
         );
 
     }
 
 
     validateNonNegativeNumber(
-
-        record.expectedVolume,
-
-        "expectedVolume",
-
+        record.expectedEDVolume,
+        "expectedEDVolume",
         errors
-
     );
 
 
     validateNonNegativeNumber(
-
-        record.expectedBoarders,
-
-        "expectedBoarders",
-
+        record.expectedEDBoarders,
+        "expectedEDBoarders",
         errors
+    );
 
+
+    validatePositiveNumber(
+        record.expectedStaffedAcuteCareBeds,
+        "expectedStaffedAcuteCareBeds",
+        errors
     );
 
 
     validateNonNegativeNumber(
-
-        record.expectedArrivals,
-
-        "expectedArrivals",
-
+        record.expectedOccupiedAcuteCareBeds,
+        "expectedOccupiedAcuteCareBeds",
         errors
-
     );
 
 
     validateNonNegativeNumber(
-
-        record.expectedDepartures,
-
-        "expectedDepartures",
-
+        record.expectedEDAdmissions,
+        "expectedEDAdmissions",
         errors
+    );
 
+
+    validateNonNegativeNumber(
+        record.expectedDirectAdmissions,
+        "expectedDirectAdmissions",
+        errors
+    );
+
+
+    validateNonNegativeNumber(
+        record.expectedSurgicalAdmissions,
+        "expectedSurgicalAdmissions",
+        errors
+    );
+
+
+    validateNonNegativeNumber(
+        record.expectedInpatientDepartures,
+        "expectedInpatientDepartures",
+        errors
     );
 
 
     if(
-
-        Number.isFinite(
-
-            record.expectedBoarders
-
-        )
-
+        Number.isFinite(record.expectedEDBoarders)
         &&
-
-        Number.isFinite(
-
-            record.expectedVolume
-
-        )
-
+        Number.isFinite(record.expectedEDVolume)
         &&
-
-        record.expectedBoarders
-
-        >
-
-        record.expectedVolume
-
+        record.expectedEDBoarders > record.expectedEDVolume
     ){
 
         errors.push(
+            "expectedEDBoarders cannot exceed expectedEDVolume"
+        );
 
-            "expectedBoarders cannot exceed expectedVolume"
+    }
 
+
+    if(
+        Number.isFinite(record.expectedOccupiedAcuteCareBeds)
+        &&
+        Number.isFinite(record.expectedStaffedAcuteCareBeds)
+        &&
+        record.expectedOccupiedAcuteCareBeds
+            >
+        record.expectedStaffedAcuteCareBeds
+    ){
+
+        errors.push(
+            "expectedOccupiedAcuteCareBeds cannot exceed expectedStaffedAcuteCareBeds"
         );
 
     }
@@ -508,7 +424,7 @@ function validateRecord(
 
 
 /**
- * Validate one numeric value.
+ * Validate a nonnegative historical value.
  */
 function validateNonNegativeNumber(
 
@@ -520,22 +436,11 @@ function validateNonNegativeNumber(
 
 ):void {
 
-    if(
-
-        !Number.isFinite(
-
-            value
-
-        )
-
-    ){
+    if(!Number.isFinite(value)){
 
         errors.push(
-
             `${field} must be a finite number`
-
         );
-
 
         return;
 
@@ -545,9 +450,42 @@ function validateNonNegativeNumber(
     if(value < 0){
 
         errors.push(
-
             `${field} must be nonnegative`
+        );
 
+    }
+
+}
+
+
+/**
+ * Validate a strictly positive historical value.
+ */
+function validatePositiveNumber(
+
+    value:number,
+
+    field:string,
+
+    errors:string[]
+
+):void {
+
+    if(!Number.isFinite(value)){
+
+        errors.push(
+            `${field} must be a finite number`
+        );
+
+        return;
+
+    }
+
+
+    if(value <= 0){
+
+        errors.push(
+            `${field} must be greater than zero`
         );
 
     }

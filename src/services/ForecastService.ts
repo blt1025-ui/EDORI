@@ -1,20 +1,66 @@
 /**
  * ForecastService
  *
- * Pure near-term operational-flow calculation.
+ * Version 2 Hospital Readiness Model
  *
- * The Version 1.0 forecast domain estimates
- * whether expected arrivals are likely to exceed
- * expected departures during the current hourly
- * historical period.
+ * Pure four-hour hospital-capacity forecast.
+ *
+ * The forecast estimates acute-care bed availability
+ * at the end of the current four-hour assessment
+ * horizon.
+ *
+ * Forecast logic:
+ *
+ * currentAvailableBeds
+ * =
+ * staffedAcuteCareBeds
+ * -
+ * occupiedAcuteCareBeds
+ *
+ *
+ * historicalNetFlow
+ * =
+ * expectedHospitalInflow4h
+ * -
+ * expectedInpatientDepartures4h
+ *
+ *
+ * currentKnownHospitalInflow
+ * =
+ * currentEDAdmissions
+ * +
+ * currentDirectAdmissions
+ * +
+ * currentSurgicalAdmissions
+ *
+ *
+ * projectedHospitalInflow
+ * =
+ * max(
+ *     currentKnownHospitalInflow,
+ *     expectedHospitalInflow4h
+ * )
+ *
+ *
+ * projectedAvailableBeds
+ * =
+ * currentAvailableBeds
+ * +
+ * expectedInpatientDepartures4h
+ * -
+ * projectedHospitalInflow
+ *
+ *
+ * Negative projectedAvailableBeds values are
+ * intentionally preserved.
  *
  * This service does not:
  *
- * - Read current application state
+ * - Read application state
  * - Save results
  * - Emit events
  * - Access localStorage
- * - Predict future EDORI scores
+ * - Modify SituationAssessment
  */
 
 import type {
@@ -27,39 +73,97 @@ from "../types/SituationAssessment";
 
 
 /**
- * A positive net flow of 10 patients or more
- * produces the maximum forecast score.
- *
- * This constant should be reviewed during
- * clinical calibration.
+ * Four-hour Hospital Readiness forecast.
  */
-const NET_FLOW_AT_MAXIMUM_SCORE = 10;
-
-
 export interface ForecastResult {
 
     /**
-     * Expected arrivals minus expected departures.
+     * Current staffed acute-care beds not occupied.
      */
-    netExpectedFlow:number;
+    currentAvailableBeds:number;
 
 
     /**
-     * Forecast strain from 0 through 100.
+     * Historical four-hour hospital inflow.
      */
-    forecastScore:number;
+    expectedHospitalInflow:number;
 
 
     /**
-     * Readable direction of expected flow.
+     * Historical four-hour inpatient departures.
+     */
+    expectedInpatientDepartures:number;
+
+
+    /**
+     * Historical expected net hospital flow:
+     *
+     * expected inflow - expected departures
+     *
+     * Positive values indicate expected net demand
+     * for additional beds.
+     *
+     * Negative values indicate expected net release
+     * of inpatient capacity.
+     */
+    historicalNetFlow:number;
+
+
+    /**
+     * Current known hospital inflow:
+     *
+     * ED admissions
+     * +
+     * direct admissions
+     * +
+     * surgical/procedural admissions.
+     */
+    currentKnownHospitalInflow:number;
+
+
+    /**
+     * Difference between currently known inflow
+     * and historical expected inflow.
+     *
+     * Positive values mean current known inflow
+     * exceeds the historical norm.
+     */
+    inflowVariance:number;
+
+
+    /**
+     * Hospital inflow used in the capacity forecast.
+     *
+     * This is the greater of:
+     *
+     * - current known hospital inflow
+     * - historical expected four-hour hospital inflow
+     */
+    projectedHospitalInflow:number;
+
+
+    /**
+     * Projected staffed acute-care beds available
+     * at the end of the four-hour forecast period.
+     *
+     * Negative values are valid and represent
+     * projected demand beyond staffed capacity.
+     */
+    projectedAvailableBeds:number;
+
+
+    /**
+     * Forecast direction.
      */
     direction:
 
-        | "Increasing"
+        | "Improving"
 
         | "Stable"
 
-        | "Improving";
+        | "Tightening"
+
+        | "Deficit";
 
 
     /**
@@ -71,7 +175,7 @@ export interface ForecastResult {
 
 
 /**
- * Calculate the near-term forecast domain.
+ * Calculate the four-hour hospital-capacity forecast.
  */
 export function calculateForecast(
 
@@ -79,67 +183,221 @@ export function calculateForecast(
 
 ):ForecastResult {
 
-    const expectedArrivals =
+    /*
+     * Current acute-care capacity.
+     */
+
+    const staffedAcuteCareBeds =
 
         normalizeHistoricalValue(
 
-            assessment.expectedArrivals
+            assessment.staffedAcuteCareBeds
 
         );
 
 
-    const expectedDepartures =
+    const occupiedAcuteCareBeds =
 
         normalizeHistoricalValue(
 
-            assessment.expectedDepartures
+            assessment.occupiedAcuteCareBeds
 
         );
 
 
-    const netExpectedFlow = roundValue(
+    const currentAvailableBeds =
 
-        expectedArrivals
+        roundValue(
 
-        -
+            staffedAcuteCareBeds
 
-        expectedDepartures
+            -
 
-    );
-
-
-    const forecastScore =
-
-        calculateForecastScore(
-
-            netExpectedFlow
+            occupiedAcuteCareBeds
 
         );
 
 
-    const direction = getForecastDirection(
+    /*
+     * Historical four-hour flow.
+     */
 
-        netExpectedFlow
+    const expectedHospitalInflow =
 
-    );
+        normalizeHistoricalValue(
+
+            assessment.expectedHospitalInflow4h
+
+        );
+
+
+    const expectedInpatientDepartures =
+
+        normalizeHistoricalValue(
+
+            assessment.expectedInpatientDepartures4h
+
+        );
+
+
+    const historicalNetFlow =
+
+        roundValue(
+
+            expectedHospitalInflow
+
+            -
+
+            expectedInpatientDepartures
+
+        );
+
+
+    /*
+     * Current known hospital inflow.
+     */
+
+    const currentKnownHospitalInflow =
+
+        roundValue(
+
+            normalizeHistoricalValue(
+
+                assessment.currentEDAdmissions
+
+            )
+
+            +
+
+            normalizeHistoricalValue(
+
+                assessment.currentDirectAdmissions
+
+            )
+
+            +
+
+            normalizeHistoricalValue(
+
+                assessment.currentSurgicalAdmissions
+
+            )
+
+        );
+
+
+    /*
+     * Compare current known inflow with historical
+     * expected inflow.
+     */
+
+    const inflowVariance =
+
+        roundValue(
+
+            currentKnownHospitalInflow
+
+            -
+
+            expectedHospitalInflow
+
+        );
+
+
+    /*
+     * Never assume future inflow will be lower than
+     * the historical expectation solely because fewer
+     * admissions are currently known.
+     *
+     * If current known inflow exceeds the historical
+     * four-hour expectation, use the known value.
+     *
+     * Otherwise retain the historical expectation.
+     */
+
+    const projectedHospitalInflow =
+
+        roundValue(
+
+            Math.max(
+
+                currentKnownHospitalInflow,
+
+                expectedHospitalInflow
+
+            )
+
+        );
+
+
+    /*
+     * Four-hour acute-care bed projection.
+     *
+     * Negative values are intentionally preserved.
+     */
+
+    const projectedAvailableBeds =
+
+        roundValue(
+
+            currentAvailableBeds
+
+            +
+
+            expectedInpatientDepartures
+
+            -
+
+            projectedHospitalInflow
+
+        );
+
+
+    const direction =
+
+        getForecastDirection(
+
+            currentAvailableBeds,
+
+            projectedAvailableBeds
+
+        );
 
 
     return {
 
-        netExpectedFlow,
+        currentAvailableBeds,
 
-        forecastScore,
+        expectedHospitalInflow,
+
+        expectedInpatientDepartures,
+
+        historicalNetFlow,
+
+        currentKnownHospitalInflow,
+
+        inflowVariance,
+
+        projectedHospitalInflow,
+
+        projectedAvailableBeds,
 
         direction,
 
         description:
             createForecastDescription(
 
-                expectedArrivals,
+                currentAvailableBeds,
 
-                expectedDepartures,
+                expectedHospitalInflow,
 
-                netExpectedFlow,
+                expectedInpatientDepartures,
+
+                currentKnownHospitalInflow,
+
+                projectedHospitalInflow,
+
+                projectedAvailableBeds,
 
                 direction
 
@@ -151,83 +409,63 @@ export function calculateForecast(
 
 
 /**
- * Convert positive expected net flow to a
- * 0–100 forecast score.
- *
- * Zero or negative net flow contributes no
- * forecast-strain score.
- */
-function calculateForecastScore(
-
-    netExpectedFlow:number
-
-):number {
-
-    if(
-
-        !Number.isFinite(
-
-            netExpectedFlow
-
-        )
-
-        ||
-
-        netExpectedFlow <= 0
-
-    ){
-
-        return 0;
-
-    }
-
-
-    return roundScore(
-
-        clampScore(
-
-            netExpectedFlow
-
-            /
-
-            NET_FLOW_AT_MAXIMUM_SCORE
-
-            *
-
-            100
-
-        )
-
-    );
-
-}
-
-
-/**
- * Determine expected operational direction.
+ * Determine the overall four-hour capacity direction.
  */
 function getForecastDirection(
 
-    netExpectedFlow:number
+    currentAvailableBeds:number,
+
+    projectedAvailableBeds:number
 
 ):
 
-    | "Increasing"
+    | "Improving"
 
     | "Stable"
 
-    | "Improving" {
+    | "Tightening"
 
-    if(netExpectedFlow > 0){
+    | "Deficit" {
 
-        return "Increasing";
+    /*
+     * A negative projected bed count means projected
+     * demand exceeds staffed acute-care capacity.
+     */
+
+    if(projectedAvailableBeds < 0){
+
+        return "Deficit";
 
     }
 
 
-    if(netExpectedFlow < 0){
+    const change =
+
+        projectedAvailableBeds
+
+        -
+
+        currentAvailableBeds;
+
+
+    /*
+     * A meaningful increase in available beds.
+     */
+
+    if(change >= 2){
 
         return "Improving";
+
+    }
+
+
+    /*
+     * A meaningful decrease in available beds.
+     */
+
+    if(change <= -2){
+
+        return "Tightening";
 
     }
 
@@ -238,47 +476,121 @@ function getForecastDirection(
 
 
 /**
- * Create a readable explanation.
+ * Create a human-readable four-hour forecast.
  */
 function createForecastDescription(
 
-    expectedArrivals:number,
+    currentAvailableBeds:number,
 
-    expectedDepartures:number,
+    expectedHospitalInflow:number,
 
-    netExpectedFlow:number,
+    expectedInpatientDepartures:number,
+
+    currentKnownHospitalInflow:number,
+
+    projectedHospitalInflow:number,
+
+    projectedAvailableBeds:number,
 
     direction:
 
-        | "Increasing"
+        | "Improving"
 
         | "Stable"
 
-        | "Improving"
+        | "Tightening"
+
+        | "Deficit"
 
 ):string {
 
-    if(direction === "Increasing"){
+    if(direction === "Deficit"){
 
-        return `Expected arrivals (${formatValue(expectedArrivals)}) exceed expected departures (${formatValue(expectedDepartures)}) by ${formatValue(netExpectedFlow)} patients during the current hourly period.`;
+        return [
+
+            `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
+
+            `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
+
+            `Current known hospital inflow is ${formatValue(currentKnownHospitalInflow)} patients.`,
+
+            `The forecast therefore uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
+
+            `Projected acute-care availability is ${formatValue(projectedAvailableBeds)} beds, representing a projected capacity deficit of ${formatValue(Math.abs(projectedAvailableBeds))} beds.`
+
+        ].join(
+
+            " "
+
+        );
+
+    }
+
+
+    if(direction === "Tightening"){
+
+        return [
+
+            `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
+
+            `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
+
+            `The forecast uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
+
+            `Acute-care availability is expected to decrease to ${formatValue(projectedAvailableBeds)} beds during the next four hours.`
+
+        ].join(
+
+            " "
+
+        );
 
     }
 
 
     if(direction === "Improving"){
 
-        return `Expected departures (${formatValue(expectedDepartures)}) exceed expected arrivals (${formatValue(expectedArrivals)}) by ${formatValue(Math.abs(netExpectedFlow))} patients during the current hourly period.`;
+        return [
+
+            `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
+
+            `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
+
+            `The forecast uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
+
+            `Acute-care availability is expected to improve to ${formatValue(projectedAvailableBeds)} beds during the next four hours.`
+
+        ].join(
+
+            " "
+
+        );
 
     }
 
 
-    return `Expected arrivals and departures are balanced at ${formatValue(expectedArrivals)} patients during the current hourly period.`;
+    return [
+
+        `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
+
+        `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
+
+        `The forecast uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
+
+        `Acute-care availability is expected to remain relatively stable at approximately ${formatValue(projectedAvailableBeds)} beds during the next four hours.`
+
+    ].join(
+
+        " "
+
+    );
 
 }
 
 
 /**
- * Normalize a historical expectation.
+ * Normalize a nonnegative operational or
+ * historical value.
  *
  * Historical values may contain decimals.
  */
@@ -313,58 +625,7 @@ function normalizeHistoricalValue(
 
 
 /**
- * Keep a score between 0 and 100.
- */
-function clampScore(
-
-    value:number
-
-):number {
-
-    if(!Number.isFinite(value)){
-
-        return 0;
-
-    }
-
-
-    return Math.min(
-
-        100,
-
-        Math.max(
-
-            0,
-
-            value
-
-        )
-
-    );
-
-}
-
-
-/**
- * Round a score to one decimal place.
- */
-function roundScore(
-
-    value:number
-
-):number {
-
-    return Math.round(
-
-        value * 10
-
-    ) / 10;
-
-}
-
-
-/**
- * Round a flow value to two decimal places.
+ * Round operational values to two decimal places.
  */
 function roundValue(
 
@@ -382,7 +643,7 @@ function roundValue(
 
 
 /**
- * Format a historical value for text.
+ * Format a value for human-readable text.
  */
 function formatValue(
 

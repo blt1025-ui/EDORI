@@ -2,7 +2,7 @@
  * OperationalForecast
  *
  * Produces a transparent, directional 2-hour and
- * 4-hour ED operational outlook.
+ * 4-hour Hospital Readiness operational outlook.
  *
  * This is a scenario estimate rather than a
  * clinically validated predictive model.
@@ -10,12 +10,12 @@
  * Inputs:
  *
  * - Current ED volume
- * - Expected arrivals
- * - Expected departures
+ * - Expected four-hour hospital inflow
+ * - Expected four-hour inpatient departures
  * - Current boarding burden
- * - Recent EDORI score movement
+ * - Recent Hospital Readiness score movement
  *
- * This component does not modify EDORI results,
+ * This component does not modify Hospital Readiness results,
  * application state, or snapshot history.
  */
 
@@ -280,13 +280,39 @@ function updateOperationalForecast():void {
         const snapshots = getSnapshots();
 
 
+        /*
+         * Version 2 Hospital Readiness:
+         *
+         * Historical flow is stored as a rolling
+         * four-hour hospital forecast rather than
+         * hourly ED arrivals/departures.
+         *
+         * Convert the four-hour hospital net flow
+         * to an hourly rate so the existing 2-hour
+         * and 4-hour scenario horizons remain
+         * internally consistent.
+         */
         const expectedNetFlow =
 
-            assessment.expectedArrivals
+            (
 
-            -
+                assessment.expectedHospitalInflow4h
 
-            assessment.expectedDepartures;
+                -
+
+                assessment.expectedInpatientDepartures4h
+
+            )
+
+            /
+
+            Math.max(
+
+                1,
+
+                assessment.forecastHours
+
+            );
 
 
         const recentHourlyScoreChange =
@@ -306,7 +332,7 @@ function updateOperationalForecast():void {
 
                 assessment.boardedPatients,
 
-                assessment.expectedBoarders
+                assessment.expectedEDBoarders
 
             );
 
@@ -696,7 +722,7 @@ function calculateBoardingPressure(
 
 
 /**
- * Estimate recent hourly EDORI movement.
+ * Estimate recent hourly Hospital Readiness movement.
  *
  * This uses up to the two most recent valid saved
  * assessments. When assessment timestamps are too
@@ -949,7 +975,7 @@ function createForecastMarkup(
             <div>
 
                 <span>
-                    Current EDORI
+                    Current Hospital Readiness
                 </span>
 
                 <strong>
@@ -979,7 +1005,7 @@ function createForecastMarkup(
             <div>
 
                 <span>
-                    Expected Net Flow
+                    Expected Net Hospital Flow
                 </span>
 
                 <strong class="${createSignedValueClass(
@@ -1040,13 +1066,13 @@ function createForecastMarkup(
 
                 ${createAssumptionCard(
 
-                    "Hourly Net Flow",
+                    "Hourly Net Hospital Flow",
 
                     formatSignedNumber(
                         options.expectedNetFlow
                     ),
 
-                    "Expected arrivals minus expected departures are applied for each forecast hour."
+                    "Expected four-hour hospital inflow minus expected inpatient departures is normalized to an hourly rate and applied across each scenario horizon."
 
                 )}
 
@@ -1170,7 +1196,7 @@ function createForecastCard(
             <div class="operational-forecast-score">
 
                 <span>
-                    Projected EDORI
+                    Projected Hospital Readiness
                 </span>
 
                 <strong>
@@ -1451,7 +1477,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to generate the 2-hour and 4-hour operational outlook.
+                Calculate Hospital Readiness to generate the 2-hour and 4-hour operational outlook.
             </p>
 
         </div>

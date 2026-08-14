@@ -1,8 +1,10 @@
 /**
  * HistoricalExpectationsTemplate
  *
- * Development helper containing all
- * 168 weekday/hour combinations.
+ * Version 2.1 Hospital Readiness Model
+ *
+ * Development helper containing all 168
+ * weekday/hour combinations.
  *
  * All expectation values are placeholders.
  */
@@ -10,7 +12,6 @@
 import type {
 
     DayOfWeek,
-
     HistoricalExpectation
 
 }
@@ -21,17 +22,11 @@ from "../types/HistoricalExpectation";
 const DAYS:DayOfWeek[] = [
 
     "Sunday",
-
     "Monday",
-
     "Tuesday",
-
     "Wednesday",
-
     "Thursday",
-
     "Friday",
-
     "Saturday"
 
 ];
@@ -44,30 +39,41 @@ HistoricalExpectation[] = DAYS.flatMap(
     day => Array.from(
 
         {
-
             length:24
-
         },
 
         (
-
             _,
-
             hour
-
-        ) => ({
+        ):HistoricalExpectation => ({
 
             day,
 
             hour,
 
-            expectedVolume:0,
+            expectedEDVolume:
+                0,
 
-            expectedBoarders:0,
+            expectedEDBoarders:
+                0,
 
-            expectedArrivals:0,
+            expectedStaffedAcuteCareBeds:
+                1,
 
-            expectedDepartures:0
+            expectedOccupiedAcuteCareBeds:
+                0,
+
+            expectedEDAdmissions:
+                0,
+
+            expectedDirectAdmissions:
+                0,
+
+            expectedSurgicalAdmissions:
+                0,
+
+            expectedInpatientDepartures:
+                0
 
         })
 
