@@ -941,8 +941,6 @@ function createCurrentAssessmentRow(
         occupiedCriticalCareBeds:
             assessment.occupiedCriticalCareBeds,
 
-        currentEDAdmissions:
-            assessment.currentEDAdmissions,
 
         currentDirectAdmissions:
             assessment.currentDirectAdmissions,
@@ -995,8 +993,8 @@ function createCurrentAssessmentRow(
         edAcuityScore:
             result.edAcuityScore,
 
-        currentHospitalInflow:
-            result.currentHospitalInflow,
+       knownNonEDInflow:
+    result.currentHospitalInflow,
 
         expectedHospitalInflow:
             result.expectedHospitalInflow,
@@ -1114,17 +1112,14 @@ function createSnapshotCsvRow(
         occupiedCriticalCareBeds:
             snapshot.occupiedCriticalCareBeds,
 
-        currentEDAdmissions:
-            snapshot.currentEDAdmissions,
 
-        currentDirectAdmissions:
-            snapshot.currentDirectAdmissions,
+    
 
         currentSurgicalAdmissions:
             snapshot.currentSurgicalAdmissions,
 
-        currentHospitalInflow:
-            snapshot.currentHospitalInflow,
+        knownNonEDInflow:
+    snapshot.currentHospitalInflow,
 
         expectedEDVolume:
             snapshot.expectedEDVolume,
