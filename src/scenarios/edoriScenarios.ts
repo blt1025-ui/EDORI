@@ -11,6 +11,16 @@
  *
  * Expected ranges should be refined using local
  * operational experience and retrospective data.
+ *
+ * Version 2.1 calibration rule:
+ *
+ * currentEDAdmissions is retained only as a
+ * compatibility field and is always 0.
+ *
+ * Existing ED inpatient demand is represented by
+ * boardedPatients. expectedEDAdmissions4h represents
+ * NEW ED-origin admissions expected during the
+ * four-hour forecast horizon.
  */
 
 import type {
@@ -80,7 +90,7 @@ EdoriScenario[] = [
                 16,
 
             currentEDAdmissions:
-                4,
+                0,
 
             currentDirectAdmissions:
                 1,
@@ -129,15 +139,14 @@ EdoriScenario[] = [
         expectedScore:{
 
             minimum:
-                15,
+                0,
 
             maximum:
-                35
+                19
 
         },
-
         expectedOperationalState:
-            "Bravo",
+            "Alpha",
 
         rationale:
             "ED pressure is close to baseline, acute- and critical-care capacity remain available, and expected inpatient departures exceed expected four-hour inflow. The environment should not be classified as surge."
@@ -198,7 +207,7 @@ EdoriScenario[] = [
                 19,
 
             currentEDAdmissions:
-                12,
+                0,
 
             currentDirectAdmissions:
                 3,
@@ -247,13 +256,12 @@ EdoriScenario[] = [
         expectedScore:{
 
             minimum:
-                30,
+                20,
 
             maximum:
-                50
+                39
 
         },
-
         expectedOperationalState:
             "Bravo",
 
@@ -316,7 +324,7 @@ EdoriScenario[] = [
                 21,
 
             currentEDAdmissions:
-                18,
+                0,
 
             currentDirectAdmissions:
                 4,
@@ -434,7 +442,7 @@ EdoriScenario[] = [
                 23,
 
             currentEDAdmissions:
-                24,
+                0,
 
             currentDirectAdmissions:
                 5,
@@ -483,15 +491,14 @@ EdoriScenario[] = [
         expectedScore:{
 
             minimum:
-                70,
+                80,
 
             maximum:
-                90
+                100
 
         },
-
         expectedOperationalState:
-            "Delta",
+            "Echo",
 
         rationale:
             "ED pressure, excess boarding, acute-care occupancy, critical-care occupancy, and projected hospital flow are all severely strained. A high-level surge classification is expected."
@@ -552,7 +559,7 @@ EdoriScenario[] = [
                 24,
 
             currentEDAdmissions:
-                30,
+                0,
 
             currentDirectAdmissions:
                 6,
@@ -670,7 +677,7 @@ EdoriScenario[] = [
                 18,
 
             currentEDAdmissions:
-                10,
+                0,
 
             currentDirectAdmissions:
                 3,
@@ -719,10 +726,10 @@ EdoriScenario[] = [
         expectedScore:{
 
             minimum:
-                30,
+                15,
 
             maximum:
-                55
+                30
 
         },
 
@@ -785,7 +792,7 @@ EdoriScenario[] = [
                 23,
 
             currentEDAdmissions:
-                10,
+                0,
 
             currentDirectAdmissions:
                 3,
@@ -834,12 +841,15 @@ EdoriScenario[] = [
         expectedScore:{
 
             minimum:
-                25,
+                60,
 
             maximum:
-                50
+                79
 
         },
+        expectedOperationalState:
+            "Delta",
+
 
         rationale:
             "High hospital occupancy should increase operational concern, but it should not by itself create a severe Hospital Readiness score when current ED conditions and hospital flow remain close to baseline."
@@ -900,7 +910,7 @@ EdoriScenario[] = [
                 20,
 
             currentEDAdmissions:
-                15,
+                0,
 
             currentDirectAdmissions:
                 3,
@@ -958,6 +968,836 @@ EdoriScenario[] = [
 
         rationale:
             "Historical normalization should prevent a predictable high-volume period from automatically appearing critical, while hospital capacity, acuity, and projected flow still contribute operational pressure."
+
+    },
+    /*
+     * Scenario 9
+     *
+     * Targeted calibration: isolated acute-care exhaustion.
+     */
+
+    {
+
+        id:
+            "acute-capacity-max",
+
+        name:
+            "Acute-Care Capacity at 100%",
+
+        description:
+            "Acute-care staffed capacity is completely occupied while ED conditions, critical-care occupancy, known non-ED inflow, and projected capacity remain near their comparison baselines.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T12:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                12,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                50,
+
+            boardedPatients:
+                0,
+
+            esi1:
+                0,
+
+            esi2:
+                0,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                273,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                12,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                2,
+
+            currentSurgicalAdmissions:
+                2,
+
+            expectedEDVolume:
+                50,
+
+            expectedEDBoarders:
+                0,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                273,
+
+            expectedAvailableAcuteCareBeds:
+                0,
+
+            historicalProjectedBedDemand4h:
+                8,
+
+            historicalProjectedBedBalance4h:
+                4,
+
+            expectedEDAdmissions4h:
+                4,
+
+            expectedDirectAdmissions4h:
+                2,
+
+            expectedSurgicalAdmissions4h:
+                2,
+
+            expectedHospitalInflow4h:
+                8,
+
+            expectedInpatientDepartures4h:
+                12
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                20,
+
+            maximum:
+                40
+
+        },
+
+        expectedOperationalState:
+            "Bravo",
+
+        rationale:
+            "One completely exhausted major domain should materially raise the HRI even when unrelated domains are stable. The severe-domain adjustment should prevent 100% acute-care occupancy from being diluted to an Alpha score."
+
+    },
+
+    /*
+     * Scenario 10
+     *
+     * Targeted calibration: isolated critical-care exhaustion.
+     */
+
+    {
+
+        id:
+            "critical-capacity-max",
+
+        name:
+            "Critical-Care Capacity at 100%",
+
+        description:
+            "Critical-care staffed capacity is completely occupied while acute-care capacity, ED conditions, inflow, and projected acute-care capacity remain otherwise stable.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T13:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                13,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                50,
+
+            boardedPatients:
+                0,
+
+            esi1:
+                0,
+
+            esi2:
+                0,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                205,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                24,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                1,
+
+            currentSurgicalAdmissions:
+                1,
+
+            expectedEDVolume:
+                50,
+
+            expectedEDBoarders:
+                0,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                205,
+
+            expectedAvailableAcuteCareBeds:
+                68,
+
+            historicalProjectedBedDemand4h:
+                6,
+
+            historicalProjectedBedBalance4h:
+                70,
+
+            expectedEDAdmissions4h:
+                4,
+
+            expectedDirectAdmissions4h:
+                1,
+
+            expectedSurgicalAdmissions4h:
+                1,
+
+            expectedHospitalInflow4h:
+                6,
+
+            expectedInpatientDepartures4h:
+                8
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                20,
+
+            maximum:
+                40
+
+        },
+
+        expectedOperationalState:
+            "Bravo",
+
+        rationale:
+            "Complete critical-care occupancy should be clearly visible in the HRI even when the rest of the hospital is stable, but one isolated domain should not automatically force the highest operational state."
+
+    },
+
+    /*
+     * Scenario 11
+     *
+     * Targeted calibration: maximum ED operational pressure.
+     */
+
+    {
+
+        id:
+            "ed-pressure-max",
+
+        name:
+            "Maximum ED Operational Pressure",
+
+        description:
+            "ED volume is 50% above baseline, boarding is extreme, and ESI 1 plus ESI 2 patients represent at least 30% of the ED census.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T14:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                14,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                90,
+
+            boardedPatients:
+                60,
+
+            esi1:
+                5,
+
+            esi2:
+                22,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                210,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                12,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                2,
+
+            currentSurgicalAdmissions:
+                2,
+
+            expectedEDVolume:
+                60,
+
+            expectedEDBoarders:
+                30,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                210,
+
+            expectedAvailableAcuteCareBeds:
+                63,
+
+            historicalProjectedBedDemand4h:
+                70,
+
+            historicalProjectedBedBalance4h:
+                3,
+
+            expectedEDAdmissions4h:
+                6,
+
+            expectedDirectAdmissions4h:
+                2,
+
+            expectedSurgicalAdmissions4h:
+                2,
+
+            expectedHospitalInflow4h:
+                10,
+
+            expectedInpatientDepartures4h:
+                10
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                40,
+
+            maximum:
+                65
+
+        },
+
+        expectedOperationalState:
+            "Charlie",
+
+        rationale:
+            "A maximum ED domain should move the overall HRI well beyond routine operations. Current boarders also remain part of projected bed demand, so this scenario intentionally captures that real interaction."
+
+    },
+
+    /*
+     * Scenario 12
+     *
+     * Targeted calibration: maximum known non-ED inflow.
+     */
+
+    {
+
+        id:
+            "inflow-max",
+
+        name:
+            "Maximum Known Non-ED Inflow",
+
+        description:
+            "Known direct and surgical/procedural admissions exceed their historical four-hour expectation by eight patients, producing maximum inflow pressure and a downstream projected-capacity effect.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T15:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                15,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                50,
+
+            boardedPatients:
+                0,
+
+            esi1:
+                0,
+
+            esi2:
+                0,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                205,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                12,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                6,
+
+            currentSurgicalAdmissions:
+                6,
+
+            expectedEDVolume:
+                50,
+
+            expectedEDBoarders:
+                0,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                205,
+
+            expectedAvailableAcuteCareBeds:
+                68,
+
+            historicalProjectedBedDemand4h:
+                8,
+
+            historicalProjectedBedBalance4h:
+                68,
+
+            expectedEDAdmissions4h:
+                4,
+
+            expectedDirectAdmissions4h:
+                2,
+
+            expectedSurgicalAdmissions4h:
+                2,
+
+            expectedHospitalInflow4h:
+                8,
+
+            expectedInpatientDepartures4h:
+                8
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                20,
+
+            maximum:
+                55
+
+        },
+
+        rationale:
+            "Maximum inflow pressure should not be evaluated independently from its downstream bed-demand effect. This scenario preserves that causal relationship."
+
+    },
+
+    /*
+     * Scenario 13
+     *
+     * Targeted calibration: projected capacity 30 beds worse than historical normal.
+     */
+
+    {
+
+        id:
+            "projected-capacity-max",
+
+        name:
+            "Projected Capacity 30 Beds Worse Than Historical",
+
+        description:
+            "Current and projected bed demand produce a four-hour acute-care bed balance approximately 30 beds worse than the historical projected balance for the same period.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T16:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                16,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                60,
+
+            boardedPatients:
+                30,
+
+            esi1:
+                1,
+
+            esi2:
+                7,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                240,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                16,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                2,
+
+            currentSurgicalAdmissions:
+                2,
+
+            expectedEDVolume:
+                60,
+
+            expectedEDBoarders:
+                30,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                210,
+
+            expectedAvailableAcuteCareBeds:
+                63,
+
+            historicalProjectedBedDemand4h:
+                40,
+
+            historicalProjectedBedBalance4h:
+                33,
+
+            expectedEDAdmissions4h:
+                6,
+
+            expectedDirectAdmissions4h:
+                2,
+
+            expectedSurgicalAdmissions4h:
+                2,
+
+            expectedHospitalInflow4h:
+                10,
+
+            expectedInpatientDepartures4h:
+                10
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                25,
+
+            maximum:
+                60
+
+        },
+
+        rationale:
+            "Projected capacity should reach maximum pressure when today's four-hour bed balance is about 30 beds worse than the historical projection."
+
+    },
+
+    /*
+     * Scenario 14
+     *
+     * Targeted calibration: two major domains at maximum.
+     */
+
+    {
+
+        id:
+            "two-domains-max",
+
+        name:
+            "Acute and Critical Capacity Both at 100%",
+
+        description:
+            "Both acute-care and critical-care staffed capacity are completely occupied while ED conditions and known inflow remain close to their comparison baselines.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T17:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                17,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                55,
+
+            boardedPatients:
+                20,
+
+            esi1:
+                1,
+
+            esi2:
+                5,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                273,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                24,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                2,
+
+            currentSurgicalAdmissions:
+                2,
+
+            expectedEDVolume:
+                55,
+
+            expectedEDBoarders:
+                20,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                273,
+
+            expectedAvailableAcuteCareBeds:
+                0,
+
+            historicalProjectedBedDemand4h:
+                30,
+
+            historicalProjectedBedBalance4h:
+                -20,
+
+            expectedEDAdmissions4h:
+                6,
+
+            expectedDirectAdmissions4h:
+                2,
+
+            expectedSurgicalAdmissions4h:
+                2,
+
+            expectedHospitalInflow4h:
+                10,
+
+            expectedInpatientDepartures4h:
+                10
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                45,
+
+            maximum:
+                70
+
+        },
+
+        rationale:
+            "Two exhausted major capacity domains should receive both individual severe-domain adjustments and the additional multi-domain adjustment. This tests whether extreme capacity constraints are averaged down too aggressively."
+
+    },
+
+    /*
+     * Scenario 15
+     *
+     * Targeted calibration: three major domains at maximum.
+     */
+
+    {
+
+        id:
+            "three-domains-max",
+
+        name:
+            "Three Major Domains at Maximum",
+
+        description:
+            "ED operational pressure, acute-care capacity, and critical-care capacity are simultaneously at or near maximum, providing a direct test of the three-domain severe adjustment.",
+
+        assessment:{
+
+            assessmentTime:
+                "2026-08-10T18:00:00.000Z",
+
+            day:
+                "Monday",
+
+            hour:
+                18,
+
+            forecastHours:
+                4,
+
+            totalEDVolume:
+                90,
+
+            boardedPatients:
+                60,
+
+            esi1:
+                5,
+
+            esi2:
+                22,
+
+            staffedAcuteCareBeds:
+                273,
+
+            occupiedAcuteCareBeds:
+                273,
+
+            staffedCriticalCareBeds:
+                24,
+
+            occupiedCriticalCareBeds:
+                24,
+
+            currentEDAdmissions:
+                0,
+
+            currentDirectAdmissions:
+                2,
+
+            currentSurgicalAdmissions:
+                2,
+
+            expectedEDVolume:
+                60,
+
+            expectedEDBoarders:
+                30,
+
+            expectedStaffedAcuteCareBeds:
+                273,
+
+            expectedOccupiedAcuteCareBeds:
+                273,
+
+            expectedAvailableAcuteCareBeds:
+                0,
+
+            historicalProjectedBedDemand4h:
+                70,
+
+            historicalProjectedBedBalance4h:
+                -60,
+
+            expectedEDAdmissions4h:
+                6,
+
+            expectedDirectAdmissions4h:
+                2,
+
+            expectedSurgicalAdmissions4h:
+                2,
+
+            expectedHospitalInflow4h:
+                10,
+
+            expectedInpatientDepartures4h:
+                10
+
+        },
+
+        expectedScore:{
+
+            minimum:
+                81,
+
+            maximum:
+                100
+
+        },
+
+        expectedOperationalState:
+            "Echo",
+
+        rationale:
+            "Three simultaneously extreme major domains should produce the highest readiness range after individual and multi-domain severe adjustments are applied."
 
     }
 

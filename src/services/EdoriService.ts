@@ -89,16 +89,6 @@ const ED_VOLUME_EXCESS_AT_MAXIMUM_SCORE =
 
 
 /**
- * Current ED boarding reaching 50% above its
- * historical expectation produces maximum
- * boarding pressure.
- */
-const ED_BOARDING_EXCESS_AT_MAXIMUM_SCORE =
-
-    0.50;
-
-
-/**
  * ESI 1 + ESI 2 patients representing 30% of
  * the current ED population produces maximum
  * acuity pressure.
@@ -164,13 +154,11 @@ export function calculateEdori(
 
     const edBoardingScore =
 
-        calculateRelativeExcessScore(
+        calculateEDBoardingScore(
 
             assessment.boardedPatients,
 
-            assessment.expectedEDBoarders,
-
-            ED_BOARDING_EXCESS_AT_MAXIMUM_SCORE
+            assessment.expectedEDBoarders
 
         );
 
@@ -547,70 +535,73 @@ export function calculateEdori(
 
 
     /*
-     * Overall Hospital Readiness Index.
+     * =================================================
+     * Base Hospital Readiness Index
+     * =================================================
      */
+
+    const baseScore =
+
+        roundScore(
+
+            (edPressureScore * WEIGHTS.edPressure)
+
+            +
+
+            (acuteCapacityScore * WEIGHTS.acuteCapacity)
+
+            +
+
+            (criticalCapacityScore * WEIGHTS.criticalCapacity)
+
+            +
+
+            (inflowScore * WEIGHTS.inflow)
+
+            +
+
+            (projectedCapacityScore * WEIGHTS.projectedCapacity)
+
+        );
+
+
+    /*
+     * Extreme domain values must not be completely
+     * diluted by normal values in unrelated domains.
+     *
+     * This changes the numeric HRI only. Operational
+     * state selection remains entirely score-driven.
+     */
+    const severityAdjustment =
+
+        calculateSevereDomainAdjustment(
+
+            [
+
+                edPressureScore,
+
+                acuteCapacityScore,
+
+                criticalCapacityScore,
+
+                inflowScore,
+
+                projectedCapacityScore
+
+            ]
+
+        );
+
 
     const score =
 
         roundScore(
 
-            (
-
-                edPressureScore
-
-                *
-
-                WEIGHTS.edPressure
-
-            )
+            baseScore
 
             +
 
-            (
-
-                acuteCapacityScore
-
-                *
-
-                WEIGHTS.acuteCapacity
-
-            )
-
-            +
-
-            (
-
-                criticalCapacityScore
-
-                *
-
-                WEIGHTS.criticalCapacity
-
-            )
-
-            +
-
-            (
-
-                inflowScore
-
-                *
-
-                WEIGHTS.inflow
-
-            )
-
-            +
-
-            (
-
-                projectedCapacityScore
-
-                *
-
-                WEIGHTS.projectedCapacity
-
-            )
+            severityAdjustment
 
         );
 
@@ -665,7 +656,7 @@ export function calculateEdori(
         );
 
 
-        return {
+    return {
 
         score,
 
@@ -673,13 +664,6 @@ export function calculateEdori(
             operationalState.title,
 
         operationalState,
-
-
-        /*
-         * =================================================
-         * Hospital Readiness domain scores
-         * =================================================
-         */
 
         edPressureScore,
 
@@ -691,25 +675,11 @@ export function calculateEdori(
 
         projectedCapacityScore,
 
-
-        /*
-         * =================================================
-         * ED Operational Pressure subdomains
-         * =================================================
-         */
-
         edVolumeScore,
 
         edBoardingScore,
 
         edAcuityScore,
-
-
-        /*
-         * =================================================
-         * Version 2.1 hospital-flow detail
-         * =================================================
-         */
 
         knownNonEDInflow,
 
@@ -735,29 +705,12 @@ export function calculateEdori(
 
         projectedCapacityVariance,
 
-
-        /*
-         * =================================================
-         * Temporary compatibility aliases
-         * =================================================
-         *
-         * These allow existing dashboard/report
-         * components to continue compiling while they
-         * are migrated to the Version 2.1 terminology.
-         */
-
+        /* Temporary compatibility aliases. */
         currentHospitalInflow,
 
         expectedHospitalInflow,
 
         projectedHospitalInflow,
-
-
-        /*
-         * =================================================
-         * Operational interpretation
-         * =================================================
-         */
 
         drivers,
 
@@ -766,7 +719,7 @@ export function calculateEdori(
 
                 operationalState.recommendation,
 
-                               acuteOccupancy,
+                acuteOccupancy,
 
                 criticalOccupancy,
 
@@ -775,7 +728,6 @@ export function calculateEdori(
                 edPressureScore
 
             ),
-
 
         timestamp:
             new Date(
@@ -890,6 +842,164 @@ function calculateRelativeExcessScore(
 
 
 /**
+ * Calculate Emergency Department boarding pressure.
+ *
+ * Boarding is scored using a hybrid model so that
+ * chronically high boarding is not normalized to zero.
+ *
+ * The score combines:
+ *
+ * 1. Absolute boarding burden.
+ * 2. Additional pressure when boarding is worse than
+ *    the historical weekday/hour expectation.
+ *
+ * Absolute burden anchors:
+ *
+ * 0 boarders   ->   0
+ * 10 boarders  ->  10
+ * 20 boarders  ->  25
+ * 30 boarders  ->  40
+ * 40 boarders  ->  60
+ * 50 boarders  ->  80
+ * 60+ boarders -> 100
+ *
+ * Historical-deviation modifier:
+ *
+ * At/below expected -> +0
+ * 10% above         -> +5
+ * 20% above         -> +10
+ * 30% above         -> +15
+ * 40% above         -> +20
+ * 50%+ above        -> +25
+ */
+function calculateEDBoardingScore(
+
+    currentBoarders:number,
+
+    expectedBoarders:number
+
+):number {
+
+    const safeCurrentBoarders =
+
+        normalizeNonNegative(
+
+            currentBoarders
+
+        );
+
+
+    const safeExpectedBoarders =
+
+        normalizeNonNegative(
+
+            expectedBoarders
+
+        );
+
+
+    const absoluteBoardingScore =
+
+        interpolatePressureCurve(
+
+            safeCurrentBoarders,
+
+            [
+
+                { x:0, y:0 },
+
+                { x:10, y:10 },
+
+                { x:20, y:25 },
+
+                { x:30, y:40 },
+
+                { x:40, y:60 },
+
+                { x:50, y:80 },
+
+                { x:60, y:100 }
+
+            ]
+
+        );
+
+
+    let historicalDeviationModifier = 0;
+
+
+    if(
+
+        safeExpectedBoarders > 0
+
+        &&
+
+        safeCurrentBoarders > safeExpectedBoarders
+
+    ){
+
+        const relativeExcess =
+
+            (
+
+                safeCurrentBoarders
+
+                -
+
+                safeExpectedBoarders
+
+            )
+
+            /
+
+            safeExpectedBoarders;
+
+
+        historicalDeviationModifier =
+
+            interpolatePressureCurve(
+
+                relativeExcess,
+
+                [
+
+                    { x:0, y:0 },
+
+                    { x:0.10, y:5 },
+
+                    { x:0.20, y:10 },
+
+                    { x:0.30, y:15 },
+
+                    { x:0.40, y:20 },
+
+                    { x:0.50, y:25 }
+
+                ]
+
+            );
+
+    }
+
+
+    return roundScore(
+
+        clampScore(
+
+            absoluteBoardingScore
+
+            +
+
+            historicalDeviationModifier
+
+        )
+
+    );
+
+}
+
+
+/**
  * Calculate ED high-acuity pressure.
  *
  * Only ESI 1 and ESI 2 are entered.
@@ -983,17 +1093,20 @@ function calculateEDAcuityScore(
 
 
 /**
- * Convert acute-care occupancy into pressure.
+ * Convert acute-care occupancy into operational
+ * pressure.
  *
- * The curve intentionally accelerates as the
- * hospital approaches staffed capacity.
+ * Acute-care capacity is an absolute constraint.
+ * Historical occupancy never reduces this score.
  *
- * <= 80% occupancy -> 0
- * 90% occupancy    -> 35
- * 95% occupancy    -> 65
- * 100% occupancy   -> 100
- *
- * Values between anchors are linearly interpolated.
+ * <= 80% ->   0
+ * 85%    ->  10
+ * 90%    ->  25
+ * 95%    ->  50
+ * 97%    ->  65
+ * 98%    ->  75
+ * 99%    ->  88
+ * 100%   -> 100
  */
 function calculateAcuteCapacityScore(
 
@@ -1007,37 +1120,21 @@ function calculateAcuteCapacityScore(
 
         [
 
-            {
+            { x:0.80, y:0 },
 
-                x:0.80,
+            { x:0.85, y:10 },
 
-                y:0
+            { x:0.90, y:25 },
 
-            },
+            { x:0.95, y:50 },
 
-            {
+            { x:0.97, y:65 },
 
-                x:0.90,
+            { x:0.98, y:75 },
 
-                y:35
+            { x:0.99, y:88 },
 
-            },
-
-            {
-
-                x:0.95,
-
-                y:65
-
-            },
-
-            {
-
-                x:1.00,
-
-                y:100
-
-            }
+            { x:1.00, y:100 }
 
         ]
 
@@ -1260,6 +1357,97 @@ function calculateProjectedCapacityScore(
 
 /*
  * =====================================================
+ * Severe-domain adjustment
+ * =====================================================
+ */
+
+/**
+ * Add a controlled numerical adjustment when one or
+ * more major Hospital Readiness domains become severe.
+ *
+ * A domain is considered severe at a score of 80 or
+ * greater.
+ *
+ * Adjustment:
+ *
+ * 0 severe domains  -> +0
+ * 1 severe domain   -> +5
+ * 2 severe domains  -> +10
+ * 3+ severe domains -> +15
+ *
+ * This adjustment is intentionally non-cumulative.
+ * It prevents multiple extreme domains from being
+ * excessively diluted by lower scores elsewhere while
+ * avoiding very large additive bonuses.
+ *
+ * The operational state is still selected solely from
+ * the final numerical Hospital Readiness score.
+ */
+function calculateSevereDomainAdjustment(
+
+    domainScores:number[]
+
+):number {
+
+    const severeDomainCount =
+
+        domainScores
+
+            .map(
+
+                domainScore =>
+
+                    clampScore(
+
+                        Number.isFinite(domainScore)
+
+                            ? domainScore
+
+                            : 0
+
+                    )
+
+            )
+
+            .filter(
+
+                domainScore =>
+
+                    domainScore >= 80
+
+            )
+
+            .length;
+
+
+    if(severeDomainCount >= 3){
+
+        return 15;
+
+    }
+
+
+    if(severeDomainCount === 2){
+
+        return 10;
+
+    }
+
+
+    if(severeDomainCount === 1){
+
+        return 5;
+
+    }
+
+
+    return 0;
+
+}
+
+
+/*
+ * =====================================================
  * Driver generation
  * =====================================================
  */
@@ -1344,7 +1532,7 @@ function buildDrivers(
                 "ED Boarding",
 
             description:
-                "The current ED boarding population is above the historical expectation for this period.",
+                "The current ED boarding population creates substantial operational burden and/or exceeds the historical expectation for this period.",
 
             severity:
                 domains.edBoardingScore,
@@ -1516,7 +1704,7 @@ function buildRecommendations(
 
     stateRecommendation:string,
 
-      acuteOccupancy:number,
+    acuteOccupancy:number,
 
     criticalOccupancy:number,
 
@@ -1750,9 +1938,6 @@ function interpolatePressureCurve(
     );
 
 }
-
-
-
 
 
 /**

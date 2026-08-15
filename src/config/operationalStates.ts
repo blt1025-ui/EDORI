@@ -57,7 +57,7 @@ OperationalStateRange[] = [
             0,
 
         maximum:
-            20,
+            19,
 
         title:
             "Alpha",
@@ -80,10 +80,10 @@ OperationalStateRange[] = [
     {
 
         minimum:
-            21,
+            20,
 
         maximum:
-            40,
+            39,
 
         title:
             "Bravo",
@@ -106,10 +106,10 @@ OperationalStateRange[] = [
     {
 
         minimum:
-            41,
+            40,
 
         maximum:
-            60,
+            59,
 
         title:
             "Charlie",
@@ -132,10 +132,10 @@ OperationalStateRange[] = [
     {
 
         minimum:
-            61,
+            60,
 
         maximum:
-            80,
+            79,
 
         title:
             "Delta",
@@ -158,7 +158,7 @@ OperationalStateRange[] = [
     {
 
         minimum:
-            81,
+            80,
 
         maximum:
             100,

@@ -1,7 +1,7 @@
 /**
  * Hospital Readiness scoring-domain weights.
  *
- * Version 2
+ * Version 2.1 calibration
  *
  * Overall Hospital Readiness:
  *
@@ -33,22 +33,26 @@ export const WEIGHTS = {
 
 
 /**
- * ED Operational Pressure is itself composed of:
+ * ED Operational Pressure is composed of:
  *
- * 30% ED census pressure
- * 50% ED boarding pressure
- * 20% high-acuity pressure
+ * 25% ED census pressure
+ * 45% ED boarding pressure
+ * 30% high-acuity pressure
+ *
+ * Boarding remains the largest ED component while
+ * acuity receives greater influence than in the
+ * earlier 30 / 50 / 20 calibration.
  */
 export const ED_PRESSURE_WEIGHTS = {
 
     volume:
-        0.30,
+        0.25,
 
     boarding:
-        0.50,
+        0.45,
 
     acuity:
-        0.20
+        0.30
 
 } as const;
 

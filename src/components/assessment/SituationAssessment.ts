@@ -123,8 +123,6 @@ const CURRENT_VALUE_FIELDS:Array<
 
     "occupiedCriticalCareBeds",
 
-    "currentEDAdmissions",
-
     "currentDirectAdmissions",
 
     "currentSurgicalAdmissions"
@@ -157,8 +155,6 @@ const REQUIRED_ASSESSMENT_FIELD_IDS:string[] = [
     "staffedCriticalCareBeds",
 
     "occupiedCriticalCareBeds",
-
-    "currentEDAdmissions",
 
     "currentDirectAdmissions",
 
@@ -555,11 +551,11 @@ function createKnownInflowSection():string {
                 <div>
 
                     <h3>
-                        Known Hospital Inflow
+                        Known Non-ED Hospital Inflow
                     </h3>
 
                     <p>
-                        Enter patients currently known or anticipated to require inpatient beds during the assessment horizon.
+                        Enter non-ED patients currently known or anticipated to require inpatient beds during the assessment horizon. ED boarding patients are already captured in the Emergency Department section and should not be entered again here.
                     </p>
 
                 </div>
@@ -568,17 +564,6 @@ function createKnownInflowSection():string {
 
 
             <div class="input-grid">
-
-                ${createNumberInput(
-
-                    "currentEDAdmissions",
-
-                    "Current ED Admissions",
-
-                    0
-
-                )}
-
 
                 ${createNumberInput(
 
@@ -925,12 +910,15 @@ function restoreDraftInput():void {
 
             ),
 
-        currentEDAdmissions:
-            normalizeStoredNumber(
-
-                state.currentEDAdmissions
-
-            ),
+                /*
+         * Current ED Admissions is no longer a
+         * user-entered value.
+         *
+         * ED boarding demand is represented by
+         * boardedPatients. Retain this compatibility
+         * property as zero for the Version 2 schema.
+         */
+        currentEDAdmissions:0,
 
         currentDirectAdmissions:
             normalizeStoredNumber(
@@ -1168,8 +1156,15 @@ function submitAssessmentToEngine():void {
             occupiedCriticalCareBeds:
                 engineResult.assessment.occupiedCriticalCareBeds,
 
-            currentEDAdmissions:
-                engineResult.assessment.currentEDAdmissions,
+                       /*
+             * Compatibility-only field.
+             *
+             * Current ED admissions are not separately
+             * entered in Version 2.1 because existing
+             * ED admission demand is represented by
+             * boardedPatients.
+             */
+            currentEDAdmissions:0,
 
             currentDirectAdmissions:
                 engineResult.assessment.currentDirectAdmissions,

@@ -303,17 +303,23 @@ function createAssessmentMarkup(
         assessment.occupiedCriticalCareBeds;
 
 
-    const currentHospitalInflow =
+    /*
+ * Known current hospital inflow contains only
+ * non-ED admissions.
+ *
+ * Existing ED inpatient demand is already represented
+ * by boardedPatients and must not be counted again.
+ *
+ * Future NEW ED-origin admissions are supplied by the
+ * historical four-hour forecast.
+ */
+const currentHospitalInflow =
 
-        assessment.currentEDAdmissions
+    assessment.currentDirectAdmissions
 
-        +
+    +
 
-        assessment.currentDirectAdmissions
-
-        +
-
-        assessment.currentSurgicalAdmissions;
+    assessment.currentSurgicalAdmissions;
 
 
     const inflowDifference =
@@ -615,26 +621,13 @@ function createAssessmentMarkup(
         <div class="assessment-details-section">
 
             <h4>
-                Hospital Inflow
+                Hospital Inflow and Forecast
             </h4>
 
 
             <div class="assessment-details-grid">
 
-                ${createMetricCard({
-
-                    label:
-                        "Known ED Admissions",
-
-                    value:
-                        formatNumber(
-                            assessment.currentEDAdmissions
-                        ),
-
-                    description:
-                        "Known inpatient admissions currently originating from the Emergency Department."
-
-                })}
+               
 
 
                 ${createMetricCard({

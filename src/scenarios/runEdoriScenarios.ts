@@ -24,6 +24,15 @@ from "../services/EdoriService";
 
 import {
 
+    WEIGHTS
+
+}
+
+from "../config/weights";
+
+
+import {
+
     EDORI_SCENARIOS
 
 }
@@ -77,6 +86,10 @@ export interface EdoriScenarioCalibrationRow {
     inflowScore:number;
 
     projectedCapacityScore:number;
+
+    baseScore:number;
+
+    severeDomainAdjustment:number;
 
     scorePassed:boolean;
 
@@ -186,6 +199,27 @@ EdoriScenarioCalibrationRow[] {
 
             projectedCapacityScore:
                 scenarioResult.result.projectedCapacityScore,
+
+            baseScore:
+                calculateBaseScore(
+                    scenarioResult.result.edPressureScore,
+                    scenarioResult.result.acuteCapacityScore,
+                    scenarioResult.result.criticalCapacityScore,
+                    scenarioResult.result.inflowScore,
+                    scenarioResult.result.projectedCapacityScore
+                ),
+
+            severeDomainAdjustment:
+                calculateAppliedSevereDomainAdjustment(
+                    scenarioResult.result.score,
+                    calculateBaseScore(
+                        scenarioResult.result.edPressureScore,
+                        scenarioResult.result.acuteCapacityScore,
+                        scenarioResult.result.criticalCapacityScore,
+                        scenarioResult.result.inflowScore,
+                        scenarioResult.result.projectedCapacityScore
+                    )
+                ),
 
             scorePassed:
                 scenarioResult.scorePassed,
@@ -321,6 +355,15 @@ export function printEdoriCalibrationTable():void {
 
                 "Projected Capacity":
                     row.projectedCapacityScore,
+
+                "Base HRI":
+                    row.baseScore,
+
+                "Severe Adjustment":
+                    row.severeDomainAdjustment,
+
+                "Final HRI":
+                    row.score,
 
                 Deviation:
                     row.scoreDeviation,
@@ -517,7 +560,31 @@ export function printEdoriScenarioReport():void {
                     scenarioResult.result.inflowScore,
 
                 "Projected Capacity":
-                    scenarioResult.result.projectedCapacityScore
+                    scenarioResult.result.projectedCapacityScore,
+
+                "Base HRI":
+                    calculateBaseScore(
+                        scenarioResult.result.edPressureScore,
+                        scenarioResult.result.acuteCapacityScore,
+                        scenarioResult.result.criticalCapacityScore,
+                        scenarioResult.result.inflowScore,
+                        scenarioResult.result.projectedCapacityScore
+                    ),
+
+                "Severe Adjustment":
+                    calculateAppliedSevereDomainAdjustment(
+                        scenarioResult.result.score,
+                        calculateBaseScore(
+                            scenarioResult.result.edPressureScore,
+                            scenarioResult.result.acuteCapacityScore,
+                            scenarioResult.result.criticalCapacityScore,
+                            scenarioResult.result.inflowScore,
+                            scenarioResult.result.projectedCapacityScore
+                        )
+                    ),
+
+                "Final HRI":
+                    scenarioResult.result.score
 
             })
 
@@ -650,6 +717,40 @@ function printScenarioResult(
     );
 
 
+    const baseScore = calculateBaseScore(
+        result.edPressureScore,
+        result.acuteCapacityScore,
+        result.criticalCapacityScore,
+        result.inflowScore,
+        result.projectedCapacityScore
+    );
+
+
+    const severeDomainAdjustment =
+        calculateAppliedSevereDomainAdjustment(
+            result.score,
+            baseScore
+        );
+
+
+    console.log(
+        "Base weighted HRI:",
+        baseScore
+    );
+
+
+    console.log(
+        "Severe-domain adjustment:",
+        severeDomainAdjustment
+    );
+
+
+    console.log(
+        "Final HRI:",
+        result.score
+    );
+
+
     console.log(
 
         "Drivers:",
@@ -695,6 +796,57 @@ function printScenarioResult(
 
 
     console.groupEnd();
+
+}
+
+
+/**
+ * Reconstruct the weighted HRI before the
+ * severe-domain adjustment.
+ */
+function calculateBaseScore(
+    edPressureScore:number,
+    acuteCapacityScore:number,
+    criticalCapacityScore:number,
+    inflowScore:number,
+    projectedCapacityScore:number
+):number {
+
+    return roundCalibrationScore(
+        edPressureScore * WEIGHTS.edPressure
+        + acuteCapacityScore * WEIGHTS.acuteCapacity
+        + criticalCapacityScore * WEIGHTS.criticalCapacity
+        + inflowScore * WEIGHTS.inflow
+        + projectedCapacityScore * WEIGHTS.projectedCapacity
+    );
+
+}
+
+
+/**
+ * Return the severe-domain adjustment actually
+ * visible in the capped final HRI.
+ */
+function calculateAppliedSevereDomainAdjustment(
+    finalScore:number,
+    baseScore:number
+):number {
+
+    return roundCalibrationScore(
+        Math.max(
+            0,
+            finalScore - baseScore
+        )
+    );
+
+}
+
+
+function roundCalibrationScore(
+    value:number
+):number {
+
+    return Math.round(value * 10) / 10;
 
 }
 

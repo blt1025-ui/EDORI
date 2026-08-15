@@ -591,7 +591,7 @@ function createCommandCenterCards(
                 "↘️",
 
             primaryLabel:
-                "Known 4-Hour Inflow",
+    "Known Non-ED Inflow",
 
             primaryValue:
                 formatNumber(
@@ -615,13 +615,11 @@ function createCommandCenterCards(
                 ),
 
             detail:
-                `ED admissions ${formatNumber(
-                    assessment.currentEDAdmissions
-                )} · direct admissions ${formatNumber(
-                    assessment.currentDirectAdmissions
-                )} · surgical/procedural admissions ${formatNumber(
-                    assessment.currentSurgicalAdmissions
-                )}.`,
+    `Known non-ED inflow: direct admissions ${formatNumber(
+        assessment.currentDirectAdmissions
+    )} · surgical/procedural admissions ${formatNumber(
+        assessment.currentSurgicalAdmissions
+    )}.`,
 
             severity:
                 severityFromScore(

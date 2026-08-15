@@ -1,66 +1,12 @@
 /**
  * ForecastService
  *
- * Version 2 Hospital Readiness Model
+ * Version 2.1 Hospital Readiness Model
  *
  * Pure four-hour hospital-capacity forecast.
  *
- * The forecast estimates acute-care bed availability
- * at the end of the current four-hour assessment
- * horizon.
- *
- * Forecast logic:
- *
- * currentAvailableBeds
- * =
- * staffedAcuteCareBeds
- * -
- * occupiedAcuteCareBeds
- *
- *
- * historicalNetFlow
- * =
- * expectedHospitalInflow4h
- * -
- * expectedInpatientDepartures4h
- *
- *
- * currentKnownHospitalInflow
- * =
- * currentEDAdmissions
- * +
- * currentDirectAdmissions
- * +
- * currentSurgicalAdmissions
- *
- *
- * projectedHospitalInflow
- * =
- * max(
- *     currentKnownHospitalInflow,
- *     expectedHospitalInflow4h
- * )
- *
- *
- * projectedAvailableBeds
- * =
- * currentAvailableBeds
- * +
- * expectedInpatientDepartures4h
- * -
- * projectedHospitalInflow
- *
- *
- * Negative projectedAvailableBeds values are
- * intentionally preserved.
- *
- * This service does not:
- *
- * - Read application state
- * - Save results
- * - Emit events
- * - Access localStorage
- * - Modify SituationAssessment
+ * This service mirrors the authoritative Version 2.1
+ * demand model used by EdoriService.
  */
 
 import type {
@@ -72,89 +18,32 @@ import type {
 from "../types/SituationAssessment";
 
 
-/**
- * Four-hour Hospital Readiness forecast.
- */
 export interface ForecastResult {
 
-    /**
-     * Current staffed acute-care beds not occupied.
-     */
     currentAvailableBeds:number;
 
-
-    /**
-     * Historical four-hour hospital inflow.
-     */
     expectedHospitalInflow:number;
 
-
-    /**
-     * Historical four-hour inpatient departures.
-     */
     expectedInpatientDepartures:number;
 
-
-    /**
-     * Historical expected net hospital flow:
-     *
-     * expected inflow - expected departures
-     *
-     * Positive values indicate expected net demand
-     * for additional beds.
-     *
-     * Negative values indicate expected net release
-     * of inpatient capacity.
-     */
     historicalNetFlow:number;
 
-
-    /**
-     * Current known hospital inflow:
-     *
-     * ED admissions
-     * +
-     * direct admissions
-     * +
-     * surgical/procedural admissions.
-     */
     currentKnownHospitalInflow:number;
 
-
-    /**
-     * Difference between currently known inflow
-     * and historical expected inflow.
-     *
-     * Positive values mean current known inflow
-     * exceeds the historical norm.
-     */
     inflowVariance:number;
 
-
-    /**
-     * Hospital inflow used in the capacity forecast.
-     *
-     * This is the greater of:
-     *
-     * - current known hospital inflow
-     * - historical expected four-hour hospital inflow
-     */
     projectedHospitalInflow:number;
 
+    projectedTotalBedDemand:number;
 
-    /**
-     * Projected staffed acute-care beds available
-     * at the end of the four-hour forecast period.
-     *
-     * Negative values are valid and represent
-     * projected demand beyond staffed capacity.
-     */
+    historicalProjectedBedDemand:number;
+
+    historicalProjectedBedBalance:number;
+
+    projectedCapacityVariance:number;
+
     projectedAvailableBeds:number;
 
-
-    /**
-     * Forecast direction.
-     */
     direction:
 
         | "Improving"
@@ -165,27 +54,16 @@ export interface ForecastResult {
 
         | "Deficit";
 
-
-    /**
-     * Human-readable forecast explanation.
-     */
     description:string;
 
 }
 
 
-/**
- * Calculate the four-hour hospital-capacity forecast.
- */
 export function calculateForecast(
 
     assessment:SituationAssessment
 
 ):ForecastResult {
-
-    /*
-     * Current acute-care capacity.
-     */
 
     const staffedAcuteCareBeds =
 
@@ -218,15 +96,59 @@ export function calculateForecast(
         );
 
 
-    /*
-     * Historical four-hour flow.
-     */
-
-    const expectedHospitalInflow =
+    const expectedEDAdmissions =
 
         normalizeHistoricalValue(
 
-            assessment.expectedHospitalInflow4h
+            assessment.expectedEDAdmissions4h
+
+        );
+
+
+    const expectedDirectAdmissions =
+
+        normalizeHistoricalValue(
+
+            assessment.expectedDirectAdmissions4h
+
+        );
+
+
+    const expectedSurgicalAdmissions =
+
+        normalizeHistoricalValue(
+
+            assessment.expectedSurgicalAdmissions4h
+
+        );
+
+
+    const expectedHospitalInflow =
+
+        roundValue(
+
+            expectedEDAdmissions
+
+            +
+
+            expectedDirectAdmissions
+
+            +
+
+            expectedSurgicalAdmissions
+
+        );
+
+
+    const expectedNonEDInflow =
+
+        roundValue(
+
+            expectedDirectAdmissions
+
+            +
+
+            expectedSurgicalAdmissions
 
         );
 
@@ -253,43 +175,36 @@ export function calculateForecast(
         );
 
 
-    /*
-     * Current known hospital inflow.
-     */
+    const currentDirectAdmissions =
+
+        normalizeHistoricalValue(
+
+            assessment.currentDirectAdmissions
+
+        );
+
+
+    const currentSurgicalAdmissions =
+
+        normalizeHistoricalValue(
+
+            assessment.currentSurgicalAdmissions
+
+        );
+
 
     const currentKnownHospitalInflow =
 
         roundValue(
 
-            normalizeHistoricalValue(
-
-                assessment.currentEDAdmissions
-
-            )
+            currentDirectAdmissions
 
             +
 
-            normalizeHistoricalValue(
-
-                assessment.currentDirectAdmissions
-
-            )
-
-            +
-
-            normalizeHistoricalValue(
-
-                assessment.currentSurgicalAdmissions
-
-            )
+            currentSurgicalAdmissions
 
         );
 
-
-    /*
-     * Compare current known inflow with historical
-     * expected inflow.
-     */
 
     const inflowVariance =
 
@@ -299,42 +214,79 @@ export function calculateForecast(
 
             -
 
-            expectedHospitalInflow
+            expectedNonEDInflow
 
         );
 
 
-    /*
-     * Never assume future inflow will be lower than
-     * the historical expectation solely because fewer
-     * admissions are currently known.
-     *
-     * If current known inflow exceeds the historical
-     * four-hour expectation, use the known value.
-     *
-     * Otherwise retain the historical expectation.
-     */
-
-    const projectedHospitalInflow =
+    const projectedDirectAdmissions =
 
         roundValue(
 
             Math.max(
 
-                currentKnownHospitalInflow,
+                currentDirectAdmissions,
 
-                expectedHospitalInflow
+                expectedDirectAdmissions
 
             )
 
         );
 
 
-    /*
-     * Four-hour acute-care bed projection.
-     *
-     * Negative values are intentionally preserved.
-     */
+    const projectedSurgicalAdmissions =
+
+        roundValue(
+
+            Math.max(
+
+                currentSurgicalAdmissions,
+
+                expectedSurgicalAdmissions
+
+            )
+
+        );
+
+
+    const projectedHospitalInflow =
+
+        roundValue(
+
+            expectedEDAdmissions
+
+            +
+
+            projectedDirectAdmissions
+
+            +
+
+            projectedSurgicalAdmissions
+
+        );
+
+
+    const currentBoarders =
+
+        normalizeHistoricalValue(
+
+            assessment.boardedPatients
+
+        );
+
+
+    const projectedTotalBedDemand =
+
+        roundValue(
+
+            currentBoarders
+
+            +
+
+            projectedHospitalInflow
+
+        );
+
 
     const projectedAvailableBeds =
 
@@ -348,7 +300,38 @@ export function calculateForecast(
 
             -
 
-            projectedHospitalInflow
+            projectedTotalBedDemand
+
+        );
+
+
+    const historicalProjectedBedDemand =
+
+        normalizeHistoricalValue(
+
+            assessment.historicalProjectedBedDemand4h
+
+        );
+
+
+    const historicalProjectedBedBalance =
+
+        normalizeSignedHistoricalValue(
+
+            assessment.historicalProjectedBedBalance4h
+
+        );
+
+
+    const projectedCapacityVariance =
+
+        roundValue(
+
+            projectedAvailableBeds
+
+            -
+
+            historicalProjectedBedBalance
 
         );
 
@@ -357,9 +340,9 @@ export function calculateForecast(
 
         getForecastDirection(
 
-            currentAvailableBeds,
+            projectedAvailableBeds,
 
-            projectedAvailableBeds
+            projectedCapacityVariance
 
         );
 
@@ -380,6 +363,14 @@ export function calculateForecast(
 
         projectedHospitalInflow,
 
+        projectedTotalBedDemand,
+
+        historicalProjectedBedDemand,
+
+        historicalProjectedBedBalance,
+
+        projectedCapacityVariance,
+
         projectedAvailableBeds,
 
         direction,
@@ -389,15 +380,29 @@ export function calculateForecast(
 
                 currentAvailableBeds,
 
-                expectedHospitalInflow,
+                currentBoarders,
 
-                expectedInpatientDepartures,
+                expectedEDAdmissions,
 
-                currentKnownHospitalInflow,
+                currentDirectAdmissions,
+
+                currentSurgicalAdmissions,
+
+                projectedDirectAdmissions,
+
+                projectedSurgicalAdmissions,
 
                 projectedHospitalInflow,
 
+                projectedTotalBedDemand,
+
+                expectedInpatientDepartures,
+
                 projectedAvailableBeds,
+
+                historicalProjectedBedBalance,
+
+                projectedCapacityVariance,
 
                 direction
 
@@ -408,14 +413,11 @@ export function calculateForecast(
 }
 
 
-/**
- * Determine the overall four-hour capacity direction.
- */
 function getForecastDirection(
 
-    currentAvailableBeds:number,
+    projectedAvailableBeds:number,
 
-    projectedAvailableBeds:number
+    projectedCapacityVariance:number
 
 ):
 
@@ -427,45 +429,20 @@ function getForecastDirection(
 
     | "Deficit" {
 
-    /*
-     * A negative projected bed count means projected
-     * demand exceeds staffed acute-care capacity.
-     */
+    if(projectedCapacityVariance <= -5){
 
-    if(projectedAvailableBeds < 0){
+        return projectedAvailableBeds < 0
 
-        return "Deficit";
+            ? "Deficit"
+
+            : "Tightening";
 
     }
 
 
-    const change =
-
-        projectedAvailableBeds
-
-        -
-
-        currentAvailableBeds;
-
-
-    /*
-     * A meaningful increase in available beds.
-     */
-
-    if(change >= 2){
+    if(projectedCapacityVariance >= 5){
 
         return "Improving";
-
-    }
-
-
-    /*
-     * A meaningful decrease in available beds.
-     */
-
-    if(change <= -2){
-
-        return "Tightening";
 
     }
 
@@ -475,22 +452,33 @@ function getForecastDirection(
 }
 
 
-/**
- * Create a human-readable four-hour forecast.
- */
 function createForecastDescription(
 
     currentAvailableBeds:number,
 
-    expectedHospitalInflow:number,
+    currentBoarders:number,
+
+    expectedEDAdmissions:number,
+
+    currentDirectAdmissions:number,
+
+    currentSurgicalAdmissions:number,
+
+    projectedDirectAdmissions:number,
+
+    projectedSurgicalAdmissions:number,
+
+    projectedNewAdmissions:number,
+
+    projectedTotalBedDemand:number,
 
     expectedInpatientDepartures:number,
 
-    currentKnownHospitalInflow:number,
-
-    projectedHospitalInflow:number,
-
     projectedAvailableBeds:number,
+
+    historicalProjectedBedBalance:number,
+
+    projectedCapacityVariance:number,
 
     direction:
 
@@ -504,82 +492,76 @@ function createForecastDescription(
 
 ):string {
 
-    if(direction === "Deficit"){
-
-        return [
-
-            `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
-
-            `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
-
-            `Current known hospital inflow is ${formatValue(currentKnownHospitalInflow)} patients.`,
-
-            `The forecast therefore uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
-
-            `Projected acute-care availability is ${formatValue(projectedAvailableBeds)} beds, representing a projected capacity deficit of ${formatValue(Math.abs(projectedAvailableBeds))} beds.`
-
-        ].join(
-
-            " "
-
-        );
-
-    }
-
-
-    if(direction === "Tightening"){
-
-        return [
-
-            `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
-
-            `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
-
-            `The forecast uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
-
-            `Acute-care availability is expected to decrease to ${formatValue(projectedAvailableBeds)} beds during the next four hours.`
-
-        ].join(
-
-            " "
-
-        );
-
-    }
-
-
-    if(direction === "Improving"){
-
-        return [
-
-            `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
-
-            `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
-
-            `The forecast uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
-
-            `Acute-care availability is expected to improve to ${formatValue(projectedAvailableBeds)} beds during the next four hours.`
-
-        ].join(
-
-            " "
-
-        );
-
-    }
-
-
-    return [
+    const details = [
 
         `Current acute-care availability is ${formatValue(currentAvailableBeds)} beds.`,
 
-        `Historical four-hour inflow is ${formatValue(expectedHospitalInflow)} patients and historical inpatient departures are ${formatValue(expectedInpatientDepartures)}.`,
+        `There are ${formatValue(currentBoarders)} ED boarders already requiring inpatient beds.`,
 
-        `The forecast uses ${formatValue(projectedHospitalInflow)} projected admissions.`,
+        `Historical expectations include ${formatValue(expectedEDAdmissions)} new ED-origin admissions during the next four hours.`,
 
-        `Acute-care availability is expected to remain relatively stable at approximately ${formatValue(projectedAvailableBeds)} beds during the next four hours.`
+        `Currently known non-ED demand includes ${formatValue(currentDirectAdmissions)} direct admissions and ${formatValue(currentSurgicalAdmissions)} surgical/procedural admissions.`,
 
-    ].join(
+        `The forecast uses ${formatValue(projectedDirectAdmissions)} direct admissions and ${formatValue(projectedSurgicalAdmissions)} surgical/procedural admissions after comparison with historical expectations.`,
+
+        `Projected new admissions total ${formatValue(projectedNewAdmissions)} patients.`,
+
+        `Total projected bed demand is ${formatValue(projectedTotalBedDemand)} patients after adding current ED boarders exactly once.`,
+
+        `Historical inpatient departures over the same horizon are ${formatValue(expectedInpatientDepartures)} patients.`,
+
+        `Projected acute-care bed balance is ${formatSignedValue(projectedAvailableBeds)} beds.`,
+
+        `The historical projected bed balance for this weekday/hour is ${formatSignedValue(historicalProjectedBedBalance)} beds.`,
+
+        createCapacityVarianceDescription(
+
+            projectedCapacityVariance
+
+        )
+
+    ];
+
+
+    if(direction === "Deficit"){
+
+        details.push(
+
+            "The projected bed balance is materially worse than the historical baseline and remains below zero."
+
+        );
+
+    }
+    else if(direction === "Tightening"){
+
+        details.push(
+
+            "Projected capacity is materially tighter than the historical baseline."
+
+        );
+
+    }
+    else if(direction === "Improving"){
+
+        details.push(
+
+            "Projected capacity is materially better than the historical baseline."
+
+        );
+
+    }
+    else {
+
+        details.push(
+
+            "Projected capacity is within approximately five beds of the historical baseline."
+
+        );
+
+    }
+
+
+    return details.join(
 
         " "
 
@@ -588,12 +570,43 @@ function createForecastDescription(
 }
 
 
-/**
- * Normalize a nonnegative operational or
- * historical value.
- *
- * Historical values may contain decimals.
- */
+function createCapacityVarianceDescription(
+
+    projectedCapacityVariance:number
+
+):string {
+
+    if(projectedCapacityVariance < 0){
+
+        return `Today's projected bed balance is ${formatValue(
+
+            Math.abs(
+
+                projectedCapacityVariance
+
+            )
+
+        )} beds worse than the historical projection.`;
+
+    }
+
+
+    if(projectedCapacityVariance > 0){
+
+        return `Today's projected bed balance is ${formatValue(
+
+            projectedCapacityVariance
+
+        )} beds better than the historical projection.`;
+
+    }
+
+
+    return "Today's projected bed balance matches the historical projection.";
+
+}
+
+
 function normalizeHistoricalValue(
 
     value:number
@@ -624,40 +637,74 @@ function normalizeHistoricalValue(
 }
 
 
-/**
- * Round operational values to two decimal places.
- */
+function normalizeSignedHistoricalValue(
+
+    value:number
+
+):number {
+
+    if(
+
+        !Number.isFinite(
+
+            value
+
+        )
+
+    ){
+
+        return 0;
+
+    }
+
+
+    return value;
+
+}
+
+
 function roundValue(
 
     value:number
 
 ):number {
 
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+
     return Math.round(
 
         value * 100
 
-    ) / 100;
+    )
+
+    /
+
+    100;
 
 }
 
 
-/**
- * Format a value for human-readable text.
- */
 function formatValue(
 
     value:number
 
 ):string {
 
+    if(!Number.isFinite(value)){
+
+        return "0";
+
+    }
+
+
     if(Number.isInteger(value)){
 
-        return String(
-
-            value
-
-        );
+        return String(value);
 
     }
 
@@ -677,5 +724,30 @@ function formatValue(
             ""
 
         );
+
+}
+
+
+function formatSignedValue(
+
+    value:number
+
+):string {
+
+    if(!Number.isFinite(value)){
+
+        return "0";
+
+    }
+
+
+    if(value > 0){
+
+        return `+${formatValue(value)}`;
+
+    }
+
+
+    return formatValue(value);
 
 }
