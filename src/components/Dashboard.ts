@@ -37,6 +37,15 @@ from "./SummaryCards";
 
 import {
 
+    DomainAlerts
+
+}
+
+from "./DomainAlerts";
+
+
+import {
+
     SituationAssessment
 
 }
@@ -141,6 +150,16 @@ export function Dashboard():string {
             >
 
                 ${SummaryCards()}
+
+            </section>
+
+
+            <section
+                id="domainAlertsSection"
+                class="dashboard-domain-alerts-section"
+            >
+
+                ${DomainAlerts()}
 
             </section>
 

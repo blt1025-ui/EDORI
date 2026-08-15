@@ -8732,3 +8732,211 @@ body {
     }
 
 }
+
+/* =========================================================
+   DOMAIN ALERTS
+   Version 2.1 Hospital Readiness Model
+========================================================= */
+
+.dashboard-domain-alerts-section {
+    width:100%;
+    min-width:0;
+    margin-bottom:22px;
+}
+
+.domain-alerts[hidden] {
+    display:none !important;
+}
+
+.domain-alerts {
+    width:100%;
+    min-width:0;
+    padding:16px 18px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    border-radius:13px;
+    box-shadow:0 7px 18px rgba(15, 23, 42, .055);
+}
+
+.domain-alerts-header {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:18px;
+    padding-bottom:13px;
+    margin-bottom:13px;
+    border-bottom:1px solid #e2e8f0;
+}
+
+.domain-alerts-header > div {
+    min-width:0;
+}
+
+.domain-alerts-kicker {
+    display:block;
+    margin-bottom:3px;
+    color:#64748b;
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.08em;
+    line-height:1.4;
+    text-transform:uppercase;
+}
+
+.domain-alerts-header strong {
+    display:block;
+    color:#0f172a;
+    font-size:15px;
+    font-weight:800;
+    line-height:1.35;
+}
+
+.domain-alerts-explanation {
+    max-width:440px;
+    color:#64748b;
+    font-size:11px;
+    line-height:1.5;
+    text-align:right;
+}
+
+.domain-alerts-list {
+    display:grid;
+    grid-template-columns:repeat(
+        auto-fit,
+        minmax(220px, 1fr)
+    );
+    gap:10px;
+}
+
+.domain-alert-item {
+    --domain-alert-accent:#f97316;
+    --domain-alert-background:#fff7ed;
+    --domain-alert-border:#fed7aa;
+    --domain-alert-badge-background:#ffedd5;
+    --domain-alert-badge-text:#9a3412;
+
+    display:grid;
+    grid-template-columns:auto minmax(0, 1fr) auto auto;
+    align-items:center;
+    min-width:0;
+    gap:9px;
+    padding:11px 12px;
+    background:var(--domain-alert-background);
+    border:1px solid var(--domain-alert-border);
+    border-left:5px solid var(--domain-alert-accent);
+    border-radius:9px;
+}
+
+.domain-alert-item-elevated {
+    --domain-alert-accent:#f97316;
+    --domain-alert-background:#fff7ed;
+    --domain-alert-border:#fed7aa;
+    --domain-alert-badge-background:#ffedd5;
+    --domain-alert-badge-text:#9a3412;
+}
+
+.domain-alert-item-high {
+    --domain-alert-accent:#dc2626;
+    --domain-alert-background:#fef2f2;
+    --domain-alert-border:#fecaca;
+    --domain-alert-badge-background:#fee2e2;
+    --domain-alert-badge-text:#991b1b;
+}
+
+.domain-alert-item-severe {
+    --domain-alert-accent:#111827;
+    --domain-alert-background:#f8fafc;
+    --domain-alert-border:#cbd5e1;
+    --domain-alert-badge-background:#e2e8f0;
+    --domain-alert-badge-text:#111827;
+}
+
+.domain-alert-indicator {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    width:26px;
+    height:26px;
+    color:var(--domain-alert-accent);
+    font-size:15px;
+    line-height:1;
+}
+
+.domain-alert-name {
+    min-width:0;
+    overflow-wrap:anywhere;
+    color:#334155;
+    font-size:12px;
+    font-weight:800;
+    line-height:1.35;
+}
+
+.domain-alert-score {
+    color:#0f172a;
+    font-size:17px;
+    font-weight:900;
+    line-height:1;
+    font-variant-numeric:tabular-nums;
+}
+
+.domain-alert-level {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:70px;
+    padding:5px 8px;
+    background:var(--domain-alert-badge-background);
+    border-radius:999px;
+    color:var(--domain-alert-badge-text);
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.055em;
+    line-height:1.2;
+    text-transform:uppercase;
+}
+
+
+/* =========================================================
+   DOMAIN ALERTS — RESPONSIVE
+========================================================= */
+
+@media(max-width:900px) {
+
+    .domain-alerts-header {
+        flex-direction:column;
+        gap:7px;
+    }
+
+    .domain-alerts-explanation {
+        max-width:none;
+        text-align:left;
+    }
+
+}
+
+@media(max-width:650px) {
+
+    .dashboard-domain-alerts-section {
+        margin-bottom:16px;
+    }
+
+    .domain-alerts {
+        padding:13px;
+    }
+
+    .domain-alerts-list {
+        grid-template-columns:1fr;
+    }
+
+    .domain-alert-item {
+        grid-template-columns:auto minmax(0, 1fr) auto;
+    }
+
+    .domain-alert-level {
+        grid-column:2 / 4;
+        justify-self:start;
+        min-width:0;
+    }
+
+}

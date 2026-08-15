@@ -15,6 +15,7 @@ import {
 
 from "./DashboardCommandBar";
 
+
 import {
 
     initializeHistoryRestoreCenter
@@ -50,6 +51,7 @@ import {
 
 from "../ShiftHandoffSummary";
 
+
 import {
 
     initializeOperationalForecast
@@ -57,6 +59,7 @@ import {
 }
 
 from "../OperationalForecast";
+
 
 import {
 
@@ -92,6 +95,24 @@ import {
 }
 
 from "../ExecutiveSummary";
+
+
+import {
+
+    initializeSummaryCards
+
+}
+
+from "../SummaryCards";
+
+
+import {
+
+    initializeDomainAlerts
+
+}
+
+from "../DomainAlerts";
 
 
 import {
@@ -150,15 +171,6 @@ from "../Recommendations";
 
 import {
 
-    initializeSummaryCards
-
-}
-
-from "../SummaryCards";
-
-
-import {
-
     initializeTrendChart
 
 }
@@ -191,12 +203,14 @@ from "./DashboardToolbar";
 export function initializeDashboardComponents():void {
 
     initializeDashboardCommandBar();
-    
+
     initializeSituationAssessment();
 
     initializeExecutiveSummary();
 
     initializeSummaryCards();
+
+    initializeDomainAlerts();
 
     initializeGauge();
 

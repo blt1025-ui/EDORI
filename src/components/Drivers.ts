@@ -26,6 +26,15 @@ from "../config/appEvents";
 
 import {
 
+    getDomainSeverity
+
+}
+
+from "../config/domainSeverity";
+
+
+import {
+
     subscribe
 
 }
@@ -1592,7 +1601,11 @@ function createTriggerSeverity(
 
 
 /**
- * Convert a numerical severity to visual severity.
+ * Convert a numerical domain severity into the
+ * existing driver-card visual severity classes.
+ *
+ * Domain thresholds come from the centralized
+ * domainSeverity configuration.
  */
 function createNumericSeverity(
 
@@ -1600,28 +1613,39 @@ function createNumericSeverity(
 
 ):DriverVisualSeverity {
 
-    if(value >= 80){
+    const domainSeverity =
 
-        return "critical";
+        getDomainSeverity(
+
+            value
+
+        );
+
+
+    switch(domainSeverity.level){
+
+        case "severe":
+
+            return "critical";
+
+
+        case "high":
+
+            return "high";
+
+
+        case "elevated":
+
+        case "watch":
+
+            return "moderate";
+
+
+        default:
+
+            return "routine";
 
     }
-
-
-    if(value >= 60){
-
-        return "high";
-
-    }
-
-
-    if(value >= 35){
-
-        return "moderate";
-
-    }
-
-
-    return "routine";
 
 }
 

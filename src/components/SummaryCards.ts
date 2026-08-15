@@ -28,6 +28,15 @@ from "../config/appEvents";
 
 import {
 
+    getDomainCardSeverity
+
+}
+
+from "../config/domainSeverity";
+
+
+import {
+
     subscribe
 
 }
@@ -487,7 +496,7 @@ function createCommandCenterCards(
                 )}%).`,
 
             severity:
-                severityFromScore(
+                getDomainCardSeverity(
 
                     result.edPressureScore
 
@@ -530,7 +539,7 @@ function createCommandCenterCards(
                 )}.`,
 
             severity:
-                severityFromScore(
+                getDomainCardSeverity(
 
                     result.acuteCapacityScore
 
@@ -573,7 +582,7 @@ function createCommandCenterCards(
                 "Critical-care capacity is evaluated separately from acute-care capacity.",
 
             severity:
-                severityFromScore(
+                getDomainCardSeverity(
 
                     result.criticalCapacityScore
 
@@ -622,7 +631,7 @@ function createCommandCenterCards(
     )}.`,
 
             severity:
-                severityFromScore(
+                getDomainCardSeverity(
 
                     result.inflowScore
 
@@ -669,7 +678,7 @@ function createCommandCenterCards(
                 )}-hour horizon. Negative bed availability means projected demand exceeds staffed acute-care capacity.`,
 
             severity:
-                severityFromScore(
+                getDomainCardSeverity(
 
                     result.projectedCapacityScore
 
@@ -1052,58 +1061,6 @@ function createOperationalStatusComparison(
 
 }
 
-
-/**
- * Convert an authoritative 0-100 domain score into
- * the existing command-card severity classes.
- */
-function severityFromScore(
-
-    score:number
-
-):
-
-    | "alpha"
-
-    | "bravo"
-
-    | "charlie"
-
-    | "delta"
-
-    | "echo" {
-
-    if(score >= 80){
-
-        return "echo";
-
-    }
-
-
-    if(score >= 60){
-
-        return "delta";
-
-    }
-
-
-    if(score >= 40){
-
-        return "charlie";
-
-    }
-
-
-    if(score >= 20){
-
-        return "bravo";
-
-    }
-
-
-    return "alpha";
-
-}
 
 
 /**
