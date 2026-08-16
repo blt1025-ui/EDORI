@@ -4,8 +4,14 @@
  * Displays the primary operational conditions
  * contributing to the current EDORI assessment.
  *
- * Driver information is read from the authoritative
- * OperationalAssessment.
+ * Responsibilities:
+ *
+ * - Show active operational trigger conditions
+ * - Show the strongest EDORI score contributors
+ * - Explain why those conditions matter
+ *
+ * Detailed domain/pillar status belongs on the
+ * Dashboard and is intentionally not repeated here.
  *
  * This component does not:
  *
@@ -102,15 +108,6 @@ from "../types/OperationalAssessment";
 
 import type {
 
-    OperationalPillarDetail
-
-}
-
-from "../types/OperationalPillarDetail";
-
-
-import type {
-
     OperationalTriggerResult
 
 }
@@ -119,10 +116,16 @@ from "../types/OperationalTriggerResult";
 
 
 /**
- * Maximum number of primary driver cards displayed
- * in each section.
+ * Maximum active operational conditions shown.
  */
-const MAXIMUM_PRIMARY_DRIVERS = 6;
+const MAXIMUM_TRIGGER_DRIVERS = 6;
+
+
+/**
+ * Keep the score-contribution section intentionally
+ * focused on the strongest contributors.
+ */
+const MAXIMUM_SCORE_DRIVERS = 4;
 
 
 /**
@@ -157,7 +160,7 @@ export function Drivers():string {
                     </h3>
 
                     <p class="panel-description">
-                        Conditions contributing to the current operational level
+                        Active operational conditions and strongest score contributors
                     </p>
 
                 </div>
@@ -232,11 +235,13 @@ export function initializeDrivers():void {
  */
 function updateDrivers():void {
 
-    const container = document.getElementById(
+    const container =
 
-        "driversContent"
+        document.getElementById(
 
-    );
+            "driversContent"
+
+        );
 
 
     if(!container){
@@ -293,7 +298,9 @@ function updateDrivers():void {
     }
 
 
-    const result = getLatestResult();
+    const result =
+
+        getLatestResult();
 
 
     if(!result){
@@ -385,6 +392,15 @@ function updateDrivers():void {
 
 /**
  * Create the completed driver display.
+ *
+ * Only two categories are intentionally shown:
+ *
+ * 1. Active operational trigger conditions
+ * 2. Strongest EDORI score contributors
+ *
+ * Operational pillar/domain cards are excluded
+ * because those are already presented on the
+ * Dashboard.
  */
 function createDriversMarkup(
 
@@ -394,10 +410,9 @@ function createDriversMarkup(
 
     const triggerDrivers =
 
-        operationalAssessment.activeTriggers
-
+        operationalAssessment
+            .activeTriggers
             .slice()
-
             .sort(
 
                 compareTriggerPriority
@@ -407,10 +422,9 @@ function createDriversMarkup(
 
     const scoreDrivers =
 
-        operationalAssessment.primaryDrivers
-
+        operationalAssessment
+            .primaryDrivers
             .slice()
-
             .sort(
 
                 compareDriverSeverity
@@ -418,48 +432,53 @@ function createDriversMarkup(
             );
 
 
-    const pillarDrivers =
+    const visibleTriggerCount =
 
-        operationalAssessment.pillarDetails
+        Math.min(
 
-            .filter(
+            triggerDrivers.length,
 
-                pillar =>
+            MAXIMUM_TRIGGER_DRIVERS
 
-                    pillar.score !== null
-
-            )
-
-            .slice()
-
-            .sort(
-
-                comparePillarScore
-
-            );
+        );
 
 
-    const totalDriverCount =
+    const visibleScoreDriverCount =
 
-        triggerDrivers.length
+        Math.min(
 
-        +
+            scoreDrivers.length,
 
-        scoreDrivers.length
+            MAXIMUM_SCORE_DRIVERS
+
+        );
+
+
+    const totalVisibleDriverCount =
+
+        visibleTriggerCount
 
         +
 
-        pillarDrivers.length;
+        visibleScoreDriverCount;
 
 
     updateDriverCount(
 
-        totalDriverCount
+        totalVisibleDriverCount
 
     );
 
 
-    if(totalDriverCount === 0){
+    if(
+
+        triggerDrivers.length === 0
+
+        &&
+
+        scoreDrivers.length === 0
+
+    ){
 
         return createRoutineState();
 
@@ -476,7 +495,7 @@ function createDriversMarkup(
 
             )
 
-            : ""
+            : createNoActiveConditionsSection()
 
         }
 
@@ -489,20 +508,7 @@ function createDriversMarkup(
 
             )
 
-            : ""
-
-        }
-
-
-        ${pillarDrivers.length > 0
-
-            ? createPillarDriverSection(
-
-                pillarDrivers
-
-            )
-
-            : ""
+            : createNoScoreDriversSection()
 
         }
 
@@ -512,13 +518,24 @@ function createDriversMarkup(
 
 
 /**
- * Create the active operational-trigger section.
+ * Create the active operational-condition section.
  */
 function createTriggerDriverSection(
 
     triggerDrivers:OperationalTriggerResult[]
 
 ):string {
+
+    const visibleDrivers =
+
+        triggerDrivers.slice(
+
+            0,
+
+            MAXIMUM_TRIGGER_DRIVERS
+
+        );
+
 
     return `
 
@@ -536,6 +553,10 @@ function createTriggerDriverSection(
                         Operational Triggers
                     </h4>
 
+                    <p>
+                        Conditions currently meeting configured operational trigger thresholds.
+                    </p>
+
                 </div>
 
 
@@ -550,15 +571,7 @@ function createTriggerDriverSection(
 
             <div class="driver-section-content">
 
-                ${triggerDrivers
-
-                    .slice(
-
-                        0,
-
-                        MAXIMUM_PRIMARY_DRIVERS
-
-                    )
+                ${visibleDrivers
 
                     .map(
 
@@ -577,7 +590,7 @@ function createTriggerDriverSection(
             </div>
 
 
-            ${triggerDrivers.length > MAXIMUM_PRIMARY_DRIVERS
+            ${triggerDrivers.length > MAXIMUM_TRIGGER_DRIVERS
 
                 ? createAdditionalDriverMessage(
 
@@ -585,9 +598,9 @@ function createTriggerDriverSection(
 
                     -
 
-                    MAXIMUM_PRIMARY_DRIVERS,
+                    MAXIMUM_TRIGGER_DRIVERS,
 
-                    "operational triggers"
+                    "active operational conditions"
 
                 )
 
@@ -603,13 +616,24 @@ function createTriggerDriverSection(
 
 
 /**
- * Create the EDORI score-driver section.
+ * Create the EDORI score-contributor section.
  */
 function createScoreDriverSection(
 
     scoreDrivers:Driver[]
 
 ):string {
+
+    const visibleDrivers =
+
+        scoreDrivers.slice(
+
+            0,
+
+            MAXIMUM_SCORE_DRIVERS
+
+        );
+
 
     return `
 
@@ -624,15 +648,19 @@ function createScoreDriverSection(
                     </span>
 
                     <h4>
-                        EDORI Drivers
+                        Top HRI Contributors
                     </h4>
+
+                    <p>
+                        Strongest contributors to the current calculated HRI score.
+                    </p>
 
                 </div>
 
 
                 <span class="driver-section-count">
 
-                    ${scoreDrivers.length}
+                    ${visibleDrivers.length}
 
                 </span>
 
@@ -641,15 +669,7 @@ function createScoreDriverSection(
 
             <div class="driver-section-content">
 
-                ${scoreDrivers
-
-                    .slice(
-
-                        0,
-
-                        MAXIMUM_PRIMARY_DRIVERS
-
-                    )
+                ${visibleDrivers
 
                     .map(
 
@@ -668,7 +688,7 @@ function createScoreDriverSection(
             </div>
 
 
-            ${scoreDrivers.length > MAXIMUM_PRIMARY_DRIVERS
+            ${scoreDrivers.length > MAXIMUM_SCORE_DRIVERS
 
                 ? createAdditionalDriverMessage(
 
@@ -676,79 +696,15 @@ function createScoreDriverSection(
 
                     -
 
-                    MAXIMUM_PRIMARY_DRIVERS,
+                    MAXIMUM_SCORE_DRIVERS,
 
-                    "EDORI drivers"
+                    "lower-ranked HRI contributors"
 
                 )
 
                 : ""
 
             }
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Create the operational-pillar section.
- */
-function createPillarDriverSection(
-
-    pillarDrivers:OperationalPillarDetail[]
-
-):string {
-
-    return `
-
-        <div class="driver-section">
-
-            <div class="driver-section-heading">
-
-                <div>
-
-                    <span class="driver-section-kicker">
-                        Operational Domains
-                    </span>
-
-                    <h4>
-                        Pillar Conditions
-                    </h4>
-
-                </div>
-
-
-                <span class="driver-section-count">
-
-                    ${pillarDrivers.length}
-
-                </span>
-
-            </div>
-
-
-            <div class="driver-section-content">
-
-                ${pillarDrivers
-
-                    .map(
-
-                        pillar =>
-
-                            createPillarDriverCard(
-
-                                pillar
-
-                            )
-
-                    )
-
-                    .join("")}
-
-            </div>
 
         </div>
 
@@ -766,11 +722,13 @@ function createTriggerDriverCard(
 
 ):string {
 
-    const severity = createTriggerSeverity(
+    const severity =
 
-        triggerResult.trigger.priority
+        createTriggerSeverity(
 
-    );
+            triggerResult.trigger.priority
+
+        );
 
 
     const severityLabel =
@@ -778,27 +736,13 @@ function createTriggerDriverCard(
         triggerResult.trigger.priority;
 
 
-    const proximity = clampPercentage(
+    const proximity =
 
-        triggerResult.proximityPercent
+        clampPercentage(
 
-    );
+            triggerResult.proximityPercent
 
-
-    const reassessmentText =
-
-        triggerResult.trigger.reassessmentMinutes === null
-
-            ? "Routine"
-
-            : `${triggerResult.trigger.reassessmentMinutes} min`;
-
-
-    const minimumLevel =
-
-        triggerResult.trigger.minimumOperationalState
-
-        ?? "No forced level";
+        );
 
 
     return `
@@ -807,6 +751,7 @@ function createTriggerDriverCard(
             class="
                 driver-card
                 driver-card-${severity}
+                driver-trigger-card
             "
         >
 
@@ -821,15 +766,33 @@ function createTriggerDriverCard(
                     </span>
 
 
-                    <div>
+                    <div class="driver-card-heading-copy">
 
-                        <span class="driver-category">
+                        <div class="driver-card-eyebrow-row">
 
-                            ${escapeHtml(
-                                triggerResult.trigger.category
-                            )}
+                            <span
+                                class="
+                                    driver-priority-badge
+                                    driver-priority-${severity}
+                                "
+                            >
 
-                        </span>
+                                ${escapeHtml(
+                                    severityLabel
+                                )}
+
+                            </span>
+
+
+                            <span class="driver-category">
+
+                                ${escapeHtml(
+                                    triggerResult.trigger.category
+                                )}
+
+                            </span>
+
+                        </div>
 
 
                         <h5>
@@ -843,20 +806,6 @@ function createTriggerDriverCard(
                     </div>
 
                 </div>
-
-
-                <span
-                    class="
-                        driver-priority-badge
-                        driver-priority-${severity}
-                    "
-                >
-
-                    ${escapeHtml(
-                        severityLabel
-                    )}
-
-                </span>
 
             </div>
 
@@ -887,45 +836,14 @@ function createTriggerDriverCard(
             </div>
 
 
-            <div class="driver-values-grid">
-
-                ${createValueCell(
-
-                    "Proximity",
-
-                    `${proximity}%`
-
-                )}
-
-
-                ${createValueCell(
-
-                    "Reassess",
-
-                    reassessmentText
-
-                )}
-
-
-                ${createValueCell(
-
-                    "Minimum Level",
-
-                    minimumLevel
-
-                )}
-
-            </div>
-
-
             <div class="driver-impact-row">
 
                 <span>
-                    Trigger intensity
+                    Threshold reached
                 </span>
 
                 <strong>
-                    ${proximity} / 100
+                    ${proximity}%
                 </strong>
 
             </div>
@@ -951,7 +869,7 @@ function createTriggerDriverCard(
 
 
 /**
- * Create one EDORI score-driver card.
+ * Create one EDORI score-contributor card.
  */
 function createScoreDriverCard(
 
@@ -959,27 +877,33 @@ function createScoreDriverCard(
 
 ):string {
 
-    const impact = clampPercentage(
+    const impact =
 
-        driver.severity
+        clampPercentage(
 
-    );
+            driver.severity
 
-
-    const severity = createNumericSeverity(
-
-        impact
-
-    );
+        );
 
 
-    const difference = calculateDriverDifference(
+    const severity =
 
-        driver.currentValue,
+        createNumericSeverity(
 
-        driver.expectedValue
+            impact
 
-    );
+        );
+
+
+    const difference =
+
+        calculateDriverDifference(
+
+            driver.currentValue,
+
+            driver.expectedValue
+
+        );
 
 
     return `
@@ -988,6 +912,7 @@ function createScoreDriverCard(
             class="
                 driver-card
                 driver-card-${severity}
+                driver-score-card
             "
         >
 
@@ -1002,11 +927,12 @@ function createScoreDriverCard(
                     </span>
 
 
-                    <div>
+                    <div class="driver-card-heading-copy">
 
                         <span class="driver-category">
-                            EDORI Driver
+                            HRI Contributor
                         </span>
+
 
                         <h5>
 
@@ -1095,7 +1021,7 @@ function createScoreDriverCard(
                 </span>
 
                 <strong>
-                    ${impact} / 100
+                    ${impact}
                 </strong>
 
             </div>
@@ -1121,132 +1047,49 @@ function createScoreDriverCard(
 
 
 /**
- * Create one operational-pillar driver card.
+ * Create a quiet state for the operational-condition
+ * section when no trigger is currently active.
  */
-function createPillarDriverCard(
-
-    pillar:OperationalPillarDetail
-
-):string {
-
-    const score = clampPercentage(
-
-        pillar.score
-
-        ?? 0
-
-    );
-
-
-    const severity = createNumericSeverity(
-
-        score
-
-    );
-
+function createNoActiveConditionsSection():string {
 
     return `
 
-        <article
-            class="
-                driver-card
-                driver-card-${severity}
-            "
-        >
+        <div class="driver-section">
 
-            <div class="driver-card-header">
+            <div class="driver-section-heading">
 
-                <div class="driver-card-title-group">
+                <div>
 
-                    <span
-                        class="driver-card-indicator"
-                        aria-hidden="true"
-                    >
+                    <span class="driver-section-kicker">
+                        Active Conditions
                     </span>
 
-
-                    <div>
-
-                        <span class="driver-category">
-                            Operational Pillar
-                        </span>
-
-                        <h5>
-
-                            ${escapeHtml(
-                                pillar.title
-                            )}
-
-                        </h5>
-
-                    </div>
+                    <h4>
+                        Operational Triggers
+                    </h4>
 
                 </div>
 
-
-                <div class="driver-impact-score">
-
-                    <span>
-                        Score
-                    </span>
-
-                    <strong>
-                        ${score}
-                    </strong>
-
-                </div>
-
-            </div>
-
-
-            <p class="driver-description">
-
-                ${escapeHtml(
-                    pillar.summary
-                )}
-
-            </p>
-
-
-            ${pillar.factors.length > 0
-
-                ? createPillarFactorList(
-
-                    pillar
-
-                )
-
-                : ""
-
-            }
-
-
-            <div class="driver-impact-row">
-
-                <span>
-                    Pillar severity
+                <span class="driver-section-count">
+                    0
                 </span>
 
+            </div>
+
+
+            <div class="drivers-empty-state routine">
+
                 <strong>
-                    ${score} / 100
+                    No active operational triggers
                 </strong>
 
-            </div>
-
-
-            <div class="driver-severity-track">
-
-                <div
-                    class="driver-severity-fill"
-                    style="
-                        width:${score}%;
-                    "
-                >
-                </div>
+                <p>
+                    No configured operational trigger currently meets its activation threshold.
+                </p>
 
             </div>
 
-        </article>
+        </div>
 
     `;
 
@@ -1254,105 +1097,47 @@ function createPillarDriverCard(
 
 
 /**
- * Create the factor list for one operational pillar.
+ * Create a quiet state when no score contributors
+ * are available.
  */
-function createPillarFactorList(
-
-    pillar:OperationalPillarDetail
-
-):string {
+function createNoScoreDriversSection():string {
 
     return `
 
-        <div class="pillar-factor-list">
+        <div class="driver-section">
 
-            ${pillar.factors
+            <div class="driver-section-heading">
 
-                .slice(
+                <div>
 
-                    0,
+                    <span class="driver-section-kicker">
+                        Score Contribution
+                    </span>
 
-                    4
+                    <h4>
+                        Top HRI Contributors
+                    </h4>
 
-                )
+                </div>
 
-                .map(
+                <span class="driver-section-count">
+                    0
+                </span>
 
-                    factor => {
-
-                        const differenceMarkup =
-
-                            factor.difference !== null
-
-                                ? `
-
-                                    <small>
-
-                                        ${escapeHtml(
-                                            formatSignedUnknownValue(
-                                                factor.difference
-                                            )
-                                        )}
-
-                                    </small>
-
-                                `
-
-                                : "";
+            </div>
 
 
-                        return `
+            <div class="drivers-empty-state routine">
 
-                            <div class="pillar-factor">
+                <strong>
+                    No dominant score contributor
+                </strong>
 
-                                <div>
+                <p>
+                    The current HRI result does not identify a major individual score contributor.
+                </p>
 
-                                    <strong>
-
-                                        ${escapeHtml(
-                                            factor.label
-                                        )}
-
-                                    </strong>
-
-
-                                    <span>
-
-                                        ${escapeHtml(
-                                            factor.explanation
-                                        )}
-
-                                    </span>
-
-                                </div>
-
-
-                                <div class="pillar-factor-values">
-
-                                    <span>
-
-                                        ${escapeHtml(
-                                            formatUnknownValue(
-                                                factor.currentValue
-                                            )
-                                        )}
-
-                                    </span>
-
-
-                                    ${differenceMarkup}
-
-                                </div>
-
-                            </div>
-
-                        `;
-
-                    }
-
-                )
-
-                .join("")}
+            </div>
 
         </div>
 
@@ -1400,8 +1185,8 @@ function createValueCell(
 
 
 /**
- * Create a note when more drivers exist than can
- * be displayed.
+ * Create a note when more drivers exist than are
+ * shown in the condensed operational view.
  */
 function createAdditionalDriverMessage(
 
@@ -1416,12 +1201,14 @@ function createAdditionalDriverMessage(
         <div class="driver-additional-message">
 
             ${additionalCount}
-
             additional
-
             ${escapeHtml(label)}
-
-            are not shown in this condensed view.
+            ${
+                additionalCount === 1
+                    ? "is"
+                    : "are"
+            }
+            not shown in this condensed view.
 
         </div>
 
@@ -1431,7 +1218,8 @@ function createAdditionalDriverMessage(
 
 
 /**
- * Sort active triggers by priority and proximity.
+ * Sort active triggers by priority and then
+ * proximity.
  */
 function compareTriggerPriority(
 
@@ -1475,7 +1263,8 @@ function compareTriggerPriority(
 
 
 /**
- * Sort EDORI drivers from highest to lowest impact.
+ * Sort EDORI contributors from highest to lowest
+ * relative impact.
  */
 function compareDriverSeverity(
 
@@ -1495,39 +1284,7 @@ function compareDriverSeverity(
 
 
 /**
- * Sort operational pillars by score.
- */
-function comparePillarScore(
-
-    first:OperationalPillarDetail,
-
-    second:OperationalPillarDetail
-
-):number {
-
-    return (
-
-        second.score
-
-        ?? 0
-
-    )
-
-    -
-
-    (
-
-        first.score
-
-        ?? 0
-
-    );
-
-}
-
-
-/**
- * Rank trigger priorities.
+ * Rank operational-trigger priorities.
  */
 function getTriggerPriorityRank(
 
@@ -1565,7 +1322,8 @@ function getTriggerPriorityRank(
 
 
 /**
- * Convert trigger priority to visual severity.
+ * Convert trigger priority to existing driver-card
+ * visual severity.
  */
 function createTriggerSeverity(
 
@@ -1601,11 +1359,10 @@ function createTriggerSeverity(
 
 
 /**
- * Convert a numerical domain severity into the
+ * Convert numerical driver severity into the
  * existing driver-card visual severity classes.
  *
- * Domain thresholds come from the centralized
- * domainSeverity configuration.
+ * Thresholds remain centralized in domainSeverity.
  */
 function createNumericSeverity(
 
@@ -1652,10 +1409,8 @@ function createNumericSeverity(
 
 /**
  * Calculate the difference between a driver's
- * current and expected values.
- *
- * A difference is returned only when both values
- * are finite numbers.
+ * current and expected values when both are finite
+ * numbers.
  */
 function calculateDriverDifference(
 
@@ -1840,8 +1595,7 @@ function formatSignedUnknownValue(
 
 
 /**
- * Format a number with no unnecessary trailing
- * zero.
+ * Format a number without unnecessary trailing zero.
  */
 function formatNumber(
 
@@ -1888,6 +1642,10 @@ function formatNumber(
 
 /**
  * Update the displayed driver count.
+ *
+ * This count represents the number of driver cards
+ * actually shown in the condensed view rather than
+ * every available domain/pillar record.
  */
 function updateDriverCount(
 
@@ -1895,11 +1653,13 @@ function updateDriverCount(
 
 ):void {
 
-    const element = document.getElementById(
+    const element =
 
-        "driverCount"
+        document.getElementById(
 
-    );
+            "driverCount"
+
+        );
 
 
     if(!element){
@@ -1909,11 +1669,13 @@ function updateDriverCount(
     }
 
 
-    element.textContent = count === 1
+    element.textContent =
 
-        ? "1 driver"
+        count === 1
 
-        : `${count} drivers`;
+            ? "1 driver"
+
+            : `${count} drivers`;
 
 }
 
@@ -1956,7 +1718,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to display the current operational drivers.
+                Submit the Hospital Readiness Assessment to display the current operational drivers.
             </p>
 
         </div>

@@ -25,24 +25,24 @@
 
 import {
 
-    ED_PRESSURE_WEIGHTS,
+    getConfiguration,
 
-    WEIGHTS,
-
-    areWeightsValid
+    validateConfiguration
 
 }
 
-from "../config/weights";
+from "./ConfigurationService";
 
 
 import {
 
-    getOperationalState
+    getConfiguredOperationalState
 
 }
 
-from "../config/operationalStates";
+from "./OperationalStateService";
+
+
 
 
 import type {
@@ -124,15 +124,63 @@ export function calculateEdori(
 
 ):EdoriResult {
 
-    if(!areWeightsValid()){
+    /*
+     * =================================================
+     * Effective runtime configuration
+     * =================================================
+     *
+     * ConfigurationService returns validated saved
+     * administrative overrides when they exist.
+     *
+     * Otherwise it returns the built-in configuration.
+     *
+     * Capture configuration exactly once so one HRI
+     * calculation cannot mix configuration versions.
+     */
+
+    const configuration =
+
+        getConfiguration();
+
+
+    const configurationValidation =
+
+        validateConfiguration(
+
+            configuration
+
+        );
+
+
+    if(!configurationValidation.valid){
 
         throw new Error(
 
-            "Hospital Readiness scoring weights are invalid."
+            [
+
+                "Hospital Readiness configuration is invalid.",
+
+                ...configurationValidation.errors
+
+            ].join(
+
+                " "
+
+            )
 
         );
 
     }
+
+
+    const domainWeights =
+
+        configuration.domainWeights;
+
+
+    const edPressureWeights =
+
+        configuration.edPressureWeights;
 
 
     /*
@@ -172,7 +220,7 @@ export function calculateEdori(
         );
 
 
-    const edPressureScore =
+        const edPressureScore =
 
         roundScore(
 
@@ -182,7 +230,7 @@ export function calculateEdori(
 
                 *
 
-                ED_PRESSURE_WEIGHTS.volume
+                edPressureWeights.volume
 
             )
 
@@ -194,7 +242,7 @@ export function calculateEdori(
 
                 *
 
-                ED_PRESSURE_WEIGHTS.boarding
+                edPressureWeights.boarding
 
             )
 
@@ -206,7 +254,7 @@ export function calculateEdori(
 
                 *
 
-                ED_PRESSURE_WEIGHTS.acuity
+                edPressureWeights.acuity
 
             )
 
@@ -540,27 +588,67 @@ export function calculateEdori(
      * =================================================
      */
 
-    const baseScore =
+        const baseScore =
 
         roundScore(
 
-            (edPressureScore * WEIGHTS.edPressure)
+            (
+
+                edPressureScore
+
+                *
+
+                domainWeights.edPressure
+
+            )
 
             +
 
-            (acuteCapacityScore * WEIGHTS.acuteCapacity)
+            (
+
+                acuteCapacityScore
+
+                *
+
+                domainWeights.acuteCapacity
+
+            )
 
             +
 
-            (criticalCapacityScore * WEIGHTS.criticalCapacity)
+            (
+
+                criticalCapacityScore
+
+                *
+
+                domainWeights.criticalCapacity
+
+            )
 
             +
 
-            (inflowScore * WEIGHTS.inflow)
+            (
+
+                inflowScore
+
+                *
+
+                domainWeights.inflow
+
+            )
 
             +
 
-            (projectedCapacityScore * WEIGHTS.projectedCapacity)
+            (
+
+                projectedCapacityScore
+
+                *
+
+                domainWeights.projectedCapacity
+
+            )
 
         );
 
@@ -606,13 +694,13 @@ export function calculateEdori(
         );
 
 
-    const operationalState =
+ const operationalState =
 
-        getOperationalState(
+    getConfiguredOperationalState(
 
-            score
+        score
 
-        );
+    );
 
 
     const drivers =
@@ -2190,3 +2278,4 @@ function formatAbsoluteBedCount(
         );
 
 }
+

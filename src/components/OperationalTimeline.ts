@@ -26,11 +26,11 @@ from "../config/appEvents";
 
 import {
 
-    getOperationalState
+    getConfiguredOperationalState
 
 }
 
-from "../config/operationalStates";
+from "../services/OperationalStateService";
 
 
 import {
@@ -101,7 +101,7 @@ export function OperationalTimeline():string {
                     </h3>
 
                     <p class="panel-description">
-                        Chronological EDORI score and operational-level changes
+                        Chronological HRI score and operational-level changes
                     </p>
 
                 </div>
@@ -436,7 +436,7 @@ function createTimelineEntries(
                 : null;
 
 
-            const currentLevel = getOperationalState(
+            const currentLevel = getConfiguredOperationalState(
 
                 snapshot.score
 
@@ -445,7 +445,7 @@ function createTimelineEntries(
 
             const previousLevel = previousSnapshot
 
-                ? getOperationalState(
+                ? getConfiguredOperationalState(
 
                     previousSnapshot.score
 
@@ -505,7 +505,7 @@ function createTimelineEntryMarkup(
     } = entry;
 
 
-    const currentState = getOperationalState(
+    const currentState = getConfiguredOperationalState(
 
         snapshot.score
 
@@ -514,7 +514,7 @@ function createTimelineEntryMarkup(
 
     const previousState = previousSnapshot
 
-        ? getOperationalState(
+        ? getConfiguredOperationalState(
 
             previousSnapshot.score
 
@@ -634,7 +634,7 @@ function createTimelineEntryMarkup(
 
                             <span>
 
-                                EDORI ${safeScore}
+                                HRI ${safeScore}
 
                             </span>
 
@@ -875,19 +875,19 @@ function createTimelineDescription(
 
     if(scoreChange === null || scoreChange === 0){
 
-        return `The EDORI score remained stable within level ${currentLevel}.`;
+        return `The HRI score remained stable within level ${currentLevel}.`;
 
     }
 
 
     if(scoreChange < 0){
 
-        return `The EDORI score improved while remaining within level ${currentLevel}.`;
+        return `The HRI score improved while remaining within level ${currentLevel}.`;
 
     }
 
 
-    return `The EDORI score increased while remaining within level ${currentLevel}.`;
+    return `The HRI score increased while remaining within level ${currentLevel}.`;
 
 }
 
@@ -1010,7 +1010,7 @@ function createEmptyTimelineState():string {
             </strong>
 
             <p>
-                Saved EDORI assessments will appear here after calculation.
+                Saved HRI assessments will appear here after calculation.
             </p>
 
         </div>

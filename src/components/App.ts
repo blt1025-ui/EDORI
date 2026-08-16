@@ -1,7 +1,20 @@
 /**
  * App
  *
- * Renders the main EDORI application structure.
+ * Renders the main EDORI application shell.
+ *
+ * The application is divided into four persistent
+ * top-level pages:
+ *
+ * - Dashboard
+ * - Assessment
+ * - Operational Detail
+ * - Administration
+ *
+ * All page markup remains mounted in the DOM so
+ * navigating between pages does not destroy EDORI
+ * form state, results, history, or component event
+ * subscriptions.
  *
  * Component initialization is handled by main.ts
  * after this markup has been inserted into the DOM.
@@ -27,11 +40,38 @@ from "./Sidebar";
 
 import {
 
-    Dashboard
+    DashboardPage
 
 }
 
-from "./Dashboard";
+from "./pages/DashboardPage";
+
+
+import {
+
+    AssessmentPage
+
+}
+
+from "./pages/AssessmentPage";
+
+
+import {
+
+    OperationalDetailPage
+
+}
+
+from "./pages/OperationalDetailPage";
+
+
+import {
+
+    AdministrationPage
+
+}
+
+from "./pages/AdministrationPage";
 
 
 /**
@@ -48,7 +88,24 @@ export function App():string {
 
             ${Sidebar()}
 
-            ${Dashboard()}
+
+            <div
+                id="applicationPageContainer"
+                class="application-page-container"
+            >
+
+                ${DashboardPage()}
+
+
+                ${AssessmentPage()}
+
+
+                ${OperationalDetailPage()}
+
+
+                ${AdministrationPage()}
+
+            </div>
 
         </div>
 

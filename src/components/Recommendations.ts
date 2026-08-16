@@ -2,7 +2,8 @@
  * Recommendations
  *
  * Displays prioritized operational actions from the
- * authoritative OperationalAssessment.
+ * authoritative OperationalAssessment in a concise
+ * operational action-center format.
  *
  * This component does not:
  *
@@ -90,10 +91,14 @@ from "../types/OperationalRecommendation";
 
 
 /**
- * Maximum number of actions displayed in each
- * priority section.
+ * Maximum number of actions displayed in condensed
+ * lower-priority sections.
+ *
+ * Immediate and High-priority actions are always
+ * shown in full. Moderate and Routine sections remain
+ * condensed to keep the page manageable.
  */
-const MAXIMUM_ACTIONS_PER_SECTION = 8;
+const MAXIMUM_CONDENSED_ACTIONS_PER_SECTION = 6;
 
 
 /**
@@ -132,7 +137,7 @@ export function Recommendations():string {
                     </h3>
 
                     <p class="panel-description">
-                        Prioritized operational interventions
+                        Prioritized actions, ownership, and reassessment timing
                     </p>
 
                 </div>
@@ -361,6 +366,10 @@ function updateRecommendations():void {
 
 /**
  * Create the completed Action Center.
+ *
+ * The summary focuses on actionable information:
+ * total actions, immediate actions, and the shortest
+ * reassessment interval.
  */
 function createActionCenterMarkup(
 
@@ -412,40 +421,6 @@ function createActionCenterMarkup(
 
     ).length;
 
-
-    const responsibleGroups = Array.from(
-
-        new Set(
-
-            recommendations
-
-                .map(
-
-                    recommendation =>
-
-                        normalizeOptionalText(
-
-                            recommendation.responsibleGroup
-
-                        )
-
-                )
-
-                .filter(
-
-                    (
-
-                        value
-
-                    ):value is string =>
-
-                        value !== null
-
-                )
-
-        )
-
-    );
 
 
     return `
@@ -499,17 +474,7 @@ function createActionCenterMarkup(
             </div>
 
 
-            <div class="action-center-summary-item">
 
-                <span>
-                    Responsible Groups
-                </span>
-
-                <strong>
-                    ${responsibleGroups.length}
-                </strong>
-
-            </div>
 
         </div>
 
@@ -584,28 +549,47 @@ function createPrioritySection(
 
 ):string {
 
+    const showAllRecommendations =
+
+        priority === "Immediate"
+
+        ||
+
+        priority === "High";
+
+
     const visibleRecommendations =
 
-        recommendations.slice(
+        showAllRecommendations
 
-            0,
+            ? recommendations
 
-            MAXIMUM_ACTIONS_PER_SECTION
+            : recommendations.slice(
 
-        );
+                0,
+
+                MAXIMUM_CONDENSED_ACTIONS_PER_SECTION
+
+            );
 
 
-    const hiddenCount = Math.max(
+    const hiddenCount =
 
-        0,
+        showAllRecommendations
 
-        recommendations.length
+            ? 0
 
-        -
+            : Math.max(
 
-        visibleRecommendations.length
+                0,
 
-    );
+                recommendations.length
+
+                -
+
+                visibleRecommendations.length
+
+            );
 
 
     return `
@@ -756,27 +740,6 @@ function createActionCard(
     );
 
 
-    const reassessmentText =
-
-        recommendation.reassessmentMinutes === null
-
-        ||
-
-        !Number.isFinite(
-
-            recommendation.reassessmentMinutes
-
-        )
-
-        ||
-
-        recommendation.reassessmentMinutes <= 0
-
-            ? "Routine interval"
-
-            : `${Math.round(
-                recommendation.reassessmentMinutes
-            )} minutes`;
 
 
     return `
@@ -799,7 +762,7 @@ function createActionCard(
 
                 <div class="action-center-card-header">
 
-                    <div>
+                    <div class="action-center-title-group">
 
                         <span
                             class="
@@ -826,17 +789,6 @@ function createActionCard(
                     </div>
 
 
-                    <span
-                        class="action-center-time-badge"
-                        title="Recommended reassessment interval"
-                    >
-
-                        ${escapeHtml(
-                            reassessmentText
-                        )}
-
-                    </span>
-
                 </div>
 
 
@@ -849,42 +801,22 @@ function createActionCard(
                 </p>
 
 
-                <div class="action-center-metadata">
+                <div class="action-center-owner-row">
 
-                    <div class="action-center-metadata-item">
-
-                        <span>
-                            Responsible Group
-                        </span>
-
-                        <strong>
-
-                            ${escapeHtml(
-                                responsibleGroup
-
-                                ?? "Local operational leadership"
-                            )}
-
-                        </strong>
-
-                    </div>
+                    <span>
+                        Owner
+                    </span>
 
 
-                    <div class="action-center-metadata-item">
+                    <strong>
 
-                        <span>
-                            Reassessment
-                        </span>
+                        ${escapeHtml(
+                            responsibleGroup
 
-                        <strong>
+                            ?? "Local operational leadership"
+                        )}
 
-                            ${escapeHtml(
-                                reassessmentText
-                            )}
-
-                        </strong>
-
-                    </div>
+                    </strong>
 
                 </div>
 
@@ -896,7 +828,7 @@ function createActionCard(
                         <div class="action-center-rationale">
 
                             <strong>
-                                Operational rationale
+                                Why now
                             </strong>
 
                             <p>
@@ -916,165 +848,11 @@ function createActionCard(
                 }
 
 
-                ${createRecommendationSourceMarkup(
-                    recommendation
-                )}
-
             </div>
 
         </article>
 
     `;
-
-}
-
-
-/**
- * Create a source-trigger display when the
- * recommendation type provides source trigger IDs.
- */
-function createRecommendationSourceMarkup(
-
-    recommendation:OperationalRecommendation
-
-):string {
-
-    const sourceTriggerIds =
-
-        readSourceTriggerIds(
-
-            recommendation
-
-        );
-
-
-    if(sourceTriggerIds.length === 0){
-
-        return "";
-
-    }
-
-
-    return `
-
-        <div class="action-center-source">
-
-            <span>
-                Source triggers
-            </span>
-
-
-            <div class="action-center-source-list">
-
-                ${sourceTriggerIds
-
-                    .map(
-
-                        triggerId => `
-
-                            <code>
-
-                                ${escapeHtml(
-                                    triggerId
-                                )}
-
-                            </code>
-
-                        `
-
-                    )
-
-                    .join("")}
-
-            </div>
-
-        </div>
-
-    `;
-
-}
-
-
-/**
- * Safely read source trigger IDs without requiring
- * the interface to define the optional property.
- */
-function readSourceTriggerIds(
-
-    recommendation:OperationalRecommendation
-
-):string[] {
-
-    const candidate = recommendation as
-
-        OperationalRecommendation
-
-        &
-
-        {
-
-            sourceTriggerIds?:unknown;
-
-            triggerIds?:unknown;
-
-        };
-
-
-    const possibleValues = [
-
-        candidate.sourceTriggerIds,
-
-        candidate.triggerIds
-
-    ];
-
-
-    for(const value of possibleValues){
-
-        if(!Array.isArray(value)){
-
-            continue;
-
-        }
-
-
-        const normalizedValues = value
-
-            .filter(
-
-                item =>
-
-                    typeof item === "string"
-
-            )
-
-            .map(
-
-                item =>
-
-                    item.trim()
-
-            )
-
-            .filter(
-
-                item =>
-
-                    item.length > 0
-
-            );
-
-
-        if(normalizedValues.length > 0){
-
-            return normalizedValues;
-
-        }
-
-    }
-
-
-    return [];
 
 }
 

@@ -1,54 +1,52 @@
 /**
- * Hospital constants used throughout the EDORI application.
- * These values describe the physical hospital and should only
- * change if the hospital configuration changes.
+ * Hospital constants used throughout the application.
+ *
+ * These values describe stable hospital reference
+ * characteristics rather than operational capacity
+ * values that may change from assessment to assessment.
  */
 
 export const HOSPITAL = {
 
     /**
-     * Licensed ED treatment spaces.
-     */
-    ED_BEDS: 63,
-
-    /**
      * Total licensed hospital beds.
      */
-    TOTAL_BEDS: 308,
+    TOTAL_BEDS:
+        308,
 
     /**
-     * Medical/Surgical beds used for occupancy calculations.
+     * Approximate annual Emergency Department volume.
      */
-    MEDICAL_BEDS: 273,
-
-    /**
-     * Approximate annual ED volume.
-     */
-    ANNUAL_ED_VISITS: 70000
+    ANNUAL_ED_VISITS:
+        70000
 
 } as const;
 
 
 /**
  * Default operating assumptions.
- * These are used for calibration and can be adjusted later if
- * historical data supports different baseline values.
+ *
+ * These values are retained for built-in model
+ * defaults and calibration support.
  */
 export const BASELINE = {
 
     /**
-     * Typical boarded patients.
+     * Typical ED boarding baseline.
      */
-    BOARDERS: 35,
+    BOARDERS:
+        35,
 
     /**
-     * Maximum EDORI score.
+     * Maximum Hospital Readiness score.
      */
-    MAX_SCORE: 100,
+    MAX_SCORE:
+        100,
 
     /**
-     * Minimum EDORI score.
+     * Minimum Hospital Readiness score.
      */
-    MIN_SCORE: 0
+    MIN_SCORE:
+        0
 
 } as const;

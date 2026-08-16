@@ -33,7 +33,15 @@ export const APP_EVENTS = {
      * as deletion, import, or external syncing.
      */
     HISTORY_CHANGED:
-        "historyChanged"
+        "historyChanged",
+
+
+    /**
+     * Administrative configuration overrides
+     * changed.
+     */
+    CONFIGURATION_CHANGED:
+        "configurationChanged"
 
 } as const;
 

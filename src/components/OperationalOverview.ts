@@ -469,10 +469,6 @@ function createOperationalAssessmentMarkup(
 
             )}
 
-        </div>
-
-
-        <div class="operational-momentum-section">
 
             ${createPillarCard(
 

@@ -1,24 +1,142 @@
-import { numberValue } from "./DomService";
-import { calculateDemand } from "./DemandService";
-import { defaultSettings } from "../config/defaultSettings";
+/**
+ * UpdateDemand
+ *
+ * Updates legacy ED-demand display elements using
+ * the effective administrative configuration.
+ */
 
-export function updateDemand() {
+import {
 
-    const totalVolume = numberValue("totalEDVolume");
-    const boardedPatients = numberValue("boardedPatients");
+    numberValue
 
-    const result = calculateDemand(
-        totalVolume,
-        boardedPatients
-    );
+}
 
-    document.getElementById("volumeCard")!.textContent =
-        totalVolume.toString();
+from "./DomService";
 
-    document.getElementById("occupancyRatio")!.textContent =
-        `${totalVolume}/${defaultSettings.edCapacity} (${(result.occupancyRatio * 100).toFixed(0)}%)`;
 
-    document.getElementById("boardingPercent")!.textContent =
-        `${(result.boardingPercent * 100).toFixed(0)}%`;
+import {
+
+    calculateDemand
+
+}
+
+from "./DemandService";
+
+
+import {
+
+    getConfiguration
+
+}
+
+from "./ConfigurationService";
+
+
+/**
+ * Refresh ED-demand display values.
+ */
+export function updateDemand():void {
+
+    const totalVolume =
+
+        numberValue(
+
+            "totalEDVolume"
+
+        );
+
+
+    const boardedPatients =
+
+        numberValue(
+
+            "boardedPatients"
+
+        );
+
+
+    const configuration =
+
+        getConfiguration();
+
+
+    const edCapacity =
+
+        Math.max(
+
+            1,
+
+            configuration.hospital.edCapacity
+
+        );
+
+
+    const result =
+
+        calculateDemand(
+
+            totalVolume,
+
+            boardedPatients
+
+        );
+
+
+    const volumeCard =
+
+        document.getElementById(
+
+            "volumeCard"
+
+        );
+
+
+    if(volumeCard){
+
+        volumeCard.textContent =
+
+            totalVolume.toString();
+
+    }
+
+
+    const occupancyRatio =
+
+        document.getElementById(
+
+            "occupancyRatio"
+
+        );
+
+
+    if(occupancyRatio){
+
+        occupancyRatio.textContent =
+
+            `${totalVolume}/${edCapacity} (${(
+                result.occupancyRatio * 100
+            ).toFixed(0)}%)`;
+
+    }
+
+
+    const boardingPercent =
+
+        document.getElementById(
+
+            "boardingPercent"
+
+        );
+
+
+    if(boardingPercent){
+
+        boardingPercent.textContent =
+
+            `${(
+                result.boardingPercent * 100
+            ).toFixed(0)}%`;
+
+    }
 
 }

@@ -39,6 +39,8 @@ import {
 
     getHistoricalRecordCount,
 
+    getHistoricalRepositoryStatus,
+
     hasImportedHistoricalDataset,
 
     saveHistoricalDataset
@@ -165,6 +167,22 @@ export function HistoricalDataManager():string {
 
                 </div>
 
+
+                <div class="historical-source-item">
+
+                    <span class="historical-source-label">
+                        Imported
+                    </span>
+
+                    <strong
+                        id="historicalImportedAt"
+                        class="historical-source-value"
+                    >
+                        --
+                    </strong>
+
+                </div>
+
             </div>
 
 
@@ -190,9 +208,18 @@ export function HistoricalDataManager():string {
 
                     Required columns:
 
-                    day, hour, expectedVolume,
-                    expectedBoarders, expectedArrivals,
-                    expectedDepartures.
+                    day, hour, expectedEDVolume,
+                    expectedEDBoarders,
+                    expectedStaffedAcuteCareBeds,
+                    expectedOccupiedAcuteCareBeds,
+                    expectedEDAdmissions,
+                    expectedDirectAdmissions,
+                    expectedSurgicalAdmissions,
+                    expectedInpatientDepartures.
+
+                    The file must contain exactly one
+                    record for every weekday/hour
+                    combination (168 records total).
 
                 </p>
 
@@ -200,6 +227,15 @@ export function HistoricalDataManager():string {
 
 
             <div class="historical-manager-actions">
+
+                <button
+                    id="downloadHistoricalTemplateButton"
+                    class="secondary-button"
+                    type="button"
+                >
+                    Download CSV Template
+                </button>
+
 
                 <button
                     id="validateHistoricalCsvButton"
@@ -251,6 +287,13 @@ export function HistoricalDataManager():string {
             >
             </div>
 
+
+            <div
+                id="historicalPreview"
+                class="historical-validation-results"
+            >
+            </div>
+
         </section>
 
     `;
@@ -265,6 +308,8 @@ export function initializeHistoricalDataManager():void {
 
     updateActiveSourceDisplay();
 
+    initializeTemplateButton();
+
     initializeFileInput();
 
     initializeValidateButton();
@@ -272,6 +317,181 @@ export function initializeHistoricalDataManager():void {
     initializeImportButton();
 
     initializeRestoreButton();
+
+}
+
+
+/**
+ * Initialize CSV template download.
+ */
+function initializeTemplateButton():void {
+
+    const button = document.getElementById(
+
+        "downloadHistoricalTemplateButton"
+
+    ) as HTMLButtonElement | null;
+
+
+    if(!button){
+
+        return;
+
+    }
+
+
+    button.addEventListener(
+
+        "click",
+
+        downloadHistoricalCsvTemplate
+
+    );
+
+}
+
+
+/**
+ * Download a complete 168-row Version 2.1 CSV
+ * template with weekday/hour buckets pre-populated.
+ */
+function downloadHistoricalCsvTemplate():void {
+
+    const headers = [
+
+        "day",
+        "hour",
+        "expectedEDVolume",
+        "expectedEDBoarders",
+        "expectedStaffedAcuteCareBeds",
+        "expectedOccupiedAcuteCareBeds",
+        "expectedEDAdmissions",
+        "expectedDirectAdmissions",
+        "expectedSurgicalAdmissions",
+        "expectedInpatientDepartures"
+
+    ];
+
+
+    const days:HistoricalExpectation["day"][] = [
+
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+
+    ];
+
+
+    const rows:string[] = [
+
+        headers.join(",")
+
+    ];
+
+
+    days.forEach(
+
+        day => {
+
+            for(
+
+                let hour = 0;
+
+                hour < 24;
+
+                hour += 1
+
+            ){
+
+                rows.push(
+
+                    [
+
+                        day,
+                        String(hour),
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
+
+                    ].join(",")
+
+                );
+
+            }
+
+        }
+
+    );
+
+
+    const blob = new Blob(
+
+        [
+            rows.join("\r\n")
+        ],
+
+        {
+            type:
+                "text/csv;charset=utf-8"
+        }
+
+    );
+
+
+    const url = URL.createObjectURL(
+
+        blob
+
+    );
+
+
+    const link = document.createElement(
+
+        "a"
+
+    );
+
+
+    link.href = url;
+
+    link.download =
+        "EDORI_Historical_Expectations_Template.csv";
+
+
+    document.body.appendChild(
+
+        link
+
+    );
+
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(
+
+        url
+
+    );
+
+
+    showImportMessage(
+
+        "Historical CSV template downloaded. Complete all 168 hourly records before validating the file.",
+
+        "default"
+
+    );
 
 }
 
@@ -319,6 +539,8 @@ function initializeFileInput():void {
 
 
             clearValidationResults();
+
+            clearPreview();
 
 
             const file = input.files?.[0];
@@ -494,6 +716,13 @@ async function validateSelectedCsv():Promise<void> {
         );
 
 
+        displayCandidatePreview(
+
+            validatedDataset
+
+        );
+
+
         setImportButtonEnabled(
 
             true
@@ -626,6 +855,9 @@ function importValidatedDataset():void {
 
 
         validatedDataset = null;
+
+
+        clearPreview();
 
 
         setImportButtonEnabled(
@@ -794,6 +1026,8 @@ function restoreBuiltInDataset():void {
 
         clearValidationResults();
 
+        clearPreview();
+
 
         updateActiveSourceDisplay();
 
@@ -856,6 +1090,9 @@ function updateActiveSourceDisplay():void {
     const recordCount = getHistoricalRecordCount();
 
 
+    const status = getHistoricalRepositoryStatus();
+
+
     setElementText(
 
         "historicalSourceValue",
@@ -878,6 +1115,21 @@ function updateActiveSourceDisplay():void {
             recordCount
 
         )
+
+    );
+
+
+    setElementText(
+
+        "historicalImportedAt",
+
+        status.importedAt
+
+            ? formatDateTime(
+                status.importedAt
+            )
+
+            : "Built-In"
 
     );
 
@@ -1067,6 +1319,160 @@ function displayValidationResult(
         ${warningsHtml}
 
     `;
+
+}
+
+
+/**
+ * Display a compact preview of a validated dataset.
+ */
+function displayCandidatePreview(
+
+    records:HistoricalExpectation[]
+
+):void {
+
+    const container = document.getElementById(
+
+        "historicalPreview"
+
+    );
+
+
+    if(!container){
+
+        return;
+
+    }
+
+
+    const sample = records.slice(
+
+        0,
+
+        12
+
+    );
+
+
+    container.innerHTML = `
+
+        <div class="historical-validation-success">
+
+            Validated dataset preview
+            (${records.length} records total)
+
+        </div>
+
+
+        <div style="overflow-x:auto;">
+
+            <table class="historical-preview-table">
+
+                <thead>
+
+                    <tr>
+                        <th>Day</th>
+                        <th>Hour</th>
+                        <th>ED Census</th>
+                        <th>Boarders</th>
+                        <th>Staffed Acute Beds</th>
+                        <th>Occupied Acute Beds</th>
+                        <th>ED Admissions</th>
+                        <th>Direct Admissions</th>
+                        <th>Surgical Admissions</th>
+                        <th>Inpatient Departures</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    ${sample.map(
+
+                        record => `
+
+                            <tr>
+                                <td>${escapeHtml(record.day)}</td>
+                                <td>${record.hour}</td>
+                                <td>${record.expectedEDVolume}</td>
+                                <td>${record.expectedEDBoarders}</td>
+                                <td>${record.expectedStaffedAcuteCareBeds}</td>
+                                <td>${record.expectedOccupiedAcuteCareBeds}</td>
+                                <td>${record.expectedEDAdmissions}</td>
+                                <td>${record.expectedDirectAdmissions}</td>
+                                <td>${record.expectedSurgicalAdmissions}</td>
+                                <td>${record.expectedInpatientDepartures}</td>
+                            </tr>
+
+                        `
+
+                    ).join("")}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Clear the candidate preview.
+ */
+function clearPreview():void {
+
+    const container = document.getElementById(
+
+        "historicalPreview"
+
+    );
+
+
+    if(container){
+
+        container.innerHTML = "";
+
+    }
+
+}
+
+
+/**
+ * Format repository timestamps for display.
+ */
+function formatDateTime(
+
+    value:Date
+
+):string {
+
+    return value.toLocaleString(
+
+        undefined,
+
+        {
+            year:
+                "numeric",
+
+            month:
+                "short",
+
+            day:
+                "numeric",
+
+            hour:
+                "numeric",
+
+            minute:
+                "2-digit"
+
+        }
+
+    );
 
 }
 

@@ -47,10 +47,9 @@ OperationalTrigger[] = [
 
         title:
             "ED Treatment Capacity Exceeded",
-
-        description:
-            "Total emergency department census exceeds the configured 63-bed treatment capacity.",
-
+description:
+    "Total emergency department census exceeds the configured ED treatment capacity.",
+    
         enabled:
             true,
 
@@ -71,7 +70,10 @@ OperationalTrigger[] = [
                     "greaterThan",
 
                 threshold:
-                    63
+                    63,
+
+                thresholdSource:
+                    "configuredEdCapacity"
 
             }
 
@@ -194,7 +196,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             60,
@@ -315,9 +317,9 @@ OperationalTrigger[] = [
 
         interventionIds:[
 
-            "activate-hospital-surge",
-
             "notify-bed-management",
+
+            "review-boarding-barriers",
 
             "escalate-inpatient-throughput",
 
@@ -369,7 +371,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,
@@ -426,7 +428,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,
@@ -548,7 +550,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             60,
@@ -612,9 +614,9 @@ OperationalTrigger[] = [
 
         interventionIds:[
 
-            "activate-hospital-surge",
-
             "notify-bed-management",
+
+            "review-pending-discharges",
 
             "escalate-inpatient-throughput",
 
@@ -672,7 +674,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,
@@ -740,7 +742,7 @@ OperationalTrigger[] = [
 
             "notify-hospital-operations",
 
-            "activate-hospital-surge"
+            "escalate-inpatient-throughput"
 
         ],
 
@@ -851,7 +853,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,
@@ -862,7 +864,7 @@ OperationalTrigger[] = [
 
             "prepare-for-demand-growth",
 
-            "notify-hospital-operations"
+            "review-pending-discharges"
 
         ],
 
@@ -916,7 +918,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,
@@ -955,7 +957,7 @@ OperationalTrigger[] = [
             "Projected Capacity",
 
         priority:
-            "Critical",
+            "High",
 
         conditions:[
 
@@ -975,25 +977,25 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Delta",
+            "Charlie",
 
         reassessmentMinutes:
             30,
 
         interventionIds:[
 
-            "activate-hospital-surge",
+            "review-pending-discharges",
 
             "notify-bed-management",
 
             "escalate-inpatient-throughput",
 
-            "notify-hospital-operations"
+            "prepare-for-demand-growth"
 
         ],
 
         rationale:
-            "The four-hour forecast indicates that expected demand will consume all currently available staffed acute-care capacity."
+            "The four-hour forecast indicates that expected demand will consume all projected staffed acute-care reserve and warrants focused throughput intervention, but zero projected reserve alone does not establish severe deterioration relative to the historical baseline."
 
     },
 
@@ -1016,7 +1018,7 @@ OperationalTrigger[] = [
             "Projected Capacity",
 
         priority:
-            "Critical",
+            "High",
 
         conditions:[
 
@@ -1036,25 +1038,25 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Delta",
+            "Charlie",
 
         reassessmentMinutes:
             30,
 
         interventionIds:[
 
-            "activate-hospital-surge",
+            "review-pending-discharges",
 
             "notify-bed-management",
 
             "escalate-inpatient-throughput",
 
-            "notify-hospital-operations"
+            "prepare-for-demand-growth"
 
         ],
 
         rationale:
-            "Negative projected bed availability indicates that expected four-hour demand exceeds staffed acute-care capacity."
+            "Negative projected bed availability is an important near-term capacity warning, but absolute deficit alone does not establish severe deterioration relative to the historical baseline."
 
     },
 
@@ -1068,7 +1070,7 @@ OperationalTrigger[] = [
             "Severe Projected Acute-Care Capacity Deficit",
 
         description:
-            "The four-hour forecast projects demand exceeding staffed acute-care capacity by at least 10 beds.",
+            "The four-hour forecast projects a deficit of at least 10 staffed acute-care beds and projected capacity pressure is severe relative to the historical baseline.",
 
         enabled:
             true,
@@ -1091,6 +1093,19 @@ OperationalTrigger[] = [
 
                 threshold:
                     -10
+
+            },
+
+            {
+
+                metric:
+                    "projectedCapacityScore",
+
+                operator:
+                    "greaterThanOrEqual",
+
+                threshold:
+                    80
 
             }
 
@@ -1115,7 +1130,7 @@ OperationalTrigger[] = [
         ],
 
         rationale:
-            "A projected deficit of at least 10 staffed acute-care beds represents severe near-term capacity risk."
+            "A large projected deficit combined with severe deterioration relative to the historical projected-capacity baseline represents an unusually high near-term capacity risk."
 
     },
 
@@ -1164,7 +1179,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,
@@ -1223,7 +1238,7 @@ OperationalTrigger[] = [
         ],
 
         minimumOperationalState:
-            "Charlie",
+            "Bravo",
 
         reassessmentMinutes:
             30,

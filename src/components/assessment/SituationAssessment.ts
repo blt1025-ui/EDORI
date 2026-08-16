@@ -14,6 +14,11 @@
  * - Display automatic historical expectations
  * - Call EdoriEngine when the user calculates
  *
+ * The Assessment page is the primary working screen,
+ * so the markup is organized for full-width data entry
+ * with current inputs grouped separately from automatic
+ * historical context.
+ *
  * Historical values are never entered manually.
  */
 
@@ -191,15 +196,23 @@ export function SituationAssessment():string {
 
         <section class="situation-assessment">
 
-            <div class="section-header">
+            <div class="section-header assessment-workspace-header">
 
-                <h2>
-                    Hospital Readiness Assessment
-                </h2>
+                <div>
 
-                <p>
-                    Enter current hospital operational conditions, then calculate the Hospital Readiness Index.
-                </p>
+                    <span class="assessment-workspace-eyebrow">
+                        Current Assessment
+                    </span>
+
+                    <h2>
+                        Current Operational Inputs
+                    </h2>
+
+                    <p>
+                        Enter the current ED, inpatient-capacity, and known non-ED inflow values. Historical expectations are applied automatically when the assessment is calculated.
+                    </p>
+
+                </div>
 
             </div>
 
@@ -246,15 +259,27 @@ export function SituationAssessment():string {
             </div>
 
 
-            ${createEmergencyDepartmentSection()}
+            <div
+                class="assessment-current-grid"
+                aria-label="Current operational inputs"
+            >
 
-            ${createAcuteCareSection()}
+                ${createEmergencyDepartmentSection()}
 
-            ${createCriticalCareSection()}
+                ${createAcuteCareSection()}
 
-            ${createKnownInflowSection()}
+                ${createCriticalCareSection()}
 
-            ${createHistoricalSection()}
+                ${createKnownInflowSection()}
+
+            </div>
+
+
+            <div class="assessment-historical-context">
+
+                ${createHistoricalSection()}
+
+            </div>
 
 
             <div class="assessment-action-footer">
@@ -298,7 +323,7 @@ export function SituationAssessment():string {
                     class="calculate-button assessment-calculate-button"
                     type="button"
                 >
-                    Calculate Hospital Readiness
+                    Calculate & Save Assessment
                 </button>
 
             </div>
@@ -617,11 +642,11 @@ function createHistoricalSection():string {
                     <div>
 
                         <h3>
-                            Automatic Historical Context
+                            Historical Context
                         </h3>
 
                         <p id="historicalPeriodDisplay">
-                            Based on the weekday and hour when Hospital Readiness is calculated.
+                            Automatically selected from the weekday and hour when Hospital Readiness is calculated.
                         </p>
 
                     </div>
@@ -2753,6 +2778,6 @@ function setSubmissionState(
 
         ? "Calculating..."
 
-        : "Calculate Hospital Readiness";
+        : "Calculate & Save Assessment";
 
 }

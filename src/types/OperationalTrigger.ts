@@ -171,6 +171,17 @@ export type OperationalTriggerMetric =
     | "scoreChange";
 
 
+/**
+ * Optional runtime source for a trigger threshold.
+ *
+ * When absent, the numeric threshold defined on the
+ * trigger condition is used normally.
+ */
+export type OperationalTriggerThresholdSource =
+
+    | "configuredEdCapacity";
+
+
 export interface OperationalTriggerCondition {
 
     /**
@@ -186,9 +197,23 @@ export interface OperationalTriggerCondition {
 
 
     /**
-     * Trigger threshold.
+     * Built-in/default numeric threshold.
+     *
+     * This remains required so the trigger definition
+     * is complete even when no runtime configuration
+     * override exists.
      */
     threshold:number;
+
+
+    /**
+     * Optional runtime source for the effective
+     * threshold.
+     *
+     * When present, OperationalTriggerService replaces
+     * the built-in threshold during evaluation.
+     */
+    thresholdSource?:OperationalTriggerThresholdSource;
 
 }
 

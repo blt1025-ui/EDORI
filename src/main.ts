@@ -63,6 +63,15 @@ import {
 from "./scenarios/runOperationalAssessment";
 
 
+import {
+
+    runEdoriValidationSuite
+
+}
+
+from "./scenarios/runEdoriValidationSuite";
+
+
 /**
  * Locate the application root created by index.html.
  */
@@ -152,10 +161,17 @@ if(import.meta.env.DEV){
 
 
         /**
-         * Build and print the complete EDORI 2.0
+         * Build and print the complete EDORI
          * OperationalAssessment object.
          */
         runOperationalAssessment?:() => void;
+
+
+        /**
+         * Run the consolidated EDORI development
+         * validation suite.
+         */
+        runEdoriValidationSuite?:() => unknown;
 
     };
 
@@ -185,6 +201,11 @@ if(import.meta.env.DEV){
         printOperationalAssessmentReport;
 
 
+    developmentWindow.runEdoriValidationSuite =
+
+        runEdoriValidationSuite;
+
+
     console.info(
 
         [
@@ -199,7 +220,9 @@ if(import.meta.env.DEV){
 
             "runOperationalTriggers()",
 
-            "runOperationalAssessment()"
+            "runOperationalAssessment()",
+
+            "runEdoriValidationSuite()"
 
         ].join(
 

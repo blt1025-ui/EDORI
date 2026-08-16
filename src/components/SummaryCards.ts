@@ -1,7 +1,7 @@
 /**
  * SummaryCards
  *
- * Displays six Hospital Readiness command-center cards
+ * Displays five Hospital Readiness domain cards
  * using the authoritative OperationalAssessment.
  *
  * Cards:
@@ -11,7 +11,6 @@
  * - Critical-Care Capacity
  * - Hospital Inflow
  * - Projected Capacity
- * - Hospital Readiness
  *
  * This component does not calculate Hospital Readiness,
  * evaluate triggers, or modify application state.
@@ -300,7 +299,7 @@ function updateSummaryCards():void {
 
 
 /**
- * Create all six completed cards.
+ * Create all five completed domain cards.
  */
 function createCommandCenterCards(
 
@@ -316,19 +315,7 @@ function createCommandCenterCards(
     const result =
 
         operationalAssessment.scoreResult;
-
-
-    const finalState =
-
-        operationalAssessment.finalOperationalState;
-
-
-    const baseState =
-
-        operationalAssessment.baseOperationalState;
-
-
-    /*
+/*
      * =================================================
      * Emergency Department
      * =================================================
@@ -435,21 +422,7 @@ function createCommandCenterCards(
     const projectedAvailableAcuteCareBeds =
 
         result.projectedAvailableAcuteCareBeds;
-
-
-    const activeTriggerCount =
-
-        operationalAssessment.activeTriggers.length;
-
-
-    const scoreChange = determineLatestScoreChange(
-
-        operationalAssessment
-
-    );
-
-
-    return `
+return `
 
         ${createCommandCenterCard({
 
@@ -687,58 +660,7 @@ function createCommandCenterCards(
         })}
 
 
-        ${createCommandCenterCard({
-
-            title:
-                "Hospital Readiness",
-
-            icon:
-                finalState.icon,
-
-            primaryLabel:
-                "Final Operational Level",
-
-            primaryValue:
-                finalState.title,
-
-            secondaryValue:
-                `HRI ${Math.round(
-                    result.score
-                )} · ${operationalAssessment.riskDirection}`,
-
-            comparison:
-                createOperationalStatusComparison(
-
-                    baseState.title,
-
-                    finalState.title,
-
-                    activeTriggerCount,
-
-                    scoreChange
-
-                ),
-
-            detail:
-                `${activeTriggerCount} active operational ${
-                    activeTriggerCount === 1
-
-                        ? "trigger"
-
-                        : "triggers"
-                }. Confidence: ${operationalAssessment.confidence}.`,
-
-            severity:
-                createStateSeverity(
-
-                    finalState.title
-
-                ),
-
-            accentColor:
-                finalState.color
-
-        })}
+        
 
     `;
 
@@ -885,96 +807,6 @@ function createCommandCenterCard(
 }
 
 
-/**
- * Determine the latest Hospital Readiness score change.
- */
-function determineLatestScoreChange(
-
-    operationalAssessment:OperationalAssessment
-
-):number | null {
-
-    const snapshots = operationalAssessment
-
-        .triggerResults.length >= 0
-
-            ? getSnapshots()
-
-            : [];
-
-
-    const validSnapshots = snapshots
-
-        .filter(
-
-            snapshot =>
-
-                Number.isFinite(
-
-                    snapshot.score
-
-                )
-
-        )
-
-        .slice()
-
-        .sort(
-
-            (
-
-                first,
-
-                second
-
-            ) =>
-
-                new Date(
-
-                    first.timestamp
-
-                ).getTime()
-
-                -
-
-                new Date(
-
-                    second.timestamp
-
-                ).getTime()
-
-        );
-
-
-    if(validSnapshots.length < 2){
-
-        return null;
-
-    }
-
-
-    const latest = validSnapshots[
-
-        validSnapshots.length - 1
-
-    ];
-
-
-    const previous = validSnapshots[
-
-        validSnapshots.length - 2
-
-    ];
-
-
-    return latest.score
-
-        -
-
-        previous.score;
-
-}
-
 
 /**
  * Create current-versus-expected text.
@@ -1009,57 +841,6 @@ function createDifferenceText(
 
 }
 
-
-/**
- * Create the operational-status comparison line.
- */
-function createOperationalStatusComparison(
-
-    baseLevel:string,
-
-    finalLevel:string,
-
-    activeTriggerCount:number,
-
-    scoreChange:number | null
-
-):string {
-
-    const changeText = scoreChange === null
-
-        ? "No previous score comparison"
-
-        : scoreChange > 0
-
-            ? `▲ ${formatSignedNumber(
-                scoreChange
-            )} since previous assessment`
-
-            : scoreChange < 0
-
-                ? `▼ ${formatSignedNumber(
-                    scoreChange
-                )} since previous assessment`
-
-                : "No score change";
-
-
-    if(baseLevel !== finalLevel){
-
-        return `${changeText} · elevated from ${baseLevel} by ${activeTriggerCount} active ${
-            activeTriggerCount === 1
-
-                ? "trigger"
-
-                : "triggers"
-        }`;
-
-    }
-
-
-    return `${changeText} · score-derived level ${baseLevel}`;
-
-}
 
 
 
@@ -1130,55 +911,6 @@ function createProjectedCapacityLabel(
 
 }
 
-
-/**
- * Convert Alpha–Echo title to card severity.
- */
-function createStateSeverity(
-
-    title:string
-
-):
-
-    | "alpha"
-
-    | "bravo"
-
-    | "charlie"
-
-    | "delta"
-
-    | "echo" {
-
-    switch(title){
-
-        case "Bravo":
-
-            return "bravo";
-
-
-        case "Charlie":
-
-            return "charlie";
-
-
-        case "Delta":
-
-            return "delta";
-
-
-        case "Echo":
-
-            return "echo";
-
-
-        default:
-
-            return "alpha";
-
-    }
-
-}
 
 
 /**
@@ -1338,11 +1070,6 @@ function createAwaitingAssessmentCards():string {
         {
             title:"Projected Capacity",
             icon:"↔️"
-        },
-
-        {
-            title:"Hospital Readiness",
-            icon:"◯"
         }
 
     ];

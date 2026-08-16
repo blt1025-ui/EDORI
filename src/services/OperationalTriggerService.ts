@@ -26,6 +26,15 @@ import {
 from "../config/operationalTriggers";
 
 
+
+import {
+
+    getConfiguration
+
+}
+
+from "./ConfigurationService";
+
 import type {
 
     OperationalTrigger,
@@ -34,7 +43,9 @@ import type {
 
     OperationalTriggerMetric,
 
-    OperationalTriggerOperator
+    OperationalTriggerOperator,
+
+    OperationalTriggerThresholdSource
 
 }
 
@@ -68,15 +79,7 @@ from "../types/OperationalTriggerResult";
 const APPROACHING_TRIGGER_PERCENT = 85;
 
 
-/**
- * Physical ED treatment-bed capacity.
- *
- * This remains fixed at 63 during the Version 2
- * migration. Inpatient occupancy denominators use
- * the currently staffed bed counts from the
- * assessment instead of fixed licensed capacity.
- */
-const ED_TREATMENT_BEDS = 63;
+
 
 
 /**
@@ -206,17 +209,34 @@ export function evaluateSingleTrigger(
 
 ):OperationalTriggerResult {
 
-    const conditionResults = trigger.conditions.map(
+    /*
+     * Build the effective trigger used for this
+     * evaluation. Static trigger definitions remain
+     * unchanged while runtime threshold sources are
+     * resolved from System Configuration.
+     */
+    const effectiveTrigger =
 
-        condition => evaluateCondition(
+        createEffectiveTrigger(
 
-            condition,
+            trigger
 
-            context
+        );
 
-        )
 
-    );
+    const conditionResults =
+
+        effectiveTrigger.conditions.map(
+
+            condition => evaluateCondition(
+
+                condition,
+
+                context
+
+            )
+
+        );
 
 
     const active =
@@ -262,7 +282,7 @@ export function evaluateSingleTrigger(
 
         trigger:cloneTrigger(
 
-            trigger
+            effectiveTrigger
 
         ),
 
@@ -277,7 +297,7 @@ export function evaluateSingleTrigger(
         activationReason:
             createTriggerReason(
 
-                trigger,
+                effectiveTrigger,
 
                 conditionResults,
 
@@ -294,6 +314,115 @@ export function evaluateSingleTrigger(
         )
 
     };
+
+}
+
+
+/**
+ * Create the effective trigger used for one runtime
+ * evaluation.
+ *
+ * Conditions without a thresholdSource retain their
+ * built-in numeric threshold unchanged.
+ */
+function createEffectiveTrigger(
+
+    trigger:OperationalTrigger
+
+):OperationalTrigger {
+
+    return {
+
+        ...trigger,
+
+        conditions:trigger.conditions.map(
+
+            condition => ({
+
+                ...condition,
+
+                threshold:
+                    resolveConditionThreshold(
+
+                        condition
+
+                    )
+
+            })
+
+        ),
+
+        interventionIds:[
+
+            ...trigger.interventionIds
+
+        ]
+
+    };
+
+}
+
+
+/**
+ * Resolve the effective threshold for one trigger
+ * condition.
+ */
+function resolveConditionThreshold(
+
+    condition:OperationalTriggerCondition
+
+):number {
+
+    if(!condition.thresholdSource){
+
+        return condition.threshold;
+
+    }
+
+
+    return resolveThresholdSource(
+
+        condition.thresholdSource,
+
+        condition.threshold
+
+    );
+
+}
+
+
+/**
+ * Resolve one runtime threshold source.
+ */
+function resolveThresholdSource(
+
+    source:OperationalTriggerThresholdSource,
+
+    fallbackThreshold:number
+
+):number {
+
+    const configuration =
+
+        getConfiguration();
+
+
+    switch(source){
+
+        case "configuredEdCapacity":
+
+            return Math.max(
+
+                1,
+
+                configuration.hospital.edCapacity
+
+            );
+
+    }
+
+
+    return fallbackThreshold;
 
 }
 
@@ -425,14 +554,28 @@ function getMetricValue(
 
     const result = context.result;
 
+    const configuration =
 
-    const edOccupancyPercent = calculatePercentage(
+    getConfiguration();
 
-        assessment.totalEDVolume,
 
-        ED_TREATMENT_BEDS
+const edTreatmentBeds =
+
+    Math.max(
+
+        1,
+
+        configuration.hospital.edCapacity
 
     );
+
+   const edOccupancyPercent = calculatePercentage(
+
+    assessment.totalEDVolume,
+
+    edTreatmentBeds
+
+);
 
 
     const volumeAboveExpected =

@@ -1,4 +1,19 @@
-import { defaultSettings } from "../config/defaultSettings";
+/**
+ * DemandService
+ *
+ * Calculates simple Emergency Department demand
+ * metrics using the effective administrative
+ * configuration.
+ */
+
+import {
+
+    getConfiguration
+
+}
+
+from "./ConfigurationService";
+
 
 export interface DemandResult {
 
@@ -8,21 +23,58 @@ export interface DemandResult {
 
 }
 
+
+/**
+ * Calculate current ED demand indicators.
+ */
 export function calculateDemand(
 
     totalEDVolume:number,
 
     boardedPatients:number
 
-):DemandResult{
+):DemandResult {
 
-    return{
+    const configuration =
+
+        getConfiguration();
+
+
+    const edCapacity =
+
+        Math.max(
+
+            1,
+
+            configuration.hospital.edCapacity
+
+        );
+
+
+    return {
 
         occupancyRatio:
-            totalEDVolume/defaultSettings.edCapacity,
+
+            totalEDVolume
+
+            /
+
+            edCapacity,
+
 
         boardingPercent:
-            boardedPatients/Math.max(totalEDVolume,1)
+
+            boardedPatients
+
+            /
+
+            Math.max(
+
+                totalEDVolume,
+
+                1
+
+            )
 
     };
 

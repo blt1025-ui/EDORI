@@ -102,11 +102,11 @@ export function Gauge():string {
                 <div>
 
                     <h3>
-                        EDORI Gauge
+                        HRI Gauge
                     </h3>
 
                     <p class="panel-description">
-                        Current score and trigger-adjusted operational level
+                        Current Hospital Readiness score and operational level
                     </p>
 
                 </div>
@@ -278,7 +278,7 @@ function updateGauge():void {
 
         console.error(
 
-            "Unable to update the EDORI gauge:",
+            "Unable to update the HRI gauge:",
 
             error
 
@@ -449,7 +449,7 @@ function createCompletedGauge(
                     </strong>
 
                     <span>
-                        EDORI
+                        HRI
                     </span>
 
                 </div>

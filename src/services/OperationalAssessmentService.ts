@@ -201,11 +201,24 @@ export function createOperationalAssessment(
         );
 
 
+    /*
+     * Keep every trigger evaluation in triggerResults for
+     * diagnostics, auditing, scenario testing, and future
+     * administrative review.
+     *
+     * activeTriggers represents the operationally relevant
+     * active trigger set after lower-severity overlapping
+     * triggers have been suppressed.
+     */
     const activeTriggers =
 
-        triggerResults.filter(
+        applyTriggerSupersession(
 
-            result => result.active
+            triggerResults.filter(
+
+                result => result.active
+
+            )
 
         );
 
@@ -1710,6 +1723,173 @@ function determineConfidence(
 
 
 /**
+ * Remove lower-severity active triggers when a more
+ * severe trigger represents the same operational
+ * condition.
+ *
+ * Important:
+ *
+ * - Raw triggerResults remain unchanged.
+ * - Only the operational active-trigger collection is
+ *   filtered.
+ * - HRI score is not changed.
+ * - Alpha through Echo state is not changed.
+ * - Trigger conditions and thresholds are not changed.
+ *
+ * This prevents leadership-facing displays and
+ * recommendations from showing several nested alerts
+ * for the same underlying operational problem.
+ */
+function applyTriggerSupersession(
+
+    activeTriggers:
+        OperationalAssessment["activeTriggers"]
+
+):OperationalAssessment["activeTriggers"] {
+
+    /*
+     * Each group is ordered from lowest severity
+     * to highest severity.
+     *
+     * When multiple triggers in one group are active,
+     * only the highest active trigger is retained.
+     */
+    const supersessionGroups:string[][] = [
+
+        /*
+         * =============================================
+         * Projected Acute-Care Capacity
+         * =============================================
+         */
+        [
+
+            "projected-acute-capacity-low",
+
+            "projected-acute-capacity-exhausted",
+
+            "projected-acute-capacity-deficit",
+
+            "severe-projected-acute-capacity-deficit"
+
+        ],
+
+
+        /*
+         * =============================================
+         * ED Boarding
+         * =============================================
+         */
+        [
+
+            "significant-boarding",
+
+            "boarding-crisis"
+
+        ]
+
+    ];
+
+
+    /*
+     * IDs that should be removed because a higher
+     * trigger in the same hierarchy is active.
+     */
+    const suppressedIds = new Set<string>();
+
+
+    supersessionGroups.forEach(
+
+        group => {
+
+            const activeIdsInGroup =
+
+                group.filter(
+
+                    triggerId =>
+
+                        activeTriggers.some(
+
+                            triggerResult =>
+
+                                triggerResult
+                                    .trigger
+                                    .id
+
+                                ===
+
+                                triggerId
+
+                        )
+
+                );
+
+
+            /*
+             * Zero or one active trigger means there
+             * is nothing to supersede.
+             */
+            if(activeIdsInGroup.length <= 1){
+
+                return;
+
+            }
+
+
+            /*
+             * Because the group is ordered from lowest
+             * to highest severity, the final active ID
+             * is the trigger we retain.
+             */
+            const highestActiveId =
+
+                activeIdsInGroup[
+
+                    activeIdsInGroup.length - 1
+
+                ];
+
+
+            activeIdsInGroup.forEach(
+
+                triggerId => {
+
+                    if(triggerId !== highestActiveId){
+
+                        suppressedIds.add(
+
+                            triggerId
+
+                        );
+
+                    }
+
+                }
+
+            );
+
+        }
+
+    );
+
+
+    return activeTriggers.filter(
+
+        triggerResult =>
+
+            !suppressedIds.has(
+
+                triggerResult
+                    .trigger
+                    .id
+
+            )
+
+    );
+
+}
+
+
+/**
  * Operational triggers do not alter Alpha–Echo in
  * Version 2.1. They remain available for warnings,
  * recommendations, and reassessment guidance.
@@ -1973,12 +2153,21 @@ function createOperationalRecommendations(
 
 
 /**
- * Calculate a transitional momentum score.
+ * Calculate operational momentum pressure.
  *
- * A stable score begins at 50.
+ * Operational Momentum is not part of the
+ * authoritative HRI score.
  *
- * Improving conditions move below 50.
- * Worsening conditions move above 50.
+ * This value is displayed as a pressure scale:
+ *
+ * Stable or improving        -> 0
+ * +1 HRI point               -> 10
+ * +5 HRI points              -> 50
+ * +10 or more HRI points     -> 100
+ *
+ * Improvement is communicated through the readable
+ * momentum summary and risk-direction fields rather
+ * than by assigning a negative pressure score.
  */
 function calculateMomentumScore(
 
@@ -2009,13 +2198,20 @@ function calculateMomentumScore(
         scores[scores.length - 2];
 
 
+    if(latestChange <= 0){
+
+        return 0;
+
+    }
+
+
     return clampScore(
 
-        50
+        latestChange
 
-        +
+        *
 
-        latestChange * 5
+        10
 
     );
 

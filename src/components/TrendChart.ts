@@ -25,11 +25,11 @@ from "../config/appEvents";
 
 import {
 
-    getOperationalState
+    getConfiguredOperationalState
 
 }
 
-from "../config/operationalStates";
+from "../services/OperationalStateService";
 
 
 import {
@@ -108,7 +108,7 @@ export function TrendChart():string {
                 <div>
 
                     <h3>
-                        EDORI Trend
+                        HRI Trend
                     </h3>
 
                     <p class="panel-description">
@@ -284,7 +284,7 @@ function updateTrendChart():void {
 
         console.error(
 
-            "Unable to update the EDORI trend chart:",
+            "Unable to update the HRI trend chart:",
 
             error
 
@@ -448,7 +448,7 @@ function createTrendChartMarkup(
         : null;
 
 
-    const latestState = getOperationalState(
+    const latestState = getConfiguredOperationalState(
 
         latestPoint.score
 
@@ -536,12 +536,12 @@ function createTrendChartMarkup(
             >
 
                 <title id="trendChartTitle">
-                    EDORI score trend
+                    HRI score trend
                 </title>
 
 
                 <desc id="trendChartDescription">
-                    Saved EDORI scores displayed across Alpha, Bravo, Charlie, Delta, and Echo operational levels.
+                    Saved HRI scores displayed across Alpha, Bravo, Charlie, Delta, and Echo operational levels.
                 </desc>
 
 
@@ -602,7 +602,7 @@ function createTrendChartMarkup(
 
             }
 
-            Historical points use the score-derived Alpha–Echo level stored by the EDORI score.
+            Historical points use the score-derived Alpha–Echo level stored by the HRI score.
 
         </div>
 
@@ -1201,7 +1201,7 @@ function createTrendPointMarkup(
 
 ):string {
 
-    const state = getOperationalState(
+    const state = getConfiguredOperationalState(
 
         point.score
 

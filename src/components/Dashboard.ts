@@ -115,19 +115,17 @@ export function Dashboard():string {
 
                 <div>
 
-                    <span class="dashboard-title-eyebrow">
-                        Emergency Department Operations
-                    </span>
+                    <span class="application-page-eyebrow">
+    Hospital Operations
+</span>
 
+<h2>
+    Hospital Readiness Command Center
+</h2>
 
-                    <h2>
-                        EDORI Command Center
-                    </h2>
-
-
-                    <p>
-                        Emergency Department Operational Readiness Index
-                    </p>
+<p>
+    Current hospital readiness status and operational pressure
+</p>
 
                 </div>
 

@@ -9,10 +9,13 @@
  *
  * Inputs:
  *
- * - Current ED volume
- * - Expected four-hour hospital inflow
- * - Expected four-hour inpatient departures
- * - Current boarding burden
+ * - Current ED volume relative to the historical
+ *   weekday/hour census baseline
+ * - Future historical ED census and boarding baselines
+ *   at +2 hours and +4 hours
+ * - Current boarding burden relative to expectation
+ * - Expected four-hour hospital inflow and inpatient
+ *   departures for hospital-capacity context
  * - Recent Hospital Readiness score movement
  *
  * This component does not modify Hospital Readiness results,
@@ -30,20 +33,29 @@ from "../config/appEvents";
 
 import {
 
-    HOSPITAL
+    getConfiguration
 
 }
 
-from "../config/constants";
+from "../services/ConfigurationService";
 
 
 import {
 
-    getOperationalState
+    getHistoricalExpectation
 
 }
 
-from "../config/operationalStates";
+from "../services/HistoricalDataService";
+
+
+import {
+
+    getConfiguredOperationalState
+
+}
+
+from "../services/OperationalStateService";
 
 
 import {
@@ -101,7 +113,13 @@ interface ForecastEstimate {
 
     projectedVolume:number;
 
+    projectedBoarders:number;
+
     projectedCapacityPercent:number;
+
+    futureExpectedVolume:number;
+
+    futureExpectedBoarders:number;
 
     projectedScore:number;
 
@@ -281,38 +299,44 @@ function updateOperationalForecast():void {
 
 
         /*
-         * Version 2 Hospital Readiness:
+         * Near-Term Outlook methodology:
          *
-         * Historical flow is stored as a rolling
-         * four-hour hospital forecast rather than
-         * hourly ED arrivals/departures.
+         * ED census is projected from the historical
+         * weekday/hour pattern rather than hospital
+         * inpatient net flow.
          *
-         * Convert the four-hour hospital net flow
-         * to an hourly rate so the existing 2-hour
-         * and 4-hour scenario horizons remain
-         * internally consistent.
+         * The current deviation from historical ED census
+         * is carried forward to the future historical
+         * census bucket:
+         *
+         * scenario ED volume =
+         * future historical ED volume
+         * +
+         * current ED deviation from expectation
+         *
+         * Boarding uses the same approach and is clamped
+         * between 0 and the projected ED census.
+         *
+         * Hospital inflow and inpatient departures remain
+         * available as separate hospital-capacity context.
          */
-        const expectedNetFlow =
 
-            (
+        const currentVolumeDeviation =
 
-                assessment.expectedHospitalInflow4h
+            assessment.totalEDVolume
 
-                -
+            -
 
-                assessment.expectedInpatientDepartures4h
+            assessment.expectedEDVolume;
 
-            )
 
-            /
+        const currentBoardingDeviation =
 
-            Math.max(
+            assessment.boardedPatients
 
-                1,
+            -
 
-                assessment.forecastHours
-
-            );
+            assessment.expectedEDBoarders;
 
 
         const recentHourlyScoreChange =
@@ -326,13 +350,50 @@ function updateOperationalForecast():void {
             );
 
 
-        const boardingPressure =
+        const twoHourFuturePeriod =
 
-            calculateBoardingPressure(
+            resolveFutureDayHour(
 
-                assessment.boardedPatients,
+                assessment.day,
 
-                assessment.expectedEDBoarders
+                assessment.hour,
+
+                2
+
+            );
+
+
+        const fourHourFuturePeriod =
+
+            resolveFutureDayHour(
+
+                assessment.day,
+
+                assessment.hour,
+
+                4
+
+            );
+
+
+        const twoHourHistorical =
+
+            getHistoricalExpectation(
+
+                twoHourFuturePeriod.day,
+
+                twoHourFuturePeriod.hour
+
+            );
+
+
+        const fourHourHistorical =
+
+            getHistoricalExpectation(
+
+                fourHourFuturePeriod.day,
+
+                fourHourFuturePeriod.hour
 
             );
 
@@ -347,14 +408,20 @@ function updateOperationalForecast():void {
                 currentVolume:
                     assessment.totalEDVolume,
 
-                expectedNetFlow,
-
                 currentScore:
                     result.score,
 
-                recentHourlyScoreChange,
+                currentVolumeDeviation,
 
-                boardingPressure
+                currentBoardingDeviation,
+
+                futureExpectedVolume:
+                    twoHourHistorical.expectedEDVolume,
+
+                futureExpectedBoarders:
+                    twoHourHistorical.expectedEDBoarders,
+
+                recentHourlyScoreChange
 
             });
 
@@ -369,16 +436,31 @@ function updateOperationalForecast():void {
                 currentVolume:
                     assessment.totalEDVolume,
 
-                expectedNetFlow,
-
                 currentScore:
                     result.score,
 
-                recentHourlyScoreChange,
+                currentVolumeDeviation,
 
-                boardingPressure
+                currentBoardingDeviation,
+
+                futureExpectedVolume:
+                    fourHourHistorical.expectedEDVolume,
+
+                futureExpectedBoarders:
+                    fourHourHistorical.expectedEDBoarders,
+
+                recentHourlyScoreChange
 
             });
+
+
+        const expectedHospitalNetFlow4h =
+
+            assessment.expectedHospitalInflow4h
+
+            -
+
+            assessment.expectedInpatientDepartures4h;
 
 
         container.innerHTML =
@@ -391,11 +473,28 @@ function updateOperationalForecast():void {
                 currentVolume:
                     assessment.totalEDVolume,
 
-                expectedNetFlow,
+                currentBoarders:
+                    assessment.boardedPatients,
+
+                currentExpectedVolume:
+                    assessment.expectedEDVolume,
+
+                currentExpectedBoarders:
+                    assessment.expectedEDBoarders,
+
+                currentVolumeDeviation,
+
+                currentBoardingDeviation,
+
+                expectedHospitalInflow4h:
+                    assessment.expectedHospitalInflow4h,
+
+                expectedInpatientDepartures4h:
+                    assessment.expectedInpatientDepartures4h,
+
+                expectedHospitalNetFlow4h,
 
                 recentHourlyScoreChange,
-
-                boardingPressure,
 
                 twoHourEstimate,
 
@@ -454,13 +553,17 @@ function createForecastEstimate(
 
         currentVolume:number;
 
-        expectedNetFlow:number;
-
         currentScore:number;
 
-        recentHourlyScoreChange:number;
+        currentVolumeDeviation:number;
 
-        boardingPressure:number;
+        currentBoardingDeviation:number;
+
+        futureExpectedVolume:number;
+
+        futureExpectedBoarders:number;
+
+        recentHourlyScoreChange:number;
 
     }
 
@@ -470,17 +573,50 @@ function createForecastEstimate(
 
         0,
 
-        options.currentVolume
+        options.futureExpectedVolume
 
         +
 
-        options.expectedNetFlow
-
-        *
-
-        options.horizonHours
+        options.currentVolumeDeviation
 
     );
+
+
+    const projectedBoarders =
+
+        Math.min(
+
+            projectedVolume,
+
+            Math.max(
+
+                0,
+
+                options.futureExpectedBoarders
+
+                +
+
+                options.currentBoardingDeviation
+
+            )
+
+        );
+
+
+    const configuration =
+
+        getConfiguration();
+
+
+    const edCapacity =
+
+        Math.max(
+
+            1,
+
+            configuration.hospital.edCapacity
+
+        );
 
 
     const projectedCapacityPercent =
@@ -489,7 +625,7 @@ function createForecastEstimate(
 
             projectedVolume,
 
-            HOSPITAL.ED_BEDS
+            edCapacity
 
         );
 
@@ -497,9 +633,12 @@ function createForecastEstimate(
     /*
      * Volume movement contribution:
      *
-     * Each projected patient above or below current
-     * volume changes the directional score estimate
-     * by 0.55 points.
+     * Scenario HRI remains a directional estimate.
+     *
+     * ED-volume movement now comes from the historical
+     * future-hour census pattern plus the current deviation
+     * from expectation. This replaces the prior use of
+     * hospital inpatient net flow as an ED-census proxy.
      */
     const projectedVolumeChange =
 
@@ -541,12 +680,27 @@ function createForecastEstimate(
     /*
      * Boarding contribution:
      *
-     * Boarding above expectation creates a modest
-     * sustained upward adjustment.
+     * Projected boarding above the future historical
+     * expectation adds sustained scenario pressure.
      */
+    const projectedBoardingPressure =
+
+        Math.max(
+
+            0,
+
+            projectedBoarders
+
+            -
+
+            options.futureExpectedBoarders
+
+        );
+
+
     const boardingAdjustment =
 
-        options.boardingPressure
+        projectedBoardingPressure
 
         *
 
@@ -591,7 +745,7 @@ function createForecastEstimate(
 
     const operationalState =
 
-        getOperationalState(
+        getConfiguredOperationalState(
 
             projectedScore
 
@@ -617,9 +771,24 @@ function createForecastEstimate(
                 projectedVolume
             ),
 
+        projectedBoarders:
+            roundToOneDecimal(
+                projectedBoarders
+            ),
+
         projectedCapacityPercent:
             roundToOneDecimal(
                 projectedCapacityPercent
+            ),
+
+        futureExpectedVolume:
+            roundToOneDecimal(
+                options.futureExpectedVolume
+            ),
+
+        futureExpectedBoarders:
+            roundToOneDecimal(
+                options.futureExpectedBoarders
             ),
 
         projectedScore:
@@ -690,33 +859,6 @@ function calculateCapacityAdjustment(
 
 
     return 0;
-
-}
-
-
-/**
- * Measure boarding pressure above the expected
- * historical baseline.
- */
-function calculateBoardingPressure(
-
-    boardedPatients:number,
-
-    expectedBoarders:number
-
-):number {
-
-    return Math.max(
-
-        0,
-
-        boardedPatients
-
-        -
-
-        expectedBoarders
-
-    );
 
 }
 
@@ -943,11 +1085,23 @@ function createForecastMarkup(
 
         currentVolume:number;
 
-        expectedNetFlow:number;
+        currentBoarders:number;
+
+        currentExpectedVolume:number;
+
+        currentExpectedBoarders:number;
+
+        currentVolumeDeviation:number;
+
+        currentBoardingDeviation:number;
+
+        expectedHospitalInflow4h:number;
+
+        expectedInpatientDepartures4h:number;
+
+        expectedHospitalNetFlow4h:number;
 
         recentHourlyScoreChange:number;
-
-        boardingPressure:number;
 
         twoHourEstimate:ForecastEstimate;
 
@@ -1005,17 +1159,13 @@ function createForecastMarkup(
             <div>
 
                 <span>
-                    Expected Net Hospital Flow
+                    Current ED Boarders
                 </span>
 
-                <strong class="${createSignedValueClass(
-                    options.expectedNetFlow
-                )}">
-
-                    ${formatSignedNumber(
-                        options.expectedNetFlow
+                <strong>
+                    ${formatNumber(
+                        options.currentBoarders
                     )}
-
                 </strong>
 
             </div>
@@ -1058,7 +1208,7 @@ function createForecastMarkup(
         <div class="operational-forecast-assumptions">
 
             <h4>
-                Scenario assumptions
+                Scenario basis
             </h4>
 
 
@@ -1066,39 +1216,60 @@ function createForecastMarkup(
 
                 ${createAssumptionCard(
 
-                    "Hourly Net Hospital Flow",
+                    "ED Census Position",
 
                     formatSignedNumber(
-                        options.expectedNetFlow
+                        options.currentVolumeDeviation
                     ),
 
-                    "Expected four-hour hospital inflow minus expected inpatient departures is normalized to an hourly rate and applied across each scenario horizon."
+                    `Current ED census is ${formatDifferenceDescription(
+                        options.currentVolumeDeviation
+                    )} the historical weekday/hour expectation. That deviation is carried forward across the future historical ED census pattern.`
 
                 )}
 
 
                 ${createAssumptionCard(
 
-                    "Recent Score Movement",
+                    "Boarding Position",
+
+                    formatSignedNumber(
+                        options.currentBoardingDeviation
+                    ),
+
+                    `Current boarding is ${formatDifferenceDescription(
+                        options.currentBoardingDeviation
+                    )} the historical weekday/hour expectation. The same deviation is carried forward against future historical boarding expectations.`
+
+                )}
+
+
+                ${createAssumptionCard(
+
+                    "Hospital Bed Flow",
+
+                    formatSignedNumber(
+                        options.expectedHospitalNetFlow4h
+                    ),
+
+                    `Over four hours, expected hospital inflow is ${formatNumber(
+                        options.expectedHospitalInflow4h
+                    )} and expected inpatient departures are ${formatNumber(
+                        options.expectedInpatientDepartures4h
+                    )}. This is shown as hospital-capacity context and is not used as a proxy for ED census movement.`
+
+                )}
+
+
+                ${createAssumptionCard(
+
+                    "Recent HRI Movement",
 
                     `${formatSignedNumber(
                         options.recentHourlyScoreChange
                     )} per hour`,
 
-                    "Only half of the recent score trajectory is continued to limit overreaction."
-
-                )}
-
-
-                ${createAssumptionCard(
-
-                    "Boarding Above Expected",
-
-                    formatNumber(
-                        options.boardingPressure
-                    ),
-
-                    "Boarding above the historical baseline adds sustained pressure to the scenario."
+                    "Only half of the recent HRI trajectory is continued in the scenario estimate to reduce overreaction to one change."
 
                 )}
 
@@ -1110,11 +1281,11 @@ function createForecastMarkup(
         <div class="operational-forecast-disclaimer">
 
             <strong>
-                Directional estimate only
+                Directional scenario only
             </strong>
 
             <p>
-                This outlook is a transparent scenario calculation. It has not been clinically validated and should support, not replace, operational judgment.
+                Scenario HRI and Scenario Level are transparent operational estimates, not validated predictions of the future HRI. They should support, not replace, operational judgment.
             </p>
 
         </div>
@@ -1150,7 +1321,7 @@ function createForecastCard(
                 <div>
 
                     <span>
-                        Forecast Horizon
+                        Scenario Horizon
                     </span>
 
                     <h4>
@@ -1179,7 +1350,7 @@ function createForecastCard(
             <div class="operational-forecast-level">
 
                 <span>
-                    Projected Level
+                    Scenario Level
                 </span>
 
                 <strong>
@@ -1196,7 +1367,7 @@ function createForecastCard(
             <div class="operational-forecast-score">
 
                 <span>
-                    Projected Hospital Readiness
+                    Scenario HRI
                 </span>
 
                 <strong>
@@ -1228,7 +1399,7 @@ function createForecastCard(
                 <div>
 
                     <span>
-                        Projected Volume
+                        Scenario ED Volume
                     </span>
 
                     <strong>
@@ -1238,6 +1409,35 @@ function createForecastCard(
                         )}
 
                     </strong>
+
+                    <small>
+                        Historical ${formatNumber(
+                            estimate.futureExpectedVolume
+                        )}
+                    </small>
+
+                </div>
+
+
+                <div>
+
+                    <span>
+                        Scenario Boarders
+                    </span>
+
+                    <strong>
+
+                        ${formatNumber(
+                            estimate.projectedBoarders
+                        )}
+
+                    </strong>
+
+                    <small>
+                        Historical ${formatNumber(
+                            estimate.futureExpectedBoarders
+                        )}
+                    </small>
 
                 </div>
 
@@ -1477,7 +1677,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate Hospital Readiness to generate the 2-hour and 4-hour operational outlook.
+                Calculate Hospital Readiness to generate the 2-hour and 4-hour scenario outlook.
             </p>
 
         </div>
@@ -1513,6 +1713,156 @@ function createRecalculationRequiredState(
         </div>
 
     `;
+
+}
+
+
+/**
+ * Resolve a future weekday/hour while correctly
+ * rolling across midnight and week boundaries.
+ */
+function resolveFutureDayHour(
+
+    day:string,
+
+    hour:number,
+
+    hoursAhead:number
+
+):{
+
+    day:
+        | "Sunday"
+        | "Monday"
+        | "Tuesday"
+        | "Wednesday"
+        | "Thursday"
+        | "Friday"
+        | "Saturday";
+
+    hour:number;
+
+} {
+
+    const days = [
+
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+
+    ] as const;
+
+
+    const dayIndex =
+
+        Math.max(
+
+            0,
+
+            days.indexOf(
+
+                day as typeof days[number]
+
+            )
+
+        );
+
+
+    const totalHours =
+
+        dayIndex * 24
+
+        +
+
+        hour
+
+        +
+
+        hoursAhead;
+
+
+    const normalizedTotalHours =
+
+        (
+
+            totalHours
+
+            %
+
+            (7 * 24)
+
+            +
+
+            (7 * 24)
+
+        )
+
+        %
+
+        (7 * 24);
+
+
+    const futureDayIndex =
+
+        Math.floor(
+
+            normalizedTotalHours / 24
+
+        );
+
+
+    const futureHour =
+
+        normalizedTotalHours % 24;
+
+
+    return {
+
+        day:
+            days[
+                futureDayIndex
+            ],
+
+        hour:
+            futureHour
+
+    };
+
+}
+
+
+/**
+ * Describe a signed difference relative to expectation.
+ */
+function formatDifferenceDescription(
+
+    value:number
+
+):string {
+
+    if(value > 0){
+
+        return `${formatNumber(
+            value
+        )} above`;
+
+    }
+
+
+    if(value < 0){
+
+        return `${formatNumber(
+            Math.abs(value)
+        )} below`;
+
+    }
+
+
+    return "at";
 
 }
 

@@ -1,8 +1,9 @@
 /**
  * AssessmentHistory
  *
- * Displays persistent Hospital Readiness assessment history
- * using the Alpha–Echo operational-level model.
+ * Displays a compact recent-history view of persistent
+ * Hospital Readiness assessments using the Alpha–Echo
+ * operational-level model.
  *
  * This component does not:
  *
@@ -23,11 +24,11 @@ from "../config/appEvents";
 
 import {
 
-    getOperationalState
+    getConfiguredOperationalState
 
 }
 
-from "../config/operationalStates";
+from "../services/OperationalStateService";
 
 
 import {
@@ -40,8 +41,6 @@ from "../services/EventService";
 
 
 import {
-
-    clearSnapshots,
 
     getSnapshots
 
@@ -60,9 +59,13 @@ from "../types/EdoriSnapshot";
 
 
 /**
- * Maximum number of rows displayed at once.
+ * Maximum number of recent assessments displayed on
+ * the Assessment working page.
+ *
+ * Full saved history remains available to reporting,
+ * export, restore, and administrative workflows.
  */
-const MAXIMUM_DISPLAYED_ROWS = 50;
+const MAXIMUM_DISPLAYED_ROWS = 10;
 
 
 /**
@@ -79,11 +82,11 @@ export function AssessmentHistory():string {
                 <div>
 
                     <h3>
-                        Assessment History
+                        Recent Assessments
                     </h3>
 
                     <p class="panel-description">
-                        Saved Hospital Readiness assessments and Alpha–Echo levels
+                        Most recent Hospital Readiness assessments and operational-level changes
                     </p>
 
                 </div>
@@ -99,14 +102,6 @@ export function AssessmentHistory():string {
                     </span>
 
 
-                    <button
-                        id="clearAssessmentHistoryButton"
-                        class="assessment-history-clear-button"
-                        type="button"
-                        disabled
-                    >
-                        Clear History
-                    </button>
 
                 </div>
 
@@ -135,23 +130,7 @@ export function AssessmentHistory():string {
  */
 export function initializeAssessmentHistory():void {
 
-    const clearButton = document.getElementById(
-
-        "clearAssessmentHistoryButton"
-
-    );
-
-
-    clearButton?.addEventListener(
-
-        "click",
-
-        handleClearHistory
-
-    );
-
-
-    updateAssessmentHistory();
+        updateAssessmentHistory();
 
 
     subscribe(
@@ -216,13 +195,6 @@ function updateAssessmentHistory():void {
         );
 
 
-        updateClearButton(
-
-            snapshots.length > 0
-
-        );
-
-
         if(snapshots.length === 0){
 
             container.innerHTML =
@@ -280,9 +252,6 @@ function updateAssessmentHistory():void {
                                 Acute Care
                             </th>
 
-                            <th scope="col">
-                                Critical Care
-                            </th>
 
                         </tr>
 
@@ -328,11 +297,9 @@ function updateAssessmentHistory():void {
 
                     <div class="assessment-history-limit-note">
 
-                        Showing the most recent
-                        ${MAXIMUM_DISPLAYED_ROWS}
-                        of
-                        ${snapshots.length}
-                        saved assessments.
+                        Showing the ${MAXIMUM_DISPLAYED_ROWS} most recent assessments.
+                        ${snapshots.length - MAXIMUM_DISPLAYED_ROWS}
+                        older saved assessments remain available in EDORI history and administrative tools.
 
                     </div>
 
@@ -359,13 +326,6 @@ function updateAssessmentHistory():void {
         updateHistoryCount(
 
             0
-
-        );
-
-
-        updateClearButton(
-
-            false
 
         );
 
@@ -545,7 +505,7 @@ function createHistoryRowMarkup(
 
 ):string {
 
-    const state = getOperationalState(
+    const state = getConfiguredOperationalState(
 
         row.snapshot.score
 
@@ -710,74 +670,10 @@ function createHistoryRowMarkup(
             </td>
 
 
-            <td>
-
-                ${formatCapacitySnapshot(
-                    row.snapshot.occupiedCriticalCareBeds,
-                    row.snapshot.staffedCriticalCareBeds
-                )}
-
-            </td>
 
         </tr>
 
     `;
-
-}
-
-
-/**
- * Clear saved snapshot history after confirmation.
- */
-function handleClearHistory():void {
-
-    const snapshots = getSnapshots();
-
-
-    if(snapshots.length === 0){
-
-        return;
-
-    }
-
-
-    const confirmed = window.confirm(
-
-        "Clear all saved Hospital Readiness assessment history? This cannot be undone."
-
-    );
-
-
-    if(!confirmed){
-
-        return;
-
-    }
-
-
-    try {
-
-        clearSnapshots();
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to clear assessment history:",
-
-            error
-
-        );
-
-
-        window.alert(
-
-            "Assessment history could not be cleared."
-
-        );
-
-    }
 
 }
 
@@ -810,34 +706,6 @@ function updateHistoryCount(
         ? "1 assessment"
 
         : `${count} assessments`;
-
-}
-
-
-/**
- * Enable or disable the clear-history button.
- */
-function updateClearButton(
-
-    enabled:boolean
-
-):void {
-
-    const button = document.getElementById(
-
-        "clearAssessmentHistoryButton"
-
-    ) as HTMLButtonElement | null;
-
-
-    if(!button){
-
-        return;
-
-    }
-
-
-    button.disabled = !enabled;
 
 }
 

@@ -24,11 +24,11 @@ from "../services/EdoriService";
 
 import {
 
-    WEIGHTS
+    getConfiguration
 
 }
 
-from "../config/weights";
+from "../services/ConfigurationService";
 
 
 import {
@@ -805,20 +805,104 @@ function printScenarioResult(
  * severe-domain adjustment.
  */
 function calculateBaseScore(
+
     edPressureScore:number,
+
     acuteCapacityScore:number,
+
     criticalCapacityScore:number,
+
     inflowScore:number,
+
     projectedCapacityScore:number
+
 ):number {
 
-    return roundCalibrationScore(
-        edPressureScore * WEIGHTS.edPressure
-        + acuteCapacityScore * WEIGHTS.acuteCapacity
-        + criticalCapacityScore * WEIGHTS.criticalCapacity
-        + inflowScore * WEIGHTS.inflow
-        + projectedCapacityScore * WEIGHTS.projectedCapacity
-    );
+    /*
+     * Scenario reporting must use the same effective
+     * runtime domain weights as EdoriService.
+     *
+     * Otherwise a configuration override would be
+     * incorrectly reported as part of the severe-domain
+     * adjustment.
+     */
+
+    const configuration =
+
+        getConfiguration();
+
+
+    const weights =
+
+        configuration.domainWeights;
+
+
+    const weightedScore =
+
+        (
+
+            edPressureScore
+
+            *
+
+            weights.edPressure
+
+        )
+
+        +
+
+        (
+
+            acuteCapacityScore
+
+            *
+
+            weights.acuteCapacity
+
+        )
+
+        +
+
+        (
+
+            criticalCapacityScore
+
+            *
+
+            weights.criticalCapacity
+
+        )
+
+        +
+
+        (
+
+            inflowScore
+
+            *
+
+            weights.inflow
+
+        )
+
+        +
+
+        (
+
+            projectedCapacityScore
+
+            *
+
+            weights.projectedCapacity
+
+        );
+
+
+    return Math.round(
+
+        weightedScore * 10
+
+    ) / 10;
 
 }
 

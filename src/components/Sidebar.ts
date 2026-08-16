@@ -1,41 +1,128 @@
 /**
  * Sidebar
  *
- * Functional navigation for the EDORI dashboard.
+ * Primary EDORI application navigation.
  *
- * Responsibilities:
+ * Version 2.1 page architecture:
  *
- * - Render sidebar navigation
- * - Scroll to exact dashboard panels
- * - Open collapsed panels before navigation
- * - Highlight the selected navigation item
- * - Track visible sections while scrolling
- * - Provide keyboard-accessible navigation
+ * - Dashboard
+ * - Assessment
+ * - Operational Detail
+ * - Administration
  *
- * This component does not calculate or modify
- * EDORI operational data.
+ * The sidebar changes the visible application page.
+ * It does not scroll between dashboard sections.
+ *
+ * Navigation does not modify EDORI assessment data,
+ * results, history, or calculations.
  */
+
+import {
+
+    getCurrentPage,
+
+    isApplicationPage,
+
+    navigateToPage,
+
+    subscribeToNavigation
+
+}
+
+from "../services/NavigationService";
+
+
+import type {
+
+    ApplicationPage
+
+}
+
+from "../services/NavigationService";
+
 
 interface SidebarNavigationItem {
 
-    id:string;
+    id:ApplicationPage;
 
     label:string;
 
-    icon:string;
+    description:string;
 
-    targetSelectors:string[];
+    icon:string;
 
 }
 
 
 /**
- * Navigation destinations.
+ * Professional line icons used by the sidebar.
  *
- * These selectors match the exact panel IDs rendered
- * by Dashboard.ts and DashboardRightColumn.ts.
+ * These are inline SVG fragments so EDORI does not
+ * require an external icon library or network asset.
  */
-const SIDEBAR_NAVIGATION_ITEMS:SidebarNavigationItem[] = [
+const ICONS = {
+
+    dashboard:
+        `
+            <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+            >
+                <path
+                    d="M4 4h6v6H4V4Zm10 0h6v10h-6V4ZM4 14h6v6H4v-6Zm10 4h6v2h-6v-2Z"
+                />
+            </svg>
+        `,
+
+    assessment:
+        `
+            <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+            >
+                <path
+                    d="M7 3h10v2h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2V3Zm2 2h6V4H9v1Zm-2 5h10V8H7v2Zm0 4h10v-2H7v2Zm0 4h7v-2H7v2Z"
+                />
+            </svg>
+        `,
+
+    operationalDetail:
+        `
+            <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+            >
+                <path
+                    d="M4 19h16v2H4v-2Zm1-2V9h3v8H5Zm5 0V4h3v13h-3Zm5 0v-6h3v6h-3Z"
+                />
+            </svg>
+        `,
+
+    administration:
+        `
+            <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+            >
+                <path
+                    d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm8.4 5a8.5 8.5 0 0 0 0-2l2-1.5-2-3.5-2.4 1a8.3 8.3 0 0 0-1.7-1L16 3h-4l-.3 3a8.3 8.3 0 0 0-1.7 1L7.6 6 5.6 9.5l2 1.5a8.5 8.5 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a8.3 8.3 0 0 0 1.7 1l.3 3h4l.3-3a8.3 8.3 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5ZM12 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"
+                />
+            </svg>
+        `
+
+} as const;
+
+
+/**
+ * Primary EDORI application pages.
+ */
+const SIDEBAR_NAVIGATION_ITEMS:
+
+SidebarNavigationItem[] = [
 
     {
 
@@ -45,14 +132,11 @@ const SIDEBAR_NAVIGATION_ITEMS:SidebarNavigationItem[] = [
         label:
             "Dashboard",
 
+        description:
+            "Current readiness",
+
         icon:
-            "🏠",
-
-        targetSelectors:[
-
-            "#dashboard"
-
-        ]
+            ICONS.dashboard
 
     },
 
@@ -60,21 +144,16 @@ const SIDEBAR_NAVIGATION_ITEMS:SidebarNavigationItem[] = [
     {
 
         id:
-            "current-status",
+            "assessment",
 
         label:
-            "Current Status",
+            "Assessment",
+
+        description:
+            "Data entry and history",
 
         icon:
-            "📋",
-
-        targetSelectors:[
-
-            "#gauge-panel",
-
-            "#operational-overview-panel"
-
-        ]
+            ICONS.assessment
 
     },
 
@@ -82,21 +161,16 @@ const SIDEBAR_NAVIGATION_ITEMS:SidebarNavigationItem[] = [
     {
 
         id:
-            "trends",
+            "operational-detail",
 
         label:
-            "Trends",
+            "Operational Detail",
+
+        description:
+            "Drivers and outlook",
 
         icon:
-            "📈",
-
-        targetSelectors:[
-
-            "#trend-chart-panel",
-
-            "#operational-timeline-panel"
-
-        ]
+            ICONS.operationalDetail
 
     },
 
@@ -104,87 +178,16 @@ const SIDEBAR_NAVIGATION_ITEMS:SidebarNavigationItem[] = [
     {
 
         id:
-            "historical-data",
+            "administration",
 
         label:
-            "Historical Data",
+            "Administration",
+
+        description:
+            "Data and configuration",
 
         icon:
-            "📅",
-
-        targetSelectors:[
-
-            "#assessment-history-panel",
-
-            "#historical-data-panel"
-
-        ]
-
-    },
-
-
-    {
-
-        id:
-            "settings",
-
-        label:
-            "Settings",
-
-        icon:
-            "⚙️",
-
-        targetSelectors:[
-
-            "#historical-data-panel",
-
-            "#history-restore-center-panel"
-
-        ]
-
-    },
-
-
-    {
-
-        id:
-            "reports",
-
-        label:
-            "Reports",
-
-        icon:
-            "📄",
-
-        targetSelectors:[
-
-            "#executive-assessment-report-panel",
-
-            "#shift-handoff-panel",
-
-            "#data-export-center-panel"
-
-        ]
-
-    },
-
-
-    {
-
-        id:
-            "about",
-
-        label:
-            "About",
-
-        icon:
-            "ℹ️",
-
-        targetSelectors:[
-
-            "#operational-level-reference-panel"
-
-        ]
+            ICONS.administration
 
     }
 
@@ -192,7 +195,7 @@ const SIDEBAR_NAVIGATION_ITEMS:SidebarNavigationItem[] = [
 
 
 /**
- * Render the sidebar.
+ * Render the application sidebar.
  */
 export function Sidebar():string {
 
@@ -201,41 +204,60 @@ export function Sidebar():string {
         <aside
             id="applicationSidebar"
             class="sidebar"
-            aria-label="EDORI dashboard navigation"
+            aria-label="EDORI application navigation"
         >
 
             <div class="sidebar-header">
 
-                <span class="sidebar-eyebrow">
-                    EDORI
-                </span>
+                <div class="sidebar-product-mark">
+
+                    <span
+                        class="sidebar-product-badge"
+                        aria-hidden="true"
+                    >
+                        HRI
+                    </span>
 
 
-                <h3>
-                    Navigation
-                </h3>
+                    <div class="sidebar-product-copy">
+
+                        <span class="sidebar-eyebrow">
+                            Hospital Operations
+                        </span>
+
+
+                        <h1 class="sidebar-application-title">
+                            Hospital Readiness Index
+                        </h1>
+
+                    </div>
+
+                </div>
 
             </div>
 
 
+            <span class="sidebar-navigation-heading">
+                Workspace
+            </span>
+
+
             <nav
                 class="sidebar-navigation"
-                aria-label="Dashboard sections"
+                aria-label="Application pages"
             >
 
                 <ul class="sidebar-navigation-list">
 
-                    ${SIDEBAR_NAVIGATION_ITEMS.map(
+                    ${SIDEBAR_NAVIGATION_ITEMS
 
-                        item =>
+                        .map(
 
-                            createNavigationItem(
+                            createNavigationItem
 
-                                item
+                        )
 
-                            )
-
-                    ).join("")}
+                        .join("")}
 
                 </ul>
 
@@ -244,14 +266,29 @@ export function Sidebar():string {
 
             <div class="sidebar-footer">
 
-                <span>
-                    Emergency Department
-                </span>
+                <div class="sidebar-footer-status">
+
+                    <span
+                        class="sidebar-footer-status-dot"
+                        aria-hidden="true"
+                    >
+                    </span>
 
 
-                <strong>
-                    Operational Readiness Index
-                </strong>
+                    <div>
+
+                        <span class="sidebar-footer-label">
+                            Operational Tool
+                        </span>
+
+
+                        <strong>
+                            EDORI · Version 2.1
+                        </strong>
+
+                    </div>
+
+                </div>
 
             </div>
 
@@ -263,8 +300,8 @@ export function Sidebar():string {
 
 
 /**
- * Initialize sidebar behavior after the application
- * markup has been inserted into the DOM.
+ * Initialize page-navigation behavior after the
+ * application markup has been inserted into the DOM.
  */
 export function initializeSidebar():void {
 
@@ -287,6 +324,9 @@ export function initializeSidebar():void {
     }
 
 
+    /*
+     * Handle page-selection clicks.
+     */
     navigationButtons.forEach(
 
         button => {
@@ -304,19 +344,40 @@ export function initializeSidebar():void {
     );
 
 
+    /*
+     * Retain keyboard navigation from the previous
+     * sidebar implementation.
+     */
     initializeSidebarKeyboardSupport();
 
 
-    initializeActiveSectionObserver();
+    /*
+     * Keep visible page markup and active sidebar
+     * state synchronized with NavigationService.
+     */
+    subscribeToNavigation(
+
+        synchronizeNavigationDisplay
+
+    );
 
 
-    setInitialActiveNavigationItem();
+    /*
+     * Initial synchronization.
+     *
+     * Dashboard is the NavigationService default.
+     */
+    synchronizeNavigationDisplay(
+
+        getCurrentPage()
+
+    );
 
 }
 
 
 /**
- * Render one navigation item.
+ * Render one page-navigation item.
  */
 function createNavigationItem(
 
@@ -324,29 +385,79 @@ function createNavigationItem(
 
 ):string {
 
+    const isDefaultPage =
+
+        item.id === "dashboard";
+
+
     return `
 
         <li class="sidebar-navigation-item">
 
             <button
                 id="sidebarNavigation-${item.id}"
-                class="sidebar-navigation-button"
+                class="
+                    sidebar-navigation-button
+                    ${isDefaultPage
+                        ? "active"
+                        : ""
+                    }
+                "
                 type="button"
-                data-navigation-id="${item.id}"
-                data-target-selectors="${item.targetSelectors.join("|")}"
-                aria-label="Go to ${item.label}"
+                data-application-page="${item.id}"
+                aria-label="Go to ${escapeAttribute(
+                    item.label
+                )}"
+                ${isDefaultPage
+                    ? 'aria-current="page"'
+                    : ""
+                }
             >
+
+                <span
+                    class="sidebar-navigation-active-indicator"
+                    aria-hidden="true"
+                >
+                </span>
+
 
                 <span
                     class="sidebar-navigation-icon"
                     aria-hidden="true"
                 >
+
                     ${item.icon}
+
                 </span>
 
 
-                <span class="sidebar-navigation-label">
-                    ${item.label}
+                <span class="sidebar-navigation-text">
+
+                    <span class="sidebar-navigation-label">
+
+                        ${escapeHtml(
+                            item.label
+                        )}
+
+                    </span>
+
+
+                    <span class="sidebar-navigation-description">
+
+                        ${escapeHtml(
+                            item.description
+                        )}
+
+                    </span>
+
+                </span>
+
+
+                <span
+                    class="sidebar-navigation-chevron"
+                    aria-hidden="true"
+                >
+                    ›
                 </span>
 
             </button>
@@ -359,7 +470,7 @@ function createNavigationItem(
 
 
 /**
- * Handle one sidebar navigation click.
+ * Handle one navigation-button click.
  */
 function handleNavigationClick(
 
@@ -391,37 +502,26 @@ function handleNavigationClick(
     }
 
 
-    const target =
+    const requestedPage =
 
-        findNavigationTarget(
-
-            button
-
-        );
+        button.dataset.applicationPage;
 
 
-    if(!target){
+    if(
 
-        showUnavailableNavigationItem(
+        !isApplicationPage(
 
-            button
+            requestedPage
 
-        );
+        )
 
+    ){
 
         console.warn(
 
-            "Sidebar could not find a target.",
+            "Sidebar received an invalid application page.",
 
-            {
-
-                navigationId:
-                    button.dataset.navigationId,
-
-                targetSelectors:
-                    button.dataset.targetSelectors
-
-            }
+            requestedPage
 
         );
 
@@ -431,363 +531,169 @@ function handleNavigationClick(
     }
 
 
-    expandPanelForTarget(
+    navigateToPage(
 
-        target
+        requestedPage
+
+    );
+
+}
+
+
+/**
+ * Synchronize page visibility and sidebar state.
+ */
+function synchronizeNavigationDisplay(
+
+    page:ApplicationPage
+
+):void {
+
+    updateApplicationPages(
+
+        page
 
     );
 
 
-    setActiveNavigationButton(
+    updateNavigationButtons(
 
-        button
+        page
 
     );
 
 
     /*
-     * Allow a collapsed panel to finish opening before
-     * measuring and scrolling to its location.
+     * Each application page begins at its own top.
+     *
+     * Avoid smooth scrolling because page changes
+     * should feel immediate rather than like the
+     * previous section-navigation behavior.
      */
-    window.requestAnimationFrame(
+    window.scrollTo({
 
-        () => {
+        top:
+            0,
 
-            window.requestAnimationFrame(
+        behavior:
+            "auto"
 
-                () => {
-
-                    scrollToTarget(
-
-                        target
-
-                    );
-
-                }
-
-            );
-
-        }
-
-    );
+    });
 
 }
 
 
 /**
- * Find the first existing target associated with a
- * sidebar navigation button.
+ * Show the selected application page and hide the
+ * other three pages.
  */
-function findNavigationTarget(
+function updateApplicationPages(
 
-    button:HTMLButtonElement
+    activePage:ApplicationPage
 
-):HTMLElement | null {
+):void {
 
-    const selectors =
+    const pageElements =
 
-        button.dataset.targetSelectors
+        Array.from(
 
-            ?.split("|")
+            document.querySelectorAll(
 
-            .map(
-
-                selector =>
-
-                    selector.trim()
+                "[data-application-page]"
 
             )
 
-            .filter(Boolean)
+        )
 
-        ?? [];
+        .filter(
+
+            (
+
+                element
+
+            ):element is HTMLElement =>
+
+                element
+
+                instanceof
+
+                HTMLElement
+
+        );
 
 
-    for(const selector of selectors){
+    pageElements.forEach(
 
-        try {
+        element => {
 
-            const target =
+            /*
+             * Sidebar buttons also have a page data
+             * attribute. Only application-page main
+             * containers should be shown/hidden here.
+             */
+            if(
 
-                document.querySelector(
+                !element.classList.contains(
 
-                    selector
+                    "application-page"
+
+                )
+
+            ){
+
+                return;
+
+            }
+
+
+            const pageValue =
+
+                element.dataset.applicationPage;
+
+
+            const isActive =
+
+                pageValue === activePage;
+
+
+            element.hidden =
+
+                !isActive;
+
+
+            element.classList.toggle(
+
+                "application-page-active",
+
+                isActive
+
+            );
+
+
+            if(isActive){
+
+                element.setAttribute(
+
+                    "aria-hidden",
+
+                    "false"
 
                 );
 
+            }
+            else {
 
-            if(target instanceof HTMLElement){
+                element.setAttribute(
 
-                return target;
+                    "aria-hidden",
+
+                    "true"
+
+                );
 
             }
 
         }
-        catch(error){
-
-            console.warn(
-
-                `Invalid sidebar selector: ${selector}`,
-
-                error
-
-            );
-
-        }
-
-    }
-
-
-    return null;
-
-}
-
-
-/**
- * Open the selected collapsible panel before
- * scrolling to it.
- */
-function expandPanelForTarget(
-
-    target:HTMLElement
-
-):void {
-
-    const panel =
-
-        target.matches(
-
-            ".collapsible-panel"
-
-        )
-
-            ? target
-
-            : target.closest(
-
-                ".collapsible-panel"
-
-            ) as HTMLElement | null;
-
-
-    if(!panel){
-
-        return;
-
-    }
-
-
-    const toggleButton =
-
-        findPanelToggleButton(
-
-            panel
-
-        );
-
-
-    const content =
-
-        findPanelContent(
-
-            panel
-
-        );
-
-
-    const isCollapsed =
-
-        panel.classList.contains(
-
-            "collapsed"
-
-        )
-
-        ||
-
-        panel.classList.contains(
-
-            "is-collapsed"
-
-        )
-
-        ||
-
-        panel.dataset.collapsed === "true"
-
-        ||
-
-        toggleButton?.getAttribute(
-
-            "aria-expanded"
-
-        ) === "false"
-
-        ||
-
-        content?.hidden === true;
-
-
-    if(
-
-        isCollapsed
-
-        &&
-
-        toggleButton
-
-    ){
-
-        toggleButton.click();
-
-    }
-
-}
-
-
-/**
- * Find the toggle button inside a collapsible panel.
- */
-function findPanelToggleButton(
-
-    panel:HTMLElement
-
-):HTMLButtonElement | null {
-
-    const selectors = [
-
-        ".collapsible-panel-toggle",
-
-        ".collapsible-toggle",
-
-        ".dashboard-collapsible-toggle",
-
-        "[data-collapsible-toggle]",
-
-        "button[aria-expanded]"
-
-    ];
-
-
-    for(const selector of selectors){
-
-        const element =
-
-            panel.querySelector(
-
-                selector
-
-            );
-
-
-        if(element instanceof HTMLButtonElement){
-
-            return element;
-
-        }
-
-    }
-
-
-    return null;
-
-}
-
-
-/**
- * Find the content region inside a collapsible panel.
- */
-function findPanelContent(
-
-    panel:HTMLElement
-
-):HTMLElement | null {
-
-    const selectors = [
-
-        ".collapsible-panel-content",
-
-        ".collapsible-content",
-
-        ".dashboard-collapsible-content",
-
-        "[data-collapsible-content]"
-
-    ];
-
-
-    for(const selector of selectors){
-
-        const element =
-
-            panel.querySelector(
-
-                selector
-
-            );
-
-
-        if(element instanceof HTMLElement){
-
-            return element;
-
-        }
-
-    }
-
-
-    return null;
-
-}
-
-
-/**
- * Scroll to a dashboard section.
- */
-function scrollToTarget(
-
-    target:HTMLElement
-
-):void {
-
-    const headerOffset =
-
-        calculateHeaderOffset();
-
-
-    const targetTop =
-
-        target.getBoundingClientRect().top
-
-        +
-
-        window.scrollY
-
-        -
-
-        headerOffset;
-
-
-    window.scrollTo({
-
-        top:
-            Math.max(
-
-                0,
-
-                targetTop
-
-            ),
-
-        behavior:
-            "smooth"
-
-    });
-
-
-    focusTargetAfterScroll(
-
-        target
 
     );
 
@@ -795,40 +701,12 @@ function scrollToTarget(
 
 
 /**
- * Calculate the amount of space that should remain
- * above the selected section.
+ * Highlight the navigation button associated with the
+ * selected page.
  */
-function calculateHeaderOffset():number {
+function updateNavigationButtons(
 
-    const header =
-
-        document.querySelector(
-
-            ".header"
-
-        );
-
-
-    const headerHeight =
-
-        header instanceof HTMLElement
-
-            ? header.getBoundingClientRect().height
-
-            : 0;
-
-
-    return headerHeight + 20;
-
-}
-
-
-/**
- * Highlight the active navigation button.
- */
-function setActiveNavigationButton(
-
-    activeButton:HTMLButtonElement
+    activePage:ApplicationPage
 
 ):void {
 
@@ -838,7 +716,11 @@ function setActiveNavigationButton(
 
             const isActive =
 
-                button === activeButton;
+                button.dataset.applicationPage
+
+                ===
+
+                activePage;
 
 
             button.classList.toggle(
@@ -879,221 +761,17 @@ function setActiveNavigationButton(
 
 
 /**
- * Briefly indicate that the selected section is not
- * currently available.
- */
-function showUnavailableNavigationItem(
-
-    button:HTMLButtonElement
-
-):void {
-
-    button.classList.add(
-
-        "sidebar-navigation-unavailable"
-
-    );
-
-
-    window.setTimeout(
-
-        () => {
-
-            button.classList.remove(
-
-                "sidebar-navigation-unavailable"
-
-            );
-
-        },
-
-        900
-
-    );
-
-}
-
-
-/**
- * Track visible dashboard sections while the user
- * scrolls.
- */
-function initializeActiveSectionObserver():void {
-
-    if(
-
-        !("IntersectionObserver" in window)
-
-    ){
-
-        return;
-
-    }
-
-
-    const targetPairs =
-
-        getNavigationButtons()
-
-            .map(
-
-                button => ({
-
-                    button,
-
-                    target:
-                        findNavigationTarget(
-
-                            button
-
-                        )
-
-                })
-
-            )
-
-            .filter(
-
-                pair =>
-
-                    pair.target !== null
-
-            ) as Array<{
-
-                button:HTMLButtonElement;
-
-                target:HTMLElement;
-
-            }>;
-
-
-    if(targetPairs.length === 0){
-
-        return;
-
-    }
-
-
-    const observer =
-
-        new IntersectionObserver(
-
-            entries => {
-
-                const visibleEntries =
-
-                    entries
-
-                        .filter(
-
-                            entry =>
-
-                                entry.isIntersecting
-
-                        )
-
-                        .sort(
-
-                            (
-
-                                first,
-
-                                second
-
-                            ) =>
-
-                                second.intersectionRatio
-
-                                -
-
-                                first.intersectionRatio
-
-                        );
-
-
-                const visibleEntry =
-
-                    visibleEntries[0];
-
-
-                if(!visibleEntry){
-
-                    return;
-
-                }
-
-
-                const matchingPair =
-
-                    targetPairs.find(
-
-                        pair =>
-
-                            pair.target
-
-                            ===
-
-                            visibleEntry.target
-
-                    );
-
-
-                if(matchingPair){
-
-                    setActiveNavigationButton(
-
-                        matchingPair.button
-
-                    );
-
-                }
-
-            },
-
-            {
-
-                root:
-                    null,
-
-                rootMargin:
-                    "-20% 0px -65% 0px",
-
-                threshold:[
-
-                    0,
-
-                    0.1,
-
-                    0.3,
-
-                    0.6
-
-                ]
-
-            }
-
-        );
-
-
-    targetPairs.forEach(
-
-        pair => {
-
-            observer.observe(
-
-                pair.target
-
-            );
-
-        }
-
-    );
-
-}
-
-
-/**
- * Support keyboard movement between sidebar buttons.
+ * Support keyboard movement between page-navigation
+ * buttons.
+ *
+ * Supported:
+ *
+ * Home
+ * End
+ * Arrow Up
+ * Arrow Down
+ * Arrow Left
+ * Arrow Right
  */
 function initializeSidebarKeyboardSupport():void {
 
@@ -1219,7 +897,11 @@ function initializeSidebarKeyboardSupport():void {
                         buttons.length;
 
 
-                buttons[nextIndex]?.focus();
+                buttons[
+
+                    nextIndex
+
+                ]?.focus();
 
 
                 return;
@@ -1249,7 +931,11 @@ function initializeSidebarKeyboardSupport():void {
                         : currentIndex - 1;
 
 
-                buttons[previousIndex]?.focus();
+                buttons[
+
+                    previousIndex
+
+                ]?.focus();
 
             }
 
@@ -1261,125 +947,7 @@ function initializeSidebarKeyboardSupport():void {
 
 
 /**
- * Mark the first available navigation destination
- * active when the sidebar initializes.
- */
-function setInitialActiveNavigationItem():void {
-
-    const firstAvailableButton =
-
-        getNavigationButtons().find(
-
-            button =>
-
-                findNavigationTarget(
-
-                    button
-
-                )
-
-                !==
-
-                null
-
-        );
-
-
-    if(firstAvailableButton){
-
-        setActiveNavigationButton(
-
-            firstAvailableButton
-
-        );
-
-    }
-
-}
-
-
-/**
- * Focus the destination without causing another
- * scroll jump.
- */
-function focusTargetAfterScroll(
-
-    target:HTMLElement
-
-):void {
-
-    window.setTimeout(
-
-        () => {
-
-            const alreadyFocusable =
-
-                target.hasAttribute(
-
-                    "tabindex"
-
-                );
-
-
-            if(!alreadyFocusable){
-
-                target.setAttribute(
-
-                    "tabindex",
-
-                    "-1"
-
-                );
-
-            }
-
-
-            target.focus({
-
-                preventScroll:
-                    true
-
-            });
-
-
-            if(!alreadyFocusable){
-
-                target.addEventListener(
-
-                    "blur",
-
-                    () => {
-
-                        target.removeAttribute(
-
-                            "tabindex"
-
-                        );
-
-                    },
-
-                    {
-
-                        once:
-                            true
-
-                    }
-
-                );
-
-            }
-
-        },
-
-        450
-
-    );
-
-}
-
-
-/**
- * Return every sidebar navigation button.
+ * Return every sidebar page-navigation button.
  */
 function getNavigationButtons():
 
@@ -1393,19 +961,63 @@ HTMLButtonElement[] {
 
         )
 
-    ).filter(
+    )
 
-        (
+        .filter(
 
-            element
+            (
 
-        ):element is HTMLButtonElement =>
+                element
 
-            element
+            ):element is HTMLButtonElement =>
 
-            instanceof
+                element
 
-            HTMLButtonElement
+                instanceof
+
+                HTMLButtonElement
+
+        );
+
+}
+
+
+/**
+ * Escape text inserted into HTML.
+ */
+function escapeHtml(
+
+    value:string
+
+):string {
+
+    return value
+
+        .replaceAll("&", "&amp;")
+
+        .replaceAll("<", "&lt;")
+
+        .replaceAll(">", "&gt;")
+
+        .replaceAll("\"", "&quot;")
+
+        .replaceAll("'", "&#039;");
+
+}
+
+
+/**
+ * Escape text inserted into HTML attributes.
+ */
+function escapeAttribute(
+
+    value:string
+
+):string {
+
+    return escapeHtml(
+
+        value
 
     );
 

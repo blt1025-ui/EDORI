@@ -99,6 +99,15 @@ from "../ExecutiveSummary";
 
 import {
 
+    initializeSystemConfiguration
+
+}
+
+from "../SystemConfiguration";
+
+
+import {
+
     initializeSummaryCards
 
 }
@@ -149,6 +158,15 @@ import {
 }
 
 from "../OperationalOverview";
+
+
+import {
+
+    initializeOperationalStatusStrip
+
+}
+
+from "../OperationalStatusStrip";
 
 
 import {
@@ -214,6 +232,8 @@ export function initializeDashboardComponents():void {
 
     initializeGauge();
 
+    initializeOperationalStatusStrip();
+
     initializeOperationalOverview();
 
     initializeOperationalLevelReference();
@@ -241,6 +261,8 @@ export function initializeDashboardComponents():void {
     initializeAssessmentHistory();
 
     initializeHistoricalDataManager();
+
+    initializeSystemConfiguration();
 
     initializeDashboardToolbar();
 
