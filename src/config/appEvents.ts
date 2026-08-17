@@ -37,11 +37,45 @@ export const APP_EVENTS = {
 
 
     /**
-     * Administrative configuration overrides
+     * Administrative model configuration overrides
      * changed.
      */
     CONFIGURATION_CHANGED:
-        "configurationChanged"
+        "configurationChanged",
+
+
+    /**
+     * Hospital surge-plan response configuration
+     * changed.
+     *
+     * This event does not mean the HRI score or
+     * operational state changed. It means the
+     * trigger-driven response plan changed.
+     */
+    SURGE_PLAN_CHANGED:
+        "surgePlanChanged",
+
+
+    /**
+     * Hospital-specific operational trigger mapping
+     * changed.
+     *
+     * This changes derived triggers/recommendations,
+     * not the HRI calculation itself.
+     */
+TRIGGER_CONFIGURATION_CHANGED:
+    "triggerConfigurationChanged",
+
+
+/**
+ * Application users, role assignments, or the
+ * active user/session changed.
+ *
+ * Components that display user identity or enforce
+ * authorization can refresh from this event.
+ */
+USERS_CHANGED:
+    "usersChanged"
 
 } as const;
 

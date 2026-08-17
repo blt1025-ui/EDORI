@@ -15,9 +15,30 @@
  *
  * Navigation does not modify EDORI assessment data,
  * results, history, or calculations.
+ *
+ * The sidebar also:
+ *
+ * - Displays the authenticated EDORI user
+ * - Provides explicit sign out
+ * - Hides pages the current user cannot access
+ * - Redirects the application when permissions make
+ *   the current page unauthorized
  */
 
 import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
+import {
+
+    canNavigateToPage,
+
+    ensureAuthorizedPage,
 
     getCurrentPage,
 
@@ -41,6 +62,43 @@ import type {
 from "../services/NavigationService";
 
 
+import {
+
+    subscribe
+
+}
+
+from "../services/EventService";
+
+
+import {
+
+    getCurrentUser
+
+}
+
+from "../services/UserService";
+
+
+import {
+
+    logout,
+    requestPasswordChange
+
+}
+
+from "../services/AuthenticationService";
+
+
+import {
+
+    ROLE_DEFINITIONS
+
+}
+
+from "../types/RoleDefinitions";
+
+
 interface SidebarNavigationItem {
 
     id:ApplicationPage;
@@ -52,6 +110,12 @@ interface SidebarNavigationItem {
     icon:string;
 
 }
+
+
+/**
+ * Prevent duplicate authenticated-user subscriptions.
+ */
+let currentUserSubscribed = false;
 
 
 /**
@@ -266,6 +330,9 @@ export function Sidebar():string {
 
             <div class="sidebar-footer">
 
+                ${createCurrentUserControl()}
+
+
                 <div class="sidebar-footer-status">
 
                     <span
@@ -305,43 +372,21 @@ export function Sidebar():string {
  */
 export function initializeSidebar():void {
 
-    const navigationButtons =
-
-        getNavigationButtons();
-
-
-    if(navigationButtons.length === 0){
-
-        console.warn(
-
-            "Sidebar initialization could not find any navigation buttons."
-
-        );
-
-
-        return;
-
-    }
+    /*
+     * Initialize the authenticated-user control
+     * before navigation synchronization.
+     */
+    initializeCurrentUserControl();
 
 
     /*
-     * Handle page-selection clicks.
+     * Ensure the initial page is valid for the current
+     * user's permission set.
      */
-    navigationButtons.forEach(
+    ensureAuthorizedPage();
 
-        button => {
 
-            button.addEventListener(
-
-                "click",
-
-                handleNavigationClick
-
-            );
-
-        }
-
-    );
+    bindNavigationButtons();
 
 
     /*
@@ -363,9 +408,13 @@ export function initializeSidebar():void {
 
 
     /*
+     * Apply current authorization state.
+     */
+    refreshNavigationAuthorization();
+
+
+    /*
      * Initial synchronization.
-     *
-     * Dashboard is the NavigationService default.
      */
     synchronizeNavigationDisplay(
 
@@ -390,9 +439,23 @@ function createNavigationItem(
         item.id === "dashboard";
 
 
+    const authorized =
+
+        canNavigateToPage(
+            item.id
+        );
+
+
     return `
 
-        <li class="sidebar-navigation-item">
+        <li
+            class="sidebar-navigation-item"
+            data-navigation-item-page="${item.id}"
+            ${authorized
+                ? ""
+                : "hidden"
+            }
+        >
 
             <button
                 id="sidebarNavigation-${item.id}"
@@ -470,6 +533,563 @@ function createNavigationItem(
 
 
 /**
+ * Bind all page-navigation buttons.
+ */
+function bindNavigationButtons():void {
+
+    const navigationButtons =
+
+        getAllNavigationButtons();
+
+
+    if(navigationButtons.length === 0){
+
+        console.warn(
+
+            "Sidebar initialization could not find any navigation buttons."
+
+        );
+
+
+        return;
+
+    }
+
+
+    navigationButtons.forEach(
+
+        button => {
+
+            button.addEventListener(
+
+                "click",
+
+                handleNavigationClick
+
+            );
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Render the persistent current-user control.
+ */
+function createCurrentUserControl():string {
+
+    const currentUser =
+
+        getCurrentUser();
+
+
+    const initials =
+
+        currentUser
+
+            ? getSidebarUserInitials(
+                currentUser.displayName
+            )
+
+            : "?";
+
+
+    const roleTitle =
+
+        currentUser
+
+            ? ROLE_DEFINITIONS[
+                currentUser.role
+            ].title
+
+            : "Signed out";
+
+
+    return `
+
+        <div
+            id="sidebarCurrentUser"
+            class="sidebar-current-user"
+        >
+
+            <span class="sidebar-current-user-label">
+                Signed In
+            </span>
+
+
+            <div class="sidebar-current-user-identity">
+
+                <span
+                    id="sidebarCurrentUserAvatar"
+                    class="sidebar-current-user-avatar"
+                    aria-hidden="true"
+                >
+                    ${escapeHtml(
+                        initials
+                    )}
+                </span>
+
+
+                <div class="sidebar-current-user-copy">
+
+                    <strong id="sidebarCurrentUserName">
+
+                        ${escapeHtml(
+                            currentUser?.displayName
+                            ?? "No authenticated user"
+                        )}
+
+                    </strong>
+
+
+                    <span id="sidebarCurrentUserRole">
+
+                        ${escapeHtml(
+                            roleTitle
+                        )}
+
+                    </span>
+
+
+                    <small id="sidebarCurrentUserUsername">
+
+                        ${escapeHtml(
+                            currentUser
+                                ? `@${currentUser.username}`
+                                : ""
+                        )}
+
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <div class="sidebar-account-actions">
+
+                <button
+                    id="sidebarChangePasswordButton"
+                    class="sidebar-account-action-button"
+                    type="button"
+                >
+                    Change Password
+                </button>
+
+
+                <button
+                    id="sidebarSignOutButton"
+                    class="
+                        sidebar-account-action-button
+                        sidebar-sign-out-button
+                    "
+                    type="button"
+                >
+                    Sign Out
+                </button>
+
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/**
+ * Return compact initials for the sidebar user avatar.
+ */
+function getSidebarUserInitials(
+
+    displayName:string
+
+):string {
+
+    const parts =
+
+        displayName
+
+            .trim()
+
+            .split(/\s+/)
+
+            .filter(Boolean);
+
+
+    if(parts.length === 0){
+
+        return "?";
+
+    }
+
+
+    if(parts.length === 1){
+
+        return parts[0]
+
+            ?.substring(
+                0,
+                2
+            )
+
+            .toUpperCase()
+
+            ?? "?";
+
+    }
+
+
+    const first =
+
+        parts[0]
+            ?.charAt(0)
+
+        ?? "";
+
+
+    const last =
+
+        parts[
+            parts.length - 1
+        ]
+            ?.charAt(0)
+
+        ?? "";
+
+
+    return (
+
+        first
+        +
+        last
+
+    ).toUpperCase();
+
+}
+
+
+/**
+ * Initialize the persistent current-user selector.
+ */
+function initializeCurrentUserControl():void {
+
+    bindChangePasswordButton();
+
+    bindSignOutButton();
+
+
+    if(currentUserSubscribed){
+
+        return;
+
+    }
+
+
+    currentUserSubscribed =
+
+        true;
+
+
+    subscribe(
+
+        APP_EVENTS.USERS_CHANGED,
+
+        () => {
+
+            refreshCurrentUserControl();
+
+            refreshNavigationAuthorization();
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Bind self-service password change.
+ */
+function bindChangePasswordButton():void {
+
+    const button =
+
+        document.getElementById(
+
+            "sidebarChangePasswordButton"
+
+        ) as HTMLButtonElement | null;
+
+
+    if(!button){
+
+        return;
+
+    }
+
+
+    button.addEventListener(
+
+        "click",
+
+        () => {
+
+            requestPasswordChange();
+
+
+            /*
+             * main.ts is subscribed to USERS_CHANGED.
+             * Triggering a no-op user refresh is avoided;
+             * dispatch a lightweight browser event instead.
+             */
+            window.dispatchEvent(
+
+                new CustomEvent(
+                    "edori-authentication-state-changed"
+                )
+
+            );
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Bind authenticated-session sign out.
+ */
+function bindSignOutButton():void {
+
+    const button =
+
+        document.getElementById(
+
+            "sidebarSignOutButton"
+
+        ) as HTMLButtonElement | null;
+
+
+    if(!button){
+
+        return;
+
+    }
+
+
+    button.addEventListener(
+
+        "click",
+
+        () => {
+
+            logout();
+
+        }
+
+    );
+
+}
+
+
+/**
+ * Refresh the sidebar identity after the local user
+ * directory or selected user changes.
+ */
+function refreshCurrentUserControl():void {
+
+    const container =
+
+        document.getElementById(
+
+            "sidebarCurrentUser"
+
+        );
+
+
+    if(!container){
+
+        return;
+
+    }
+
+
+    const currentUser =
+
+        getCurrentUser();
+
+
+    const avatar =
+
+        document.getElementById(
+
+            "sidebarCurrentUserAvatar"
+
+        );
+
+
+    const name =
+
+        document.getElementById(
+
+            "sidebarCurrentUserName"
+
+        );
+
+
+    const role =
+
+        document.getElementById(
+
+            "sidebarCurrentUserRole"
+
+        );
+
+
+    const username =
+
+        document.getElementById(
+
+            "sidebarCurrentUserUsername"
+
+        );
+
+
+    const signOutButton =
+
+        document.getElementById(
+
+            "sidebarSignOutButton"
+
+        ) as HTMLButtonElement | null;
+
+
+    if(avatar){
+
+        avatar.textContent =
+
+            currentUser
+
+                ? getSidebarUserInitials(
+                    currentUser.displayName
+                )
+
+                : "?";
+
+    }
+
+
+    if(name){
+
+        name.textContent =
+
+            currentUser?.displayName
+
+            ?? "No authenticated user";
+
+    }
+
+
+    if(role){
+
+        role.textContent =
+
+            currentUser
+
+                ? ROLE_DEFINITIONS[
+                    currentUser.role
+                ].title
+
+                : "Signed out";
+
+    }
+
+
+    if(username){
+
+        username.textContent =
+
+            currentUser
+
+                ? `@${currentUser.username}`
+
+                : "";
+
+    }
+
+
+    if(signOutButton){
+
+        signOutButton.disabled =
+
+            currentUser === null;
+
+    }
+
+}
+
+
+/**
+ * Re-evaluate page visibility after current-user or
+ * permission changes.
+ */
+function refreshNavigationAuthorization():void {
+
+    SIDEBAR_NAVIGATION_ITEMS.forEach(
+
+        item => {
+
+            const container =
+
+                document.querySelector<HTMLElement>(
+
+                    `[data-navigation-item-page="${item.id}"]`
+
+                );
+
+
+            const authorized =
+
+                canNavigateToPage(
+                    item.id
+                );
+
+
+            if(container){
+
+                container.hidden =
+
+                    !authorized;
+
+            }
+
+        }
+
+    );
+
+
+    /*
+     * Switching away from an Administrator while the
+     * Administration page is open must immediately move
+     * the application to an authorized page.
+     */
+    ensureAuthorizedPage();
+
+
+    synchronizeNavigationDisplay(
+
+        getCurrentPage()
+
+    );
+
+}
+
+
+/**
  * Handle one navigation-button click.
  */
 function handleNavigationClick(
@@ -510,9 +1130,7 @@ function handleNavigationClick(
     if(
 
         !isApplicationPage(
-
             requestedPage
-
         )
 
     ){
@@ -531,11 +1149,18 @@ function handleNavigationClick(
     }
 
 
-    navigateToPage(
+    const navigated =
 
-        requestedPage
+        navigateToPage(
+            requestedPage
+        );
 
-    );
+
+    if(!navigated){
+
+        refreshNavigationAuthorization();
+
+    }
 
 }
 
@@ -565,10 +1190,6 @@ function synchronizeNavigationDisplay(
 
     /*
      * Each application page begins at its own top.
-     *
-     * Avoid smooth scrolling because page changes
-     * should feel immediate rather than like the
-     * previous section-navigation behavior.
      */
     window.scrollTo({
 
@@ -585,7 +1206,7 @@ function synchronizeNavigationDisplay(
 
 /**
  * Show the selected application page and hide the
- * other three pages.
+ * other application pages.
  */
 function updateApplicationPages(
 
@@ -627,9 +1248,9 @@ function updateApplicationPages(
         element => {
 
             /*
-             * Sidebar buttons also have a page data
-             * attribute. Only application-page main
-             * containers should be shown/hidden here.
+             * Sidebar buttons also contain the page data
+             * attribute. Only actual application pages
+             * should be shown or hidden here.
              */
             if(
 
@@ -710,17 +1331,18 @@ function updateNavigationButtons(
 
 ):void {
 
-    getNavigationButtons().forEach(
+    getAllNavigationButtons().forEach(
 
         button => {
 
+            const page =
+
+                button.dataset.applicationPage;
+
+
             const isActive =
 
-                button.dataset.applicationPage
-
-                ===
-
-                activePage;
+                page === activePage;
 
 
             button.classList.toggle(
@@ -761,8 +1383,8 @@ function updateNavigationButtons(
 
 
 /**
- * Support keyboard movement between page-navigation
- * buttons.
+ * Support keyboard movement between visible,
+ * authorized page-navigation buttons.
  *
  * Supported:
  *
@@ -898,9 +1520,7 @@ function initializeSidebarKeyboardSupport():void {
 
 
                 buttons[
-
                     nextIndex
-
                 ]?.focus();
 
 
@@ -932,9 +1552,7 @@ function initializeSidebarKeyboardSupport():void {
 
 
                 buttons[
-
                     previousIndex
-
                 ]?.focus();
 
             }
@@ -947,9 +1565,50 @@ function initializeSidebarKeyboardSupport():void {
 
 
 /**
- * Return every sidebar page-navigation button.
+ * Return navigation buttons currently authorized for
+ * the selected EDORI user.
  */
 function getNavigationButtons():
+
+HTMLButtonElement[] {
+
+    return getAllNavigationButtons()
+
+        .filter(
+
+            button => {
+
+                const page =
+
+                    button.dataset.applicationPage;
+
+
+                return (
+
+                    isApplicationPage(
+                        page
+                    )
+
+                    &&
+
+                    canNavigateToPage(
+                        page
+                    )
+
+                );
+
+            }
+
+        );
+
+}
+
+
+/**
+ * Return every sidebar navigation button regardless
+ * of current authorization state.
+ */
+function getAllNavigationButtons():
 
 HTMLButtonElement[] {
 

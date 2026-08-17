@@ -16,7 +16,7 @@ import type {
 from "../config/operationalStates";
 
 
-export const EDORI_SNAPSHOT_SCHEMA_VERSION = 3;
+export const EDORI_SNAPSHOT_SCHEMA_VERSION = 4;
 
 
 export interface EdoriSnapshot {
@@ -26,6 +26,17 @@ export interface EdoriSnapshot {
     timestamp:Date | string;
 
     schemaVersion:number;
+
+
+    /*
+     * Audit attribution
+     */
+
+    enteredByUserId:string;
+
+    enteredByDisplayName:string;
+
+    enteredByUsername:string;
 
 
     /*

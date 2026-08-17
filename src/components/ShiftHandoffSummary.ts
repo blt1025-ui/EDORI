@@ -419,6 +419,13 @@ function createHandoffMarkup(
 
     const score = Math.round(result.score);
 
+
+    const attribution =
+        getAssessmentAttribution(
+            snapshots,
+            assessment.assessmentTime
+        );
+
     const scoreChange = determineScoreChange(
         snapshots,
         score
@@ -535,6 +542,17 @@ function createHandoffMarkup(
                         )
                     )}
                 </strong>
+
+
+                <small>
+                    Entered by
+                    ${escapeHtml(
+                        attribution.displayName
+                    )}
+                    (${escapeHtml(
+                        attribution.username
+                    )})
+                </small>
 
             </div>
 
@@ -1072,6 +1090,13 @@ function createPlainTextHandoff(
         score
     );
 
+
+    const attribution =
+        getAssessmentAttribution(
+            snapshots,
+            assessment.assessmentTime
+        );
+
     const driverLines =
         operationalAssessment.primaryDrivers
             .slice()
@@ -1121,6 +1146,8 @@ function createPlainTextHandoff(
         `Assessment: ${formatAssessmentTime(
             assessment.assessmentTime
         )}`,
+
+        `Entered by: ${attribution.displayName} (${attribution.username})`,
 
         "",
 
@@ -1845,6 +1872,95 @@ function createTriggerCountDescription(
 /**
  * Format assessment time.
  */
+
+/**
+ * Resolve audit attribution for the committed assessment.
+ *
+ * Assessment snapshots are the authoritative audit record.
+ * The snapshot nearest to the assessment timestamp is used.
+ */
+function getAssessmentAttribution(
+
+    snapshots:EdoriSnapshot[],
+
+    assessmentTime:Date | string
+
+):{
+
+    displayName:string;
+
+    username:string;
+
+    userId:string;
+
+} {
+
+    const assessmentTimestamp =
+        new Date(
+            assessmentTime
+        ).getTime();
+
+
+    const matchingSnapshot = snapshots
+        .slice()
+        .sort(
+            (first, second) => {
+
+                const firstDistance = Math.abs(
+                    new Date(first.timestamp).getTime()
+                    -
+                    assessmentTimestamp
+                );
+
+                const secondDistance = Math.abs(
+                    new Date(second.timestamp).getTime()
+                    -
+                    assessmentTimestamp
+                );
+
+                return firstDistance - secondDistance;
+
+            }
+        )[0];
+
+
+    if(!matchingSnapshot){
+
+        return {
+
+            displayName:
+                "Legacy / Unknown",
+
+            username:
+                "unknown",
+
+            userId:
+                "legacy-unknown"
+
+        };
+
+    }
+
+
+    return {
+
+        displayName:
+            matchingSnapshot.enteredByDisplayName
+            || "Legacy / Unknown",
+
+        username:
+            matchingSnapshot.enteredByUsername
+            || "unknown",
+
+        userId:
+            matchingSnapshot.enteredByUserId
+            || "legacy-unknown"
+
+    };
+
+}
+
+
 function formatAssessmentTime(
 
     value:Date | string

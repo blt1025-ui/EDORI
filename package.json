@@ -6,17 +6,29 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server:dev": "tsx watch server/src/server.ts",
+    "server:build": "tsc -p server/tsconfig.json",
+    "server:start": "node server/dist/server.js",
+    "db:migrate": "tsx server/src/database/migrate.ts",
+    "db:verify": "tsx server/src/database/verifySchema.ts"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.0",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
     "chart.js": "^4.5.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
-    "papaparse": "^5.5.4"
+    "papaparse": "^5.5.4",
+    "pg": "^8.23.0"
   }
 }

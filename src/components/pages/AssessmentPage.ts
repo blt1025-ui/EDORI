@@ -98,34 +98,58 @@ export function AssessmentPage():string {
                 aria-label="Recent Hospital Readiness assessments"
             >
 
-                <div class="assessment-workflow-heading">
+                <details class="assessment-history-disclosure">
 
-                    <div>
+                    <summary class="assessment-history-disclosure-summary">
 
-                        <span class="assessment-workflow-step">
-                            Recent History
+                        <span class="assessment-history-disclosure-copy">
+
+                            <span class="assessment-workflow-step">
+                                Recent History
+                            </span>
+
+
+                            <strong>
+                                Recent Assessments
+                            </strong>
+
+
+                            <small>
+                                Review recently saved assessments to confirm the latest score, operational level, and key conditions.
+                            </small>
+
                         </span>
 
 
-                        <h3>
-                            Recent Assessments
-                        </h3>
+                        <span class="assessment-history-disclosure-right">
+
+                            <span
+                                id="assessmentHistoryCount"
+                                class="assessment-history-count"
+                            >
+                                0 assessments
+                            </span>
 
 
-                        <p>
-                            Review recently saved assessments to confirm the latest score, operational level, and key conditions.
-                        </p>
+                            <span
+                                class="assessment-history-disclosure-chevron"
+                                aria-hidden="true"
+                            >
+                                ▾
+                            </span>
+
+                        </span>
+
+                    </summary>
+
+
+                    <div class="assessment-page-history">
+
+                        ${AssessmentHistory()}
 
                     </div>
 
-                </div>
-
-
-                <div class="assessment-page-history">
-
-                    ${AssessmentHistory()}
-
-                </div>
+                </details>
 
             </section>
 

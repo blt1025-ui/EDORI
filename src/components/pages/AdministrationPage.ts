@@ -8,9 +8,11 @@
  * - Manage historical baseline data
  * - Export operational and assessment data
  * - Restore saved EDORI history
+ * - Manage configuration backups
  * - Provide operational-level reference material
- * - Provide the future home for user management,
- *   permissions, and configurable system settings
+ * - Provide Hospital Readiness system configuration
+ * - Manage EDORI application users
+ * - Review authentication and account-security audit events
  *
  * Routine assessment and operational decision-support
  * functions intentionally live on the other pages.
@@ -24,6 +26,7 @@ import {
 
 from "../DataExportCenter";
 
+
 import {
 
     SystemConfiguration
@@ -32,6 +35,7 @@ import {
 
 from "../SystemConfiguration";
 
+
 import {
 
     HistoricalDataManager
@@ -39,6 +43,15 @@ import {
 }
 
 from "../HistoricalDataManager";
+
+
+import {
+
+    ConfigurationBackupCenter
+
+}
+
+from "../ConfigurationBackupCenter";
 
 
 import {
@@ -57,6 +70,24 @@ import {
 }
 
 from "../OperationalLevelReference";
+
+
+import {
+
+    UserManagement
+
+}
+
+from "../UserManagement";
+
+
+import {
+
+    SecurityAuditLog
+
+}
+
+from "../SecurityAuditLog";
 
 
 import {
@@ -100,7 +131,9 @@ export function AdministrationPage():string {
 
 
                     <p>
-                        Manage historical baselines, data exports, backups, reference information, and system configuration.
+                        Manage historical baselines, data exports, backups,
+                        reference information, system configuration, and
+                        application access.
                     </p>
 
                 </div>
@@ -164,46 +197,90 @@ export function AdministrationPage():string {
                 )}
 
 
-                <div class="administration-data-grid">
+                <div class="administration-data-workflow">
 
-                    ${CollapsiblePanel({
+                    <!-- =================================
+                         DATA EXPORT
+                    ================================== -->
 
-                        id:
-                            "data-export-center-panel",
+                    <div class="administration-data-workflow-primary">
 
-                        title:
-                            "Data Export Center",
+                        ${CollapsiblePanel({
 
-                        description:
-                            "Download current assessment and saved history data",
+                            id:
+                                "data-export-center-panel",
 
-                        content:
-                            DataExportCenter(),
+                            title:
+                                "Data Export Center",
 
-                        initiallyOpen:
-                            true
+                            description:
+                                "Download the current assessment, assessment history, or a restorable history backup",
 
-                    })}
+                            content:
+                                DataExportCenter(),
+
+                            initiallyOpen:
+                                true
+
+                        })}
+
+                    </div>
 
 
-                    ${CollapsiblePanel({
+                    <!-- =================================
+                         HISTORY RESTORE
+                    ================================== -->
 
-                        id:
-                            "history-restore-center-panel",
+                    <div class="administration-data-workflow-secondary">
 
-                        title:
-                            "History Restore Center",
+                        ${CollapsiblePanel({
 
-                        description:
-                            "Validate and restore a saved assessment-history backup",
+                            id:
+                                "history-restore-center-panel",
 
-                        content:
-                            HistoryRestoreCenter(),
+                            title:
+                                "Restore Assessment History",
 
-                        initiallyOpen:
-                            true
+                            description:
+                                "Validate and restore a previously exported Hospital Readiness history backup",
 
-                    })}
+                            content:
+                                HistoryRestoreCenter(),
+
+                            initiallyOpen:
+                                false
+
+                        })}
+
+                    </div>
+
+
+                    <!-- =================================
+                         CONFIGURATION BACKUP
+                    ================================== -->
+
+                    <div class="administration-data-workflow-tertiary">
+
+                        ${CollapsiblePanel({
+
+                            id:
+                                "configuration-backup-center-panel",
+
+                            title:
+                                "Configuration Backup & Restore",
+
+                            description:
+                                "Export or restore the Hospital Readiness model, operational triggers, and Hospital Surge Plan configuration",
+
+                            content:
+                                ConfigurationBackupCenter(),
+
+                            initiallyOpen:
+                                false
+
+                        })}
+
+                    </div>
 
                 </div>
 
@@ -248,19 +325,19 @@ export function AdministrationPage():string {
 
                     ${CollapsiblePanel({
 
-    id:
-        "system-configuration-panel",
+                        id:
+                            "system-configuration-panel",
 
-    title:
-        "System Configuration",
+                        title:
+                            "System Configuration",
 
-    description:
-        "Review current Hospital Readiness model settings",
+                        description:
+                            "Review and manage current Hospital Readiness model settings",
 
-    content:
-        SystemConfiguration()
+                        content:
+                            SystemConfiguration()
 
-})}
+                    })}
 
                 </div>
 
@@ -284,38 +361,44 @@ export function AdministrationPage():string {
                 )}
 
 
-                <div class="administration-access-grid">
+                <div class="administration-access-workspace">
 
-                    ${createFutureAdministrationCard({
+                    ${CollapsiblePanel({
 
-                        icon:
-                            "👤",
+                        id:
+                            "user-management-panel",
 
                         title:
                             "User Management",
 
                         description:
-                            "Create, edit, deactivate, and review application users.",
+                            "Create, edit, deactivate, and manage EDORI application users",
 
-                        status:
-                            "Planned"
+                        content:
+                            UserManagement(),
+
+                        initiallyOpen:
+                            false
 
                     })}
 
 
-                    ${createFutureAdministrationCard({
+                    ${CollapsiblePanel({
 
-                        icon:
-                            "🔐",
+                        id:
+                            "security-audit-log-panel",
 
                         title:
-                            "Roles & Permissions",
+                            "Security Audit Log",
 
                         description:
-                            "Control access to assessment, reporting, historical-data, and administrative functions.",
+                            "Review authentication, password, role, and account-management activity",
 
-                        status:
-                            "Planned"
+                        content:
+                            SecurityAuditLog(),
+
+                        initiallyOpen:
+                            false
 
                     })}
 
@@ -348,79 +431,6 @@ function createAdministrationSectionLabel(
             )}
 
         </div>
-
-    `;
-
-}
-
-
-/**
- * Create one placeholder card for planned
- * administrative functionality.
- */
-function createFutureAdministrationCard(
-
-    options:{
-
-        icon:string;
-
-        title:string;
-
-        description:string;
-
-        status:string;
-
-    }
-
-):string {
-
-    return `
-
-        <article class="administration-future-card">
-
-            <div class="administration-future-card-header">
-
-                <span
-                    class="administration-future-card-icon"
-                    aria-hidden="true"
-                >
-
-                    ${escapeHtml(
-                        options.icon
-                    )}
-
-                </span>
-
-
-                <span class="administration-future-card-status">
-
-                    ${escapeHtml(
-                        options.status
-                    )}
-
-                </span>
-
-            </div>
-
-
-            <h4>
-
-                ${escapeHtml(
-                    options.title
-                )}
-
-            </h4>
-
-
-            <p>
-
-                ${escapeHtml(
-                    options.description
-                )}
-
-            </p>
-
-        </article>
 
     `;
 

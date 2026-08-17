@@ -13,7 +13,7 @@
  * - Risk direction
  * - Confidence
  * - Score-derived operational state
- * - Configured operational recommendations
+ * - Hospital surge-plan recommendations
  *
  * This service does not:
  *
@@ -26,11 +26,11 @@
 
 import {
 
-    getOperationalIntervention
+    getSurgePlanIntervention
 
 }
 
-from "../config/interventions";
+from "./SurgePlanService";
 
 
 
@@ -1927,7 +1927,7 @@ function createOperationalRecommendations(
 
                         const intervention =
 
-                            getOperationalIntervention(
+                            getSurgePlanIntervention(
 
                                 interventionId
 

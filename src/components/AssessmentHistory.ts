@@ -77,37 +77,6 @@ export function AssessmentHistory():string {
 
         <section class="assessment-history-container">
 
-            <div class="panel-header">
-
-                <div>
-
-                    <h3>
-                        Recent Assessments
-                    </h3>
-
-                    <p class="panel-description">
-                        Most recent Hospital Readiness assessments and operational-level changes
-                    </p>
-
-                </div>
-
-
-                <div class="assessment-history-header-actions">
-
-                    <span
-                        id="assessmentHistoryCount"
-                        class="assessment-history-count"
-                    >
-                        0 assessments
-                    </span>
-
-
-
-                </div>
-
-            </div>
-
-
             <div
                 id="assessmentHistoryContent"
                 class="assessment-history-content"
@@ -128,6 +97,7 @@ export function AssessmentHistory():string {
 /**
  * Initialize assessment-history behavior.
  */
+
 export function initializeAssessmentHistory():void {
 
         updateAssessmentHistory();
@@ -226,6 +196,10 @@ function updateAssessmentHistory():void {
 
                             <th scope="col">
                                 Time
+                            </th>
+
+                            <th scope="col">
+                                Entered By
                             </th>
 
                             <th scope="col">
@@ -578,6 +552,37 @@ function createHistoryRowMarkup(
 
             <td>
 
+                <strong class="assessment-history-entered-by">
+
+                    ${escapeHtml(
+                        row.snapshot.enteredByDisplayName
+                    )}
+
+                </strong>
+
+                ${row.snapshot.enteredByUsername
+
+                    ? `
+
+                        <small class="assessment-history-entered-by-username">
+
+                            ${escapeHtml(
+                                row.snapshot.enteredByUsername
+                            )}
+
+                        </small>
+
+                    `
+
+                    : ""
+
+                }
+
+            </td>
+
+
+            <td>
+
                 <span
                     class="assessment-history-level"
                     style="
@@ -735,16 +740,21 @@ function createScoreChangeText(
 
     if(rounded > 0){
 
-        return `+${rounded}`;
+        return `↑ +${rounded}`;
 
     }
 
 
-    return String(
+    if(rounded < 0){
 
-        rounded
+        return `↓ ${Math.abs(
+            rounded
+        )}`;
 
-    );
+    }
+
+
+    return "— 0";
 
 }
 

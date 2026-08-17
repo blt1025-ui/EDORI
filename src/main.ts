@@ -6,12 +6,23 @@
  * Responsibilities:
  *
  * - Load global styles
- * - Render the application once
- * - Initialize dashboard behavior once
+ * - Initialize authentication
+ * - Render the login experience when signed out
+ * - Render and initialize EDORI once authenticated
+ * - Keep login/application visibility synchronized
  * - Expose development-only testing tools
  */
 
 import "./style.css";
+
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "./config/appEvents";
 
 
 import {
@@ -30,6 +41,55 @@ import {
 }
 
 from "./components/Dashboard";
+
+
+import {
+
+    initializeLoginPage,
+    LoginPage
+
+}
+
+from "./components/LoginPage";
+
+
+import {
+
+    initializePasswordChangePage,
+    PasswordChangePage
+
+}
+
+from "./components/PasswordChangePage";
+
+
+import {
+
+    initializeAuthentication,
+    isAuthenticated,
+    isPasswordChangeRequired
+
+}
+
+from "./services/AuthenticationService";
+
+
+import {
+
+    subscribe
+
+}
+
+from "./services/EventService";
+
+
+import {
+
+    initializeSessionSecurity
+
+}
+
+from "./services/SessionSecurityService";
 
 
 import {
@@ -102,19 +162,342 @@ if(!appElement){
 
 
 /**
- * Render the complete application HTML once.
+ * Track whether the authenticated application has
+ * already been rendered and initialized.
+ *
+ * The application remains mounted while signed out so
+ * repeated login/logout cycles do not create duplicate
+ * component event subscriptions.
  */
-appElement.innerHTML = App();
+let authenticatedApplicationInitialized = false;
 
 
 /**
- * Initialize all dashboard behavior after the HTML
- * has been inserted into the page.
- *
- * initializeDashboard() also initializes the
- * functional sidebar.
+ * Create persistent authentication/application hosts.
  */
-initializeDashboard();
+appElement.innerHTML = `
+
+    <div
+        id="edoriAuthenticationHost"
+        class="edori-authentication-host"
+    >
+    </div>
+
+
+    <div
+        id="edoriPasswordChangeHost"
+        class="edori-password-change-host"
+        hidden
+    >
+    </div>
+
+
+    <div
+        id="edoriAuthenticatedApplicationHost"
+        class="edori-authenticated-application-host"
+        hidden
+    >
+    </div>
+
+`;
+
+
+/**
+ * Keep the visible experience synchronized whenever
+ * UserService reports an identity/session change.
+ */
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    synchronizeAuthenticationDisplay
+
+);
+
+
+window.addEventListener(
+
+    "edori-authentication-state-changed",
+
+    synchronizeAuthenticationDisplay
+
+);
+
+
+/**
+ * Initialize the authentication layer and then display
+ * the correct experience.
+ */
+void initializeApplication();
+
+
+async function initializeApplication():Promise<void> {
+
+    try {
+
+        await initializeAuthentication();
+
+
+        initializeSessionSecurity();
+
+
+        synchronizeAuthenticationDisplay();
+
+    }
+    catch(error){
+
+        console.error(
+
+            "EDORI authentication initialization failed:",
+
+            error
+
+        );
+
+
+        renderAuthenticationInitializationError();
+
+    }
+
+}
+
+
+/**
+ * Show either LoginPage or the authenticated EDORI app.
+ */
+function synchronizeAuthenticationDisplay():void {
+
+    const authenticationHost =
+
+        document.getElementById(
+
+            "edoriAuthenticationHost"
+
+        );
+
+
+    const passwordChangeHost =
+
+        document.getElementById(
+
+            "edoriPasswordChangeHost"
+
+        );
+
+
+    const applicationHost =
+
+        document.getElementById(
+
+            "edoriAuthenticatedApplicationHost"
+
+        );
+
+
+    if(
+
+        !authenticationHost
+
+        ||
+
+        !passwordChangeHost
+
+        ||
+
+        !applicationHost
+
+    ){
+
+        return;
+
+    }
+
+
+    if(
+
+        isAuthenticated()
+
+        &&
+
+        isPasswordChangeRequired()
+
+    ){
+
+        authenticationHost.hidden =
+            true;
+
+
+        authenticationHost.innerHTML =
+            "";
+
+
+        applicationHost.hidden =
+            true;
+
+
+        passwordChangeHost.hidden =
+            false;
+
+
+        passwordChangeHost.innerHTML =
+
+            PasswordChangePage();
+
+
+        initializePasswordChangePage(
+
+            synchronizeAuthenticationDisplay
+
+        );
+
+
+        return;
+
+    }
+
+
+    passwordChangeHost.hidden =
+        true;
+
+
+    passwordChangeHost.innerHTML =
+        "";
+
+
+    if(isAuthenticated()){
+
+        authenticationHost.hidden =
+            true;
+
+
+        authenticationHost.innerHTML =
+            "";
+
+
+        applicationHost.hidden =
+            false;
+
+
+        if(!authenticatedApplicationInitialized){
+
+            applicationHost.innerHTML =
+
+                App();
+
+
+            initializeDashboard();
+
+
+            authenticatedApplicationInitialized =
+                true;
+
+        }
+
+
+        return;
+
+    }
+
+
+    applicationHost.hidden =
+        true;
+
+
+    authenticationHost.hidden =
+        false;
+
+
+    authenticationHost.innerHTML =
+
+        LoginPage();
+
+
+    initializeLoginPage();
+
+}
+
+
+/**
+ * Render an unrecoverable authentication-startup error.
+ */
+function renderAuthenticationInitializationError():void {
+
+    const authenticationHost =
+
+        document.getElementById(
+
+            "edoriAuthenticationHost"
+
+        );
+
+
+    const passwordChangeHost =
+
+        document.getElementById(
+
+            "edoriPasswordChangeHost"
+
+        );
+
+
+    const applicationHost =
+
+        document.getElementById(
+
+            "edoriAuthenticatedApplicationHost"
+
+        );
+
+
+    if(passwordChangeHost){
+
+        passwordChangeHost.hidden =
+            true;
+
+    }
+
+
+    if(applicationHost){
+
+        applicationHost.hidden =
+            true;
+
+    }
+
+
+    if(!authenticationHost){
+
+        return;
+
+    }
+
+
+    authenticationHost.hidden =
+        false;
+
+
+    authenticationHost.innerHTML = `
+
+        <main class="edori-login-page">
+
+            <section class="edori-login-card edori-login-fatal-error">
+
+                <h1>
+                    EDORI could not start
+                </h1>
+
+                <p>
+                    The authentication system could not be initialized.
+                    Review the browser console for details.
+                </p>
+
+            </section>
+
+        </main>
+
+    `;
+
+}
 
 
 /**

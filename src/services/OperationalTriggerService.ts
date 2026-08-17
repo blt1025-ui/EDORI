@@ -19,11 +19,11 @@
 
 import {
 
-    OPERATIONAL_TRIGGERS
+    getOperationalTriggers
 
 }
 
-from "../config/operationalTriggers";
+from "./TriggerConfigurationService";
 
 
 
@@ -83,7 +83,10 @@ const APPROACHING_TRIGGER_PERCENT = 85;
 
 
 /**
- * Evaluate every configured trigger.
+ * Evaluate every effective configured trigger.
+ *
+ * When no trigger list is supplied explicitly, the
+ * hospital-specific trigger configuration is used.
  */
 export function evaluateOperationalTriggers(
 
@@ -91,7 +94,7 @@ export function evaluateOperationalTriggers(
 
     triggers:OperationalTrigger[] =
 
-        OPERATIONAL_TRIGGERS
+        getOperationalTriggers()
 
 ):OperationalTriggerResult[] {
 

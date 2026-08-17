@@ -616,7 +616,7 @@ function createAwaitingMarkup():string {
                 </strong>
 
                 <p>
-                    Complete the Situation Assessment and select Calculate EDORI.
+                    Complete the Situation Assessment and select Calculate & Save Assessment.
                 </p>
 
             </div>
@@ -716,10 +716,10 @@ function createRecalculationMarkup(
             Review the current values and select
 
             <strong>
-                Calculate EDORI
+                Calculate & Save Assessment
             </strong>
 
-            to refresh the operational assessment.
+            to refresh and save the operational assessment.
 
         </div>
 

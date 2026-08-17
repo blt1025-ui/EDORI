@@ -17,6 +17,14 @@
 
 import {
 
+    requirePermission
+
+}
+
+from "./AuthorizationService";
+
+import {
+
     HISTORICAL_EXPECTATIONS
 
 }
@@ -76,6 +84,11 @@ export function saveHistoricalDataset(
     dataset:HistoricalExpectation[]
 
 ):void {
+
+    requirePermission(
+        "historicalData.manage"
+    );
+
 
     const normalizedDataset = normalizeDataset(
 
@@ -229,6 +242,11 @@ boolean {
 export function clearImportedHistoricalDataset():
 
 void {
+
+    requirePermission(
+        "historicalData.manage"
+    );
+
 
     localStorage.removeItem(
 

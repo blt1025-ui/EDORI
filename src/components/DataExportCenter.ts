@@ -554,7 +554,9 @@ function exportCurrentAssessmentCsv():void {
 
         const row = createCurrentAssessmentRow(
 
-            operationalAssessment
+            operationalAssessment,
+
+            getSnapshots()
 
         );
 
@@ -834,7 +836,9 @@ function exportHistoryJson():void {
  */
 function createCurrentAssessmentRow(
 
-    operationalAssessment:OperationalAssessment
+    operationalAssessment:OperationalAssessment,
+
+    snapshots:EdoriSnapshot[]
 
 ):Record<string, unknown> {
 
@@ -852,12 +856,27 @@ function createCurrentAssessmentRow(
         assessment.totalEDVolume - highAcuityCount
     );
 
+    const attribution =
+        getAssessmentAttribution(
+            snapshots,
+            assessment.assessmentTime
+        );
+
     return {
 
         assessmentTime:
             normalizeDateForExport(
                 assessment.assessmentTime
             ),
+
+        enteredByUserId:
+            attribution.userId,
+
+        enteredByDisplayName:
+            attribution.displayName,
+
+        enteredByUsername:
+            attribution.username,
 
         day:
             assessment.day,
@@ -1061,6 +1080,15 @@ function createSnapshotCsvRow(
 
         schemaVersion:
             snapshot.schemaVersion,
+
+        enteredByUserId:
+            snapshot.enteredByUserId,
+
+        enteredByDisplayName:
+            snapshot.enteredByDisplayName,
+
+        enteredByUsername:
+            snapshot.enteredByUsername,
 
         score:
             snapshot.score,
@@ -1440,6 +1468,95 @@ function escapeCsvValue(
 /**
  * Normalize a date for export.
  */
+
+/**
+ * Resolve audit attribution for the committed assessment.
+ *
+ * Assessment snapshots are the authoritative audit record.
+ * The snapshot nearest to the assessment timestamp is used.
+ */
+function getAssessmentAttribution(
+
+    snapshots:EdoriSnapshot[],
+
+    assessmentTime:Date | string
+
+):{
+
+    displayName:string;
+
+    username:string;
+
+    userId:string;
+
+} {
+
+    const assessmentTimestamp =
+        new Date(
+            assessmentTime
+        ).getTime();
+
+
+    const matchingSnapshot = snapshots
+        .slice()
+        .sort(
+            (first, second) => {
+
+                const firstDistance = Math.abs(
+                    new Date(first.timestamp).getTime()
+                    -
+                    assessmentTimestamp
+                );
+
+                const secondDistance = Math.abs(
+                    new Date(second.timestamp).getTime()
+                    -
+                    assessmentTimestamp
+                );
+
+                return firstDistance - secondDistance;
+
+            }
+        )[0];
+
+
+    if(!matchingSnapshot){
+
+        return {
+
+            displayName:
+                "Legacy / Unknown",
+
+            username:
+                "unknown",
+
+            userId:
+                "legacy-unknown"
+
+        };
+
+    }
+
+
+    return {
+
+        displayName:
+            matchingSnapshot.enteredByDisplayName
+            || "Legacy / Unknown",
+
+        username:
+            matchingSnapshot.enteredByUsername
+            || "unknown",
+
+        userId:
+            matchingSnapshot.enteredByUserId
+            || "legacy-unknown"
+
+    };
+
+}
+
+
 function normalizeDateForExport(
 
     value:Date | string

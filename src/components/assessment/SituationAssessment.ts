@@ -82,6 +82,15 @@ import {
 from "../../services/StateService";
 
 
+import {
+
+    hasPermission
+
+}
+
+from "../../services/AuthorizationService";
+
+
 import type {
 
     EdoriAssessmentInput
@@ -218,6 +227,17 @@ export function SituationAssessment():string {
 
 
             <div
+                id="assessmentWorkflow"
+                class="assessment-workflow"
+                aria-label="Assessment workflow"
+            >
+
+                ${createAssessmentWorkflowMarkup()}
+
+            </div>
+
+
+            <div
                 id="assessmentProgress"
                 class="assessment-progress"
                 aria-live="polite"
@@ -341,6 +361,141 @@ export function SituationAssessment():string {
             </p>
 
         </section>
+
+    `;
+
+}
+
+
+/**
+ * Render the assessment workflow.
+ *
+ * Calculation and saving are intentionally one action in
+ * the current EDORI engine, so the UI should not imply a
+ * separate commit step that does not exist.
+ */
+function createAssessmentWorkflowMarkup():string {
+
+    return `
+
+        <div
+            id="assessmentWorkflowStepInputs"
+            class="
+                assessment-workflow-step
+                assessment-workflow-step-active
+            "
+        >
+
+            <span class="assessment-workflow-number">
+                1
+            </span>
+
+            <div>
+
+                <strong>
+                    Enter Current Operations
+                </strong>
+
+                <small>
+                    Complete all required operational fields
+                </small>
+
+            </div>
+
+        </div>
+
+
+        <div
+            class="assessment-workflow-connector"
+            aria-hidden="true"
+        >
+        </div>
+
+
+        <div
+            id="assessmentWorkflowStepContext"
+            class="assessment-workflow-step"
+        >
+
+            <span class="assessment-workflow-number">
+                2
+            </span>
+
+            <div>
+
+                <strong>
+                    Review Context
+                </strong>
+
+                <small>
+                    Historical expectations load automatically
+                </small>
+
+            </div>
+
+        </div>
+
+
+        <div
+            class="assessment-workflow-connector"
+            aria-hidden="true"
+        >
+        </div>
+
+
+        <div
+            id="assessmentWorkflowStepCalculate"
+            class="assessment-workflow-step"
+        >
+
+            <span class="assessment-workflow-number">
+                3
+            </span>
+
+            <div>
+
+                <strong>
+                    Calculate & Save
+                </strong>
+
+                <small>
+                    Update the authoritative HRI assessment
+                </small>
+
+            </div>
+
+        </div>
+
+
+        <div
+            class="assessment-workflow-connector"
+            aria-hidden="true"
+        >
+        </div>
+
+
+        <div
+            id="assessmentWorkflowStepResult"
+            class="assessment-workflow-step"
+        >
+
+            <span class="assessment-workflow-number">
+                4
+            </span>
+
+            <div>
+
+                <strong>
+                    Review Dashboard
+                </strong>
+
+                <small>
+                    Operational level and guidance update
+                </small>
+
+            </div>
+
+        </div>
 
     `;
 
@@ -850,6 +1005,8 @@ export function initializeSituationAssessment():void {
 
     initializeAssessmentProgress();
 
+    updateAssessmentWorkflow();
+
 }
 
 
@@ -1042,6 +1199,8 @@ function initializeCurrentValueInputs():void {
 
                     showDraftChangedMessage();
 
+                    updateAssessmentWorkflow();
+
                 }
 
             );
@@ -1093,6 +1252,38 @@ function initializeCalculateButton():void {
 
 
 function submitAssessmentToEngine():void {
+
+    /*
+     * Authorization is enforced at the action boundary,
+     * not only through disabled UI controls.
+     */
+    if(
+
+        !hasPermission(
+            "assessment.create"
+        )
+
+        ||
+
+        !hasPermission(
+            "assessment.save"
+        )
+
+    ){
+
+        showAssessmentMessage(
+
+            "Your EDORI role allows viewing assessments but does not allow calculating or saving a new assessment.",
+
+            "error"
+
+        );
+
+
+        return;
+
+    }
+
 
     const button = document.getElementById(
 
@@ -1221,6 +1412,10 @@ function submitAssessmentToEngine():void {
         showAssessmentCalculatedStatus();
 
         clearChangedFieldIndicators();
+
+        updateAssessmentWorkflow(
+            "calculated"
+        );
 
     }
     catch(error){
@@ -2209,7 +2404,7 @@ function showDraftChangedMessage():void {
 
     showAssessmentMessage(
 
-        "Assessment values changed. Select Calculate Hospital Readiness to update the dashboard.",
+        "Assessment values changed. Select Calculate & Save Assessment to update the dashboard.",
 
         "draft"
 
@@ -2409,6 +2604,9 @@ function updateAssessmentProgress():void {
 
     );
 
+
+    updateAssessmentWorkflow();
+
 }
 
 
@@ -2474,6 +2672,141 @@ function isAssessmentFieldComplete(
         &&
 
         value >= 0;
+
+}
+
+
+/*
+ * =====================================================
+ * Workflow status
+ * =====================================================
+ */
+
+function updateAssessmentWorkflow(
+
+    forcedState?:
+        "calculated"
+
+):void {
+
+    const completedFieldCount =
+
+        REQUIRED_ASSESSMENT_FIELD_IDS.filter(
+
+            fieldId =>
+
+                isAssessmentFieldComplete(
+                    fieldId
+                )
+
+        ).length;
+
+
+    const complete =
+
+        completedFieldCount
+
+        ===
+
+        REQUIRED_ASSESSMENT_FIELD_IDS.length;
+
+
+    const hasDraftChanges =
+
+        CURRENT_VALUE_FIELDS.some(
+
+            field =>
+
+                document.getElementById(
+                    field
+                )?.classList.contains(
+                    CHANGED_FIELD_CLASS
+                )
+
+        );
+
+
+    setWorkflowStepState(
+        "assessmentWorkflowStepInputs",
+        complete
+            ? "complete"
+            : "active"
+    );
+
+
+    setWorkflowStepState(
+        "assessmentWorkflowStepContext",
+        complete
+            ? (
+                forcedState === "calculated"
+                    ? "complete"
+                    : "active"
+            )
+            : "pending"
+    );
+
+
+    setWorkflowStepState(
+        "assessmentWorkflowStepCalculate",
+        forcedState === "calculated"
+            ? "complete"
+            : (
+                complete
+                    ? "active"
+                    : "pending"
+            )
+    );
+
+
+    setWorkflowStepState(
+        "assessmentWorkflowStepResult",
+        forcedState === "calculated"
+            ? "active"
+            : (
+                hasCommittedAssessment()
+                &&
+                !hasDraftChanges
+                    ? "complete"
+                    : "pending"
+            )
+    );
+
+}
+
+
+function setWorkflowStepState(
+
+    elementId:string,
+
+    state:
+        | "pending"
+        | "active"
+        | "complete"
+
+):void {
+
+    const element = document.getElementById(
+        elementId
+    );
+
+
+    if(!element){
+
+        return;
+
+    }
+
+
+    element.classList.remove(
+        "assessment-workflow-step-pending",
+        "assessment-workflow-step-active",
+        "assessment-workflow-step-complete"
+    );
+
+
+    element.classList.add(
+        `assessment-workflow-step-${state}`
+    );
 
 }
 
@@ -2589,7 +2922,7 @@ function showAssessmentDraftStatus():void {
 
         "Changes not calculated",
 
-        "Select Calculate Hospital Readiness to update the dashboard with the current values.",
+        "Select Calculate & Save Assessment to update the dashboard with the current values.",
 
         "draft"
 
@@ -2776,7 +3109,7 @@ function setSubmissionState(
 
     button.textContent = submitting
 
-        ? "Calculating..."
+        ? "Calculating & Saving..."
 
         : "Calculate & Save Assessment";
 

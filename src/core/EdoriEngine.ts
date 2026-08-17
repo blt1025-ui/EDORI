@@ -77,6 +77,15 @@ from "../services/ResultService";
 
 import {
 
+    getCurrentUser
+
+}
+
+from "../services/UserService";
+
+
+import {
+
     saveSnapshot,
 
     shouldCreateSnapshot
@@ -507,6 +516,11 @@ export function runEdoriAssessment(
      * =================================================
      */
 
+    const currentUser =
+
+        getCurrentUser();
+
+
     const snapshot:EdoriSnapshot = {
 
         id:
@@ -514,6 +528,18 @@ export function runEdoriAssessment(
 
         schemaVersion:
             EDORI_SNAPSHOT_SCHEMA_VERSION,
+
+        enteredByUserId:
+            currentUser?.id
+            ?? "",
+
+        enteredByDisplayName:
+            currentUser?.displayName
+            ?? "Unknown",
+
+        enteredByUsername:
+            currentUser?.username
+            ?? "",
 
         timestamp:
             new Date(

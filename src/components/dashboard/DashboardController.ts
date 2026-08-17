@@ -1,10 +1,14 @@
 /**
  * DashboardController
  *
- * Coordinates dashboard-component initialization.
+ * Coordinates application-component initialization.
  *
  * This file does not render markup and does not
  * calculate EDORI.
+ *
+ * It initializes components rendered across the
+ * persistent EDORI application pages after App()
+ * inserts all markup into the DOM.
  */
 
 import {
@@ -23,6 +27,15 @@ import {
 }
 
 from "../HistoryRestoreCenter";
+
+
+import {
+
+    initializeConfigurationBackupCenter
+
+}
+
+from "../ConfigurationBackupCenter";
 
 
 import {
@@ -198,11 +211,38 @@ from "../TrendChart";
 
 import {
 
+    initializeUserManagement
+
+}
+
+from "../UserManagement";
+
+
+import {
+
+    initializeSecurityAuditLog
+
+}
+
+from "../SecurityAuditLog";
+
+
+import {
+
     initializeSituationAssessment
 
 }
 
 from "../assessment/SituationAssessment";
+
+
+import {
+
+    initializeAssessmentAccessController
+
+}
+
+from "../assessment/AssessmentAccessController";
 
 
 import {
@@ -215,15 +255,36 @@ from "./DashboardToolbar";
 
 
 /**
- * Initialize every component rendered by the
- * dashboard.
+ * Initialize every interactive component rendered by
+ * the persistent EDORI application.
  */
 export function initializeDashboardComponents():void {
 
+    /*
+     * Dashboard command/status controls.
+     */
     initializeDashboardCommandBar();
 
+
+    /*
+     * Assessment workflow.
+     *
+     * SituationAssessment initializes its normal input,
+     * validation, calculation, historical-data, and
+     * workflow state first.
+     *
+     * AssessmentAccessController is initialized
+     * immediately afterward so authorization is layered
+     * on top of that normal assessment state.
+     */
     initializeSituationAssessment();
 
+    initializeAssessmentAccessController();
+
+
+    /*
+     * Dashboard summary and operational state.
+     */
     initializeExecutiveSummary();
 
     initializeSummaryCards();
@@ -238,6 +299,10 @@ export function initializeDashboardComponents():void {
 
     initializeOperationalLevelReference();
 
+
+    /*
+     * Assessment and operational details.
+     */
     initializeAssessmentDetails();
 
     initializeDrivers();
@@ -250,10 +315,20 @@ export function initializeDashboardComponents():void {
 
     initializeExecutiveAssessmentReport();
 
+
+    /*
+     * Administration data-management tools.
+     */
     initializeDataExportCenter();
 
     initializeHistoryRestoreCenter();
 
+    initializeConfigurationBackupCenter();
+
+
+    /*
+     * Trends and historical information.
+     */
     initializeTrendChart();
 
     initializeOperationalTimeline();
@@ -262,8 +337,20 @@ export function initializeDashboardComponents():void {
 
     initializeHistoricalDataManager();
 
+
+    /*
+     * Administrative configuration and user access.
+     */
     initializeSystemConfiguration();
 
+    initializeUserManagement();
+
+    initializeSecurityAuditLog();
+
+
+    /*
+     * Shared dashboard/application toolbar behavior.
+     */
     initializeDashboardToolbar();
 
 }

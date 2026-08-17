@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# EDORI backend environment files
+server/.env
+server/.env.*
+!server/.env.example
+
+# EDORI backend compiled output
+server/dist/

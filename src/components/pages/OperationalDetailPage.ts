@@ -221,56 +221,59 @@ export function OperationalDetailPage():string {
                 )}
 
 
-                <div class="operational-detail-response-grid">
+                <div class="operational-detail-response-stack">
 
-                    <div class="operational-detail-drivers">
+    <div class="operational-detail-actions">
 
-                        ${CollapsiblePanel({
+        ${CollapsiblePanel({
 
-                            id:
-                                "drivers-panel",
+            id:
+                "recommendations-panel",
 
-                            title:
-                                "Primary Drivers",
+            title:
+                "Recommended Actions",
 
-                            description:
-                                "Active conditions and strongest HRI contributors",
+            description:
+                "Prioritized operational interventions and ownership",
 
-                            content:
-                                Drivers(),
+            content:
+                Recommendations(),
 
-                            initiallyOpen:
-                                true
+            initiallyOpen:
+                true
 
-                        })}
+        })}
 
-                    </div>
+    </div>
 
 
-                    <div class="operational-detail-actions">
+    <div class="operational-detail-drivers">
 
-                        ${CollapsiblePanel({
+        ${CollapsiblePanel({
 
-                            id:
-                                "recommendations-panel",
+            id:
+                "drivers-panel",
 
-                            title:
-                                "Recommended Actions",
+            title:
+                "Primary Drivers",
 
-                            description:
-                                "Prioritized operational interventions and ownership",
+            description:
+                "Active conditions and strongest HRI contributors",
 
-                            content:
-                                Recommendations(),
+            content:
+                Drivers(),
 
-                            initiallyOpen:
-                                true
+            initiallyOpen:
+                false
 
-                        })}
+        })}
 
-                    </div>
+    </div>
 
-                </div>
+</div>
+
+
+                    
 
             </section>
 
@@ -368,7 +371,7 @@ export function OperationalDetailPage():string {
                             OperationalTimeline(),
 
                         initiallyOpen:
-                            true
+                            false
 
                     })}
 
@@ -389,62 +392,70 @@ export function OperationalDetailPage():string {
                 aria-label="Supporting operational information"
             >
 
-                ${createSectionLabel(
-                    "Supporting Information"
-                )}
+              ${createSectionLabel(
+    "Reports & Supporting Information"
+)}
 
 
                 <div class="operational-detail-support-grid">
 
                     ${CollapsiblePanel({
 
-                        id:
-                            "assessment-details-panel",
+    id:
+        "assessment-details-panel",
 
-                        title:
-                            "Assessment Details",
+    title:
+        "Assessment Details",
 
-                        description:
-                            "Submitted values and historical comparisons",
+    description:
+        "Submitted values and historical comparisons",
 
-                        content:
-                            AssessmentDetails()
+    content:
+        AssessmentDetails(),
 
-                    })}
+    initiallyOpen:
+        false
 
-
-                    ${CollapsiblePanel({
-
-                        id:
-                            "shift-handoff-panel",
-
-                        title:
-                            "Shift Handoff Summary",
-
-                        description:
-                            "Concise operational handoff summary",
-
-                        content:
-                            ShiftHandoffSummary()
-
-                    })}
+})}
 
 
                     ${CollapsiblePanel({
 
-                        id:
-                            "executive-assessment-report-panel",
+    id:
+        "shift-handoff-panel",
 
-                        title:
-                            "Executive Assessment Report",
+    title:
+        "Shift Handoff Summary",
 
-                        description:
-                            "Printable leadership summary",
+    description:
+        "Concise operational handoff summary",
 
-                        content:
-                            ExecutiveAssessmentReport()
+    content:
+        ShiftHandoffSummary(),
 
-                    })}
+    initiallyOpen:
+        false
+
+})}
+
+                    ${CollapsiblePanel({
+
+    id:
+        "executive-assessment-report-panel",
+
+    title:
+        "Executive Assessment Report",
+
+    description:
+        "Printable leadership summary",
+
+    content:
+        ExecutiveAssessmentReport(),
+
+    initiallyOpen:
+        false
+
+})}
 
                 </div>
 

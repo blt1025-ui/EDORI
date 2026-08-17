@@ -331,6 +331,8 @@ function normalizeSnapshot(
      */
     if(
         schemaVersion !== EDORI_SNAPSHOT_SCHEMA_VERSION
+        &&
+        schemaVersion !== 3
     ){
         return null;
     }
@@ -549,6 +551,34 @@ function normalizeSnapshot(
             createSnapshotId(timestamp),
 
         timestamp,
+
+        enteredByUserId:
+            schemaVersion === 3
+                ? ""
+                : (
+                    normalizeString(
+                        candidate.enteredByUserId
+                    ) ?? ""
+                ),
+
+        enteredByDisplayName:
+            schemaVersion === 3
+                ? "Legacy / Unknown"
+                : (
+                    normalizeString(
+                        candidate.enteredByDisplayName
+                    ) ?? "Unknown"
+                ),
+
+        enteredByUsername:
+            schemaVersion === 3
+                ? ""
+                : (
+                    normalizeString(
+                        candidate.enteredByUsername
+                    ) ?? ""
+                ),
+
         score,
 
         status:

@@ -11,7 +11,9 @@
  * - ED Operational Pressure component weights
  * - Alpha through Echo score ranges
  *
- * Operational triggers remain read-only.
+ * Operational triggers and hospital surge-plan
+ * response actions are managed independently from
+ * HRI model settings.
  *
  * IMPORTANT:
  *
@@ -26,15 +28,6 @@ import {
 }
 
 from "../config/appEvents";
-
-
-import {
-
-    OPERATIONAL_TRIGGERS
-
-}
-
-from "../config/operationalTriggers";
 
 
 import {
@@ -65,6 +58,28 @@ import {
 from "../services/ConfigurationService";
 
 
+import {
+
+    getOperationalTriggers,
+
+    hasTriggerConfigurationOverrides
+
+}
+
+from "../services/TriggerConfigurationService";
+
+
+import {
+
+    getSurgePlan,
+
+    hasSurgePlanOverrides
+
+}
+
+from "../services/SurgePlanService";
+
+
 import type {
 
     ConfigurationOverrides,
@@ -76,12 +91,40 @@ import type {
 from "../types/ConfigurationOverrides";
 
 
+import {
+
+    initializeSurgePlanConfigurationPanel,
+
+    SurgePlanConfigurationPanel
+
+}
+
+from "./SurgePlanConfigurationPanel";
+
+
+import {
+
+    initializeTriggerConfigurationPanel,
+
+    TriggerConfigurationPanel
+
+}
+
+from "./TriggerConfigurationPanel";
+
+
 /**
  * Local editor state.
  */
 let editing = false;
 
 let draftConfiguration:ConfigurationOverrides | null = null;
+
+
+/**
+ * Prevent duplicate parent-level subscriptions.
+ */
+let subscribed = false;
 
 
 /**
@@ -117,6 +160,20 @@ export function initializeSystemConfiguration():void {
 
     bindConfigurationControls();
 
+    initializeTriggerConfigurationPanel();
+
+    initializeSurgePlanConfigurationPanel();
+
+
+    if(subscribed){
+
+        return;
+
+    }
+
+
+    subscribed = true;
+
 
     subscribe(
 
@@ -124,14 +181,35 @@ export function initializeSystemConfiguration():void {
 
         () => {
 
-            /*
-             * Configuration changes may originate from
-             * this component or future administrative
-             * workflows.
-             */
             editing = false;
 
             draftConfiguration = null;
+
+            refreshConfiguration();
+
+        }
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.TRIGGER_CONFIGURATION_CHANGED,
+
+        () => {
+
+            refreshConfiguration();
+
+        }
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.SURGE_PLAN_CHANGED,
+
+        () => {
 
             refreshConfiguration();
 
@@ -145,6 +223,7 @@ export function initializeSystemConfiguration():void {
 /**
  * Re-render the component.
  */
+
 function refreshConfiguration():void {
 
     const container =
@@ -169,6 +248,10 @@ function refreshConfiguration():void {
 
 
     bindConfigurationControls();
+
+    initializeTriggerConfigurationPanel();
+
+    initializeSurgePlanConfigurationPanel();
 
 }
 
@@ -205,6 +288,16 @@ function createConfigurationMarkup():string {
         hasConfigurationOverrides();
 
 
+    const triggers =
+
+        getOperationalTriggers();
+
+
+    const surgePlan =
+
+        getSurgePlan();
+
+
     return `
 
         ${createConfigurationHeader(
@@ -216,27 +309,512 @@ function createConfigurationMarkup():string {
         )}
 
 
-        ${editing
+        ${createConfigurationArchitectureSummary({
 
-            ? createEditor(
+            modelCustomized:
+                hasOverrides,
 
-                configuration
+            triggerCustomized:
+                hasTriggerConfigurationOverrides(),
 
-            )
+            surgePlanCustomized:
+                hasSurgePlanOverrides(),
 
-            : createReadOnlyConfiguration(
+            enabledTriggers:
+                triggers.filter(
+                    trigger => trigger.enabled
+                ).length,
 
-                configuration
+            totalTriggers:
+                triggers.length,
 
-            )
+            enabledActions:
+                surgePlan.interventions.filter(
+                    intervention => intervention.enabled
+                ).length,
 
-        }
+            totalActions:
+                surgePlan.interventions.length
+
+        })}
 
 
-        ${createTriggerSection()}
+        <section
+            class="
+                system-configuration-module
+                system-configuration-module-model
+            "
+        >
+
+            ${createConfigurationModuleHeading({
+
+                number:
+                    "01",
+
+                eyebrow:
+                    "Calculation Model",
+
+                title:
+                    "Hospital Readiness Model",
+
+                description:
+                    "Hospital capacity, HRI weighting, ED pressure weighting, and Alpha through Echo score ranges.",
+
+                status:
+                    hasOverrides
+                        ? "Customized"
+                        : "Built-In Defaults",
+
+                statusClass:
+                    hasOverrides
+                        ? "customized"
+                        : "default"
+
+            })}
 
 
-        ${createEngineIntegrationNotice()}
+            <div class="system-configuration-module-body">
+
+                <div class="system-configuration-model-toolbar">
+
+                    <div>
+
+                        <strong>
+                            Calculation Model Settings
+                        </strong>
+
+                        <p>
+                            Customize hospital capacity, HRI domain weights, ED pressure weights, and Alpha through Echo score ranges.
+                        </p>
+
+                    </div>
+
+
+                    <div class="system-configuration-model-toolbar-actions">
+
+                        ${!editing
+
+                            ? `
+
+                                <button
+                                    id="editSystemConfigurationButton"
+                                    class="system-configuration-primary-button"
+                                    type="button"
+                                >
+                                    Customize Calculation Model
+                                </button>
+
+                            `
+
+                            : `
+
+                                <span class="system-configuration-model-editing-badge">
+                                    Editing Calculation Model
+                                </span>
+
+                            `
+
+                        }
+
+                    </div>
+
+                </div>
+
+
+                ${editing
+
+                    ? createEditor(
+
+                        configuration
+
+                    )
+
+                    : createReadOnlyConfiguration(
+
+                        configuration
+
+                    )
+
+                }
+
+
+                ${createEngineIntegrationNotice()}
+
+            </div>
+
+        </section>
+
+
+        <section
+            class="
+                system-configuration-module
+                system-configuration-module-triggers
+            "
+        >
+
+            ${createConfigurationModuleHeading({
+
+                number:
+                    "02",
+
+                eyebrow:
+                    "Operational Detection",
+
+                title:
+                    "Operational Trigger Configuration",
+
+                description:
+                    "Controls which operational conditions are enabled and which response actions are attached to each trigger.",
+
+                status:
+                    hasTriggerConfigurationOverrides()
+                        ? "Hospital Customization"
+                        : "Built-In Mapping",
+
+                statusClass:
+                    hasTriggerConfigurationOverrides()
+                        ? "customized"
+                        : "default"
+
+            })}
+
+
+            <div class="system-configuration-module-body">
+
+                ${TriggerConfigurationPanel()}
+
+            </div>
+
+        </section>
+
+
+        <section
+            class="
+                system-configuration-module
+                system-configuration-module-surge
+            "
+        >
+
+            ${createConfigurationModuleHeading({
+
+                number:
+                    "03",
+
+                eyebrow:
+                    "Operational Response",
+
+                title:
+                    "Hospital Surge Plan",
+
+                description:
+                    "Defines the hospital-specific actions EDORI recommends when configured operational triggers become active.",
+
+                status:
+                    hasSurgePlanOverrides()
+                        ? "Hospital Customization"
+                        : "Built-In Plan",
+
+                statusClass:
+                    hasSurgePlanOverrides()
+                        ? "customized"
+                        : "default"
+
+            })}
+
+
+            <div class="system-configuration-module-body">
+
+                ${SurgePlanConfigurationPanel()}
+
+            </div>
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Create a compact overview of the three independent
+ * configuration layers.
+ */
+function createConfigurationArchitectureSummary(
+
+    options:{
+
+        modelCustomized:boolean;
+
+        triggerCustomized:boolean;
+
+        surgePlanCustomized:boolean;
+
+        enabledTriggers:number;
+
+        totalTriggers:number;
+
+        enabledActions:number;
+
+        totalActions:number;
+
+    }
+
+):string {
+
+    return `
+
+        <section class="system-configuration-architecture">
+
+            <div class="system-configuration-architecture-heading">
+
+                <div>
+
+                    <span>
+                        Configuration Architecture
+                    </span>
+
+
+                    <strong>
+                        Three independent administrative layers
+                    </strong>
+
+                </div>
+
+
+                <p>
+                    Calculation settings determine the HRI. Triggers detect operational conditions. The surge plan defines the hospital response.
+                </p>
+
+            </div>
+
+
+            <div class="system-configuration-architecture-grid">
+
+                ${createArchitectureCard({
+
+                    number:
+                        "01",
+
+                    title:
+                        "HRI Model",
+
+                    description:
+                        "How Hospital Readiness is calculated and classified.",
+
+                    detail:
+                        options.modelCustomized
+                            ? "Saved model overrides active"
+                            : "Built-in model settings",
+
+                    customized:
+                        options.modelCustomized
+
+                })}
+
+
+                ${createArchitectureCard({
+
+                    number:
+                        "02",
+
+                    title:
+                        "Operational Triggers",
+
+                    description:
+                        "When specific operational conditions are recognized.",
+
+                    detail:
+                        `${options.enabledTriggers} of ${options.totalTriggers} enabled`,
+
+                    customized:
+                        options.triggerCustomized
+
+                })}
+
+
+                ${createArchitectureCard({
+
+                    number:
+                        "03",
+
+                    title:
+                        "Hospital Surge Plan",
+
+                    description:
+                        "What the hospital does in response to those conditions.",
+
+                    detail:
+                        `${options.enabledActions} of ${options.totalActions} actions enabled`,
+
+                    customized:
+                        options.surgePlanCustomized
+
+                })}
+
+            </div>
+
+        </section>
+
+    `;
+
+}
+
+
+/**
+ * Create one architecture-summary card.
+ */
+function createArchitectureCard(
+
+    options:{
+
+        number:string;
+
+        title:string;
+
+        description:string;
+
+        detail:string;
+
+        customized:boolean;
+
+    }
+
+):string {
+
+    return `
+
+        <article class="system-configuration-architecture-card">
+
+            <div class="system-configuration-architecture-card-top">
+
+                <span class="system-configuration-architecture-number">
+                    ${escapeHtml(
+                        options.number
+                    )}
+                </span>
+
+
+                <span
+                    class="
+                        system-configuration-architecture-status
+                        ${
+                            options.customized
+                                ? "customized"
+                                : "default"
+                        }
+                    "
+                >
+                    ${
+                        options.customized
+                            ? "Customized"
+                            : "Default"
+                    }
+                </span>
+
+            </div>
+
+
+            <strong>
+                ${escapeHtml(
+                    options.title
+                )}
+            </strong>
+
+
+            <p>
+                ${escapeHtml(
+                    options.description
+                )}
+            </p>
+
+
+            <small>
+                ${escapeHtml(
+                    options.detail
+                )}
+            </small>
+
+        </article>
+
+    `;
+
+}
+
+
+/**
+ * Create one major configuration-module heading.
+ */
+function createConfigurationModuleHeading(
+
+    options:{
+
+        number:string;
+
+        eyebrow:string;
+
+        title:string;
+
+        description:string;
+
+        status:string;
+
+        statusClass:
+            "default"
+            |
+            "customized";
+
+    }
+
+):string {
+
+    return `
+
+        <div class="system-configuration-module-heading">
+
+            <div class="system-configuration-module-number">
+                ${escapeHtml(
+                    options.number
+                )}
+            </div>
+
+
+            <div class="system-configuration-module-copy">
+
+                <span>
+                    ${escapeHtml(
+                        options.eyebrow
+                    )}
+                </span>
+
+
+                <h3>
+                    ${escapeHtml(
+                        options.title
+                    )}
+                </h3>
+
+
+                <p>
+                    ${escapeHtml(
+                        options.description
+                    )}
+                </p>
+
+            </div>
+
+
+            <span
+                class="
+                    system-configuration-module-status
+                    ${options.statusClass}
+                "
+            >
+                ${escapeHtml(
+                    options.status
+                )}
+            </span>
+
+        </div>
 
     `;
 
@@ -246,6 +824,7 @@ function createConfigurationMarkup():string {
 /**
  * Create the top configuration header.
  */
+
 function createConfigurationHeader(
 
     hasOverrides:boolean,
@@ -271,7 +850,7 @@ function createConfigurationHeader(
 
 
                 <p>
-                    Review and manage Hospital Readiness model settings.
+                    Manage the Hospital Readiness model, operational trigger mapping, and hospital-specific surge response plan.
                 </p>
 
             </div>
@@ -299,23 +878,6 @@ function createConfigurationHeader(
                 </span>
 
 
-                ${!editing
-
-                    ? `
-
-                        <button
-                            id="editSystemConfigurationButton"
-                            class="system-configuration-primary-button"
-                            type="button"
-                        >
-                            Edit Configuration
-                        </button>
-
-                    `
-
-                    : ""
-
-                }
 
             </div>
 
@@ -979,69 +1541,6 @@ function createReadOnlyOperationalLevels(
 
 
 /**
- * Operational trigger inventory remains read-only.
- */
-function createTriggerSection():string {
-
-    const enabledCount =
-
-        OPERATIONAL_TRIGGERS.filter(
-
-            trigger =>
-
-                trigger.enabled
-
-        ).length;
-
-
-    return `
-
-        <section class="system-configuration-section">
-
-            ${createSectionHeading(
-
-                "Operational Triggers",
-
-                "Operational trigger definitions remain read-only in this administration view."
-
-            )}
-
-
-            <div class="system-trigger-summary">
-
-                ${createValueCard(
-                    "Configured Triggers",
-                    String(
-                        OPERATIONAL_TRIGGERS.length
-                    )
-                )}
-
-                ${createValueCard(
-                    "Enabled",
-                    String(
-                        enabledCount
-                    )
-                )}
-
-                ${createValueCard(
-                    "Disabled",
-                    String(
-                        OPERATIONAL_TRIGGERS.length
-                        -
-                        enabledCount
-                    )
-                )}
-
-            </div>
-
-        </section>
-
-    `;
-
-}
-
-
-/**
  * Critical phase notice.
  */
 function createEngineIntegrationNotice():string {
@@ -1051,12 +1550,12 @@ function createEngineIntegrationNotice():string {
         <div class="system-configuration-integration-warning">
 
             <strong>
-                Configuration changes require recalculation.
+                HRI model changes require recalculation.
             </strong>
 
 
             <p>
-                Saved administrative settings are applied to Hospital Readiness scoring, operational-level classification, ED capacity calculations, and supported operational triggers. Changing or restoring configuration invalidates the current HRI result until the assessment is recalculated.
+                Changes to hospital capacity, HRI weights, ED pressure weights, or operational-level ranges invalidate the current HRI result until the assessment is recalculated. Trigger mappings and Hospital Surge Plan response actions refresh operational guidance without changing the HRI score.
             </p>
 
         </div>

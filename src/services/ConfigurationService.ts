@@ -30,6 +30,17 @@ from "../config/appEvents";
 
 import {
 
+    requirePermission
+
+}
+
+from "./AuthorizationService";
+
+
+
+
+import {
+
     invalidateLatestResult
 
 }
@@ -277,6 +288,11 @@ export function saveConfiguration(
 
 ):ConfigurationValidationResult {
 
+    requirePermission(
+        "modelConfiguration.manage"
+    );
+
+
     const normalized =
 
         normalizeConfiguration(
@@ -379,6 +395,11 @@ export function saveConfiguration(
  * built-in configuration.
  */
 export function restoreDefaultConfiguration():void {
+
+    requirePermission(
+        "modelConfiguration.manage"
+    );
+
 
     try {
 

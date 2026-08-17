@@ -118,7 +118,7 @@ export function ExecutiveSummary():string {
                     </h3>
 
                     <p class="panel-description">
-                        Current operational status, primary cause, and next action
+                        Current operational status, primary cause, and most urgent action
                     </p>
 
                 </div>
@@ -325,22 +325,16 @@ function createExecutiveSummaryMarkup(
     );
 
 
-    const primaryRecommendation =
+    const mostUrgentAction =
 
-        determinePrimaryRecommendation(
+        operationalAssessment
+            .recommendations
+            .slice()
+            .sort(
 
-            operationalAssessment.recommendations
+                compareRecommendationPriority
 
-        );
-
-
-    const nextReassessment =
-
-        determineNextReassessment(
-
-            operationalAssessment
-
-        );
+            )[0];
 
 
     const finalState =
@@ -371,85 +365,88 @@ function createExecutiveSummaryMarkup(
 
     return `
 
-        <div class="executive-summary-top-row">
+        <div class="executive-summary-refined executive-summary-simple">
 
-            <div
-                class="executive-level-card"
-                style="
-                    --executive-state-color:
-                    ${escapeAttribute(
-                        finalState.color
-                    )};
-                "
-            >
+            <div class="executive-summary-status-grid">
 
-                <span class="executive-summary-label">
-                    Current Level
-                </span>
+                <div
+                    class="executive-level-card"
+                    style="
+                        --executive-state-color:
+                        ${escapeAttribute(
+                            finalState.color
+                        )};
+                    "
+                >
 
-
-                <div class="executive-level-value">
-
-                    <span
-                        class="executive-level-icon"
-                        aria-hidden="true"
-                    >
-
-                        ${escapeHtml(
-                            finalState.icon
-                        )}
-
+                    <span class="executive-summary-label">
+                        Current Level
                     </span>
 
 
-                    <strong>
+                    <div class="executive-level-value">
+
+                        <span
+                            class="executive-level-icon"
+                            aria-hidden="true"
+                        >
+
+                            ${escapeHtml(
+                                finalState.icon
+                            )}
+
+                        </span>
+
+
+                        <strong>
+
+                            ${escapeHtml(
+                                finalState.title
+                            )}
+
+                        </strong>
+
+                    </div>
+
+
+                    <p>
 
                         ${escapeHtml(
-                            finalState.title
+                            finalState.recommendation
                         )}
 
-                    </strong>
+                    </p>
 
                 </div>
 
 
-                <p>
+                <div class="executive-score-card">
 
-                    ${escapeHtml(
-                        finalState.recommendation
-                    )}
-
-                </p>
-
-            </div>
+                    <span class="executive-summary-label">
+                        HRI Score
+                    </span>
 
 
-            <div class="executive-score-card">
+                    <strong class="executive-score-value">
 
-                <span class="executive-summary-label">
-                    EDORI Score
-                </span>
+                        ${score}
 
-                <strong class="executive-score-value">
-
-                    ${score}
-
-                </strong>
-
-                <span class="executive-score-range">
-                    out of 100
-                </span>
-
-            </div>
+                    </strong>
 
 
-            <div class="executive-status-card">
+                    <span class="executive-score-range">
+                        out of 100
+                    </span>
 
-                <div>
+                </div>
+
+
+                <div class="executive-status-card">
 
                     <span class="executive-summary-label">
                         Trend
                     </span>
+
 
                     <strong>
 
@@ -459,14 +456,20 @@ function createExecutiveSummaryMarkup(
 
                     </strong>
 
+
+                    <span class="executive-status-context">
+                        Current trajectory
+                    </span>
+
                 </div>
 
 
-                <div>
+                <div class="executive-status-card">
 
                     <span class="executive-summary-label">
                         Confidence
                     </span>
+
 
                     <strong>
 
@@ -476,140 +479,131 @@ function createExecutiveSummaryMarkup(
 
                     </strong>
 
+
+                    <span class="executive-status-context">
+                        Assessment completeness
+                    </span>
+
                 </div>
 
             </div>
 
-        </div>
+
+            <div class="executive-summary-simple-focus-grid">
+
+                <div class="executive-cause-card">
+
+                    <span class="executive-summary-label">
+                        Primary Cause
+                    </span>
 
 
-        <div class="executive-summary-bottom-row">
+                    <strong>
 
-            <div class="executive-cause-card">
+                        ${escapeHtml(
+                            primaryCause.title
+                        )}
 
-                <span class="executive-summary-label">
-                    Primary Cause
-                </span>
-
-                <strong>
-
-                    ${escapeHtml(
-                        primaryCause.title
-                    )}
-
-                </strong>
-
-                <p>
-
-                    ${escapeHtml(
-                        primaryCause.description
-                    )}
-
-                </p>
-
-            </div>
+                    </strong>
 
 
-            <div class="executive-action-card">
+                    <p>
 
-                <span class="executive-summary-label">
-                    Most Urgent Action
-                </span>
+                        ${escapeHtml(
+                            primaryCause.description
+                        )}
 
-                ${primaryRecommendation
+                    </p>
 
-                    ? `
-
-                        <strong>
-
-                            ${escapeHtml(
-                                primaryRecommendation.title
-                            )}
-
-                        </strong>
+                </div>
 
 
-                        <p>
+                <div class="executive-action-card">
 
-                            ${escapeHtml(
-                                primaryRecommendation.description
-                            )}
-
-                        </p>
+                    <span class="executive-summary-label">
+                        Most Urgent Action
+                    </span>
 
 
-                        ${primaryRecommendation.responsibleGroup
+                    ${mostUrgentAction
 
-                            ? `
+                        ? `
 
-                                <div class="executive-action-owner">
+                            <div class="executive-action-title-row">
 
-                                    Responsible:
+                                <span
+                                    class="
+                                        executive-priority-badge
+                                        executive-priority-badge-${mostUrgentAction
+                                            .priority
+                                            .toLowerCase()}
+                                    "
+                                >
 
-                                    <strong>
+                                    ${escapeHtml(
+                                        mostUrgentAction.priority
+                                    )}
+
+                                </span>
+
+
+                                <strong>
+
+                                    ${escapeHtml(
+                                        mostUrgentAction.title
+                                    )}
+
+                                </strong>
+
+                            </div>
+
+
+                            <p>
+
+                                ${escapeHtml(
+                                    mostUrgentAction.description
+                                )}
+
+                            </p>
+
+
+                            ${mostUrgentAction.responsibleGroup
+
+                                ? `
+
+                                    <span class="executive-action-owner">
 
                                         ${escapeHtml(
-                                            primaryRecommendation
+                                            mostUrgentAction
                                                 .responsibleGroup
                                         )}
 
-                                    </strong>
+                                    </span>
 
-                                </div>
+                                `
 
-                            `
+                                : ""
 
-                            : ""
+                            }
 
-                        }
+                        `
 
-                    `
+                        : `
 
-                    : `
-
-                        <strong>
-                            Continue routine operations
-                        </strong>
-
-                        <p>
-                            No trigger-based operational intervention is currently required.
-                        </p>
-
-                    `
-
-                }
-
-            </div>
+                            <strong class="executive-action-routine">
+                                Continue routine operations
+                            </strong>
 
 
-            <div class="executive-reassessment-card">
+                            <p>
+                                No trigger-based operational intervention is currently required.
+                            </p>
 
-                <span class="executive-summary-label">
-                    Next Reassessment
-                </span>
-
-                <strong>
-
-                    ${nextReassessment === null
-
-                        ? "Routine interval"
-
-                        : `${nextReassessment} minutes`
+                        `
 
                     }
 
-                </strong>
-
-                <p>
-
-                    ${createReassessmentExplanation(
-                        nextReassessment,
-                        operationalAssessment
-                            .activeTriggers
-                            .length
-                    )}
-
-                </p>
+                </div>
 
             </div>
 
@@ -778,138 +772,6 @@ function determinePrimaryCause(
             "Current conditions do not show a dominant operational driver."
 
     };
-
-}
-
-
-/**
- * Select the highest-priority recommendation.
- */
-function determinePrimaryRecommendation(
-
-    recommendations:OperationalRecommendation[]
-
-):OperationalRecommendation | null {
-
-    if(recommendations.length === 0){
-
-        return null;
-
-    }
-
-
-    return recommendations
-
-        .slice()
-
-        .sort(
-
-            compareRecommendationPriority
-
-        )[0];
-
-}
-
-
-/**
- * Determine the shortest applicable reassessment
- * interval.
- */
-function determineNextReassessment(
-
-    operationalAssessment:OperationalAssessment
-
-):number | null {
-
-    const intervals:number[] = [];
-
-
-    operationalAssessment.activeTriggers.forEach(
-
-        triggerResult => {
-
-            const interval =
-
-                triggerResult
-                    .trigger
-                    .reassessmentMinutes;
-
-
-            if(
-
-                interval !== null
-
-                &&
-
-                Number.isFinite(interval)
-
-                &&
-
-                interval > 0
-
-            ){
-
-                intervals.push(
-
-                    interval
-
-                );
-
-            }
-
-        }
-
-    );
-
-
-    operationalAssessment.recommendations.forEach(
-
-        recommendation => {
-
-            const interval =
-
-                recommendation.reassessmentMinutes;
-
-
-            if(
-
-                interval !== null
-
-                &&
-
-                Number.isFinite(interval)
-
-                &&
-
-                interval > 0
-
-            ){
-
-                intervals.push(
-
-                    interval
-
-                );
-
-            }
-
-        }
-
-    );
-
-
-    if(intervals.length === 0){
-
-        return null;
-
-    }
-
-
-    return Math.min(
-
-        ...intervals
-
-    );
 
 }
 
@@ -1093,43 +955,6 @@ function getRecommendationPriorityRank(
 
 
 /**
- * Create a readable reassessment explanation.
- */
-function createReassessmentExplanation(
-
-    reassessmentMinutes:number | null,
-
-    activeTriggerCount:number
-
-):string {
-
-    if(reassessmentMinutes === null){
-
-        return "Continue reassessment according to routine local operational practice.";
-
-    }
-
-
-    if(activeTriggerCount === 1){
-
-        return "One active operational trigger requires closer reassessment.";
-
-    }
-
-
-    if(activeTriggerCount > 1){
-
-        return `${activeTriggerCount} active operational triggers require closer reassessment.`;
-
-    }
-
-
-    return "Current operational conditions support a shorter reassessment interval.";
-
-}
-
-
-/**
  * Create the initial state.
  */
 function createAwaitingAssessmentState():string {
@@ -1143,7 +968,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate EDORI to generate the executive operational summary.
+                Calculate Hospital Readiness to generate the executive operational summary.
             </p>
 
         </div>
