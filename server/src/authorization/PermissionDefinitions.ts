@@ -17,6 +17,7 @@ export type PermissionId =
     | "administration.view"
     | "users.manage"
     | "configuration.manage"
+    | "historicalData.manage"
     | "data.export"
     | "history.restore";
 
@@ -43,6 +44,7 @@ const ROLE_PERMISSIONS:Record<RoleId, readonly PermissionId[]> = {
         "administration.view",
         "users.manage",
         "configuration.manage",
+        "historicalData.manage",
         "data.export",
         "history.restore"
     ]

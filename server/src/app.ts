@@ -27,6 +27,14 @@ from "./routes/AssessmentSnapshotRoutes.js";
 
 import {
 
+    historicalExpectationRouter
+
+}
+
+from "./routes/HistoricalExpectationRoutes.js";
+
+import {
+
     currentOperationalStateRouter
 
 }
@@ -114,6 +122,16 @@ export function createApp() {
 
     );
 
+    /**
+ * Shared historical expectation dataset.
+ */
+app.use(
+
+    "/api/historical-expectations",
+
+    historicalExpectationRouter
+
+);
 
     /**
      * Shared current Hospital Readiness operational state.

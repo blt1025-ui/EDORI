@@ -50,30 +50,78 @@ import type {
 from "../types/HistoricalExpectation";
 
 
+import {
+
+    clearServerHistoricalDataset,
+    loadServerHistoricalDataset,
+    saveServerHistoricalDataset
+
+}
+
+from "./HistoricalExpectationApiService";
+
+
+import {
+
+    subscribe
+
+}
+
+from "./EventService";
+
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
 /**
- * A new key intentionally prevents Version 2 data,
- * which lacks acute-care baseline fields, from being
- * interpreted as Version 2.1.
+ * Previous Version 2.1 browser-storage key.
+ *
+ * Retained only so Phase 14C can remove obsolete
+ * workstation-local historical data.
  */
-const STORAGE_KEY =
+const LEGACY_STORAGE_KEY =
     "edori_historical_expectations_v3";
-
-
-const STORAGE_VERSION = 3;
 
 
 const EXPECTED_RECORD_COUNT = 168;
 
 
-interface StoredHistoricalDataEnvelope {
-
-    version:number;
+interface ImportedHistoricalDataset {
 
     importedAt:string;
 
     records:HistoricalExpectation[];
 
 }
+
+
+let importedDataset:ImportedHistoricalDataset | null = null;
+
+let serverDatasetInitialized = false;
+
+let serverDatasetInitializationInProgress = false;
+
+
+clearLegacyHistoricalStorage();
+
+
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    () => {
+
+        void initializeServerHistoricalDataset();
+
+    }
+
+);
 
 
 /**
@@ -91,36 +139,27 @@ export function saveHistoricalDataset(
 
 
     const normalizedDataset = normalizeDataset(
-
         dataset
-
     );
 
 
     const validation = validateHistoricalDataset(
-
         normalizedDataset
-
     );
 
 
     if(!validation.valid){
 
         throw new Error(
-
             createValidationErrorMessage(
                 validation
             )
-
         );
 
     }
 
 
-    const envelope:StoredHistoricalDataEnvelope = {
-
-        version:
-            STORAGE_VERSION,
+    importedDataset = {
 
         importedAt:
             new Date().toISOString(),
@@ -133,37 +172,9 @@ export function saveHistoricalDataset(
     };
 
 
-    try {
-
-        localStorage.setItem(
-
-            STORAGE_KEY,
-
-            JSON.stringify(
-                envelope
-            )
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to save the Version 2.1 historical expectation dataset:",
-
-            error
-
-        );
-
-
-        throw new Error(
-
-            "The historical expectation dataset could not be saved to browser storage."
-
-        );
-
-    }
+    void persistHistoricalDatasetToServer(
+        normalizedDataset
+    );
 
 }
 
@@ -175,14 +186,14 @@ export function getHistoricalDataset():
 
 HistoricalExpectation[] {
 
-    const importedDataset = loadImportedDataset();
+    const activeImportedDataset = importedDataset;
 
 
-    if(importedDataset){
+    if(activeImportedDataset){
 
         return cloneDataset(
 
-            importedDataset.records
+            activeImportedDataset.records
 
         );
 
@@ -205,10 +216,10 @@ export function getImportedHistoricalDataset():
 
 HistoricalExpectation[] {
 
-    const importedDataset = loadImportedDataset();
+    const activeImportedDataset = importedDataset;
 
 
-    if(!importedDataset){
+    if(!activeImportedDataset){
 
         return [];
 
@@ -217,7 +228,7 @@ HistoricalExpectation[] {
 
     return cloneDataset(
 
-        importedDataset.records
+        activeImportedDataset.records
 
     );
 
@@ -231,7 +242,7 @@ export function hasImportedHistoricalDataset():
 
 boolean {
 
-    return loadImportedDataset() !== null;
+    return importedDataset !== null;
 
 }
 
@@ -248,11 +259,20 @@ void {
     );
 
 
-    localStorage.removeItem(
+    importedDataset = null;
 
-        STORAGE_KEY
 
-    );
+    void clearServerHistoricalDataset()
+        .catch(
+            error => {
+
+                console.error(
+                    "Unable to clear the PostgreSQL historical expectation dataset:",
+                    error
+                );
+
+            }
+        );
 
 }
 
@@ -304,10 +324,10 @@ export function getHistoricalRepositoryStatus():{
 
 } {
 
-    const importedDataset = loadImportedDataset();
+    const activeImportedDataset = importedDataset;
 
 
-    if(importedDataset){
+    if(activeImportedDataset){
 
         return {
 
@@ -315,18 +335,18 @@ export function getHistoricalRepositoryStatus():{
                 "imported",
 
             recordCount:
-                importedDataset.records.length,
+                activeImportedDataset.records.length,
 
             expectedRecordCount:
                 EXPECTED_RECORD_COUNT,
 
             importedAt:
                 new Date(
-                    importedDataset.importedAt
+                    activeImportedDataset.importedAt
                 ),
 
             complete:
-                importedDataset.records.length
+                activeImportedDataset.records.length
                 ===
                 EXPECTED_RECORD_COUNT
 
@@ -360,102 +380,83 @@ export function getHistoricalRepositoryStatus():{
 
 
 /**
- * Load and validate imported Version 2.1 data.
+ * Load the authoritative optional imported dataset from
+ * PostgreSQL after authentication has been established.
  */
-function loadImportedDataset():
+export async function initializeServerHistoricalDataset():
 
-StoredHistoricalDataEnvelope | null {
+Promise<void> {
+
+    if(
+        serverDatasetInitialized
+        ||
+        serverDatasetInitializationInProgress
+    ){
+
+        return;
+
+    }
+
+
+    serverDatasetInitializationInProgress = true;
+
 
     try {
 
-        const stored = localStorage.getItem(
-
-            STORAGE_KEY
-
-        );
+        const serverDataset =
+            await loadServerHistoricalDataset();
 
 
-        if(!stored){
+        if(!serverDataset){
 
-            return null;
+            importedDataset = null;
+
+            serverDatasetInitialized = true;
+
+            return;
 
         }
 
 
-        const parsed = JSON.parse(
-
-            stored
-
-        ) as unknown;
-
-
-        const envelope = extractEnvelope(
-
-            parsed
-
-        );
-
-
-        if(!envelope){
-
-            throw new Error(
-
-                "Stored historical data have an unsupported format."
-
+        const normalizedDataset =
+            normalizeDataset(
+                serverDataset.records
             );
 
-        }
 
-
-        const normalizedDataset = normalizeDataset(
-
-            envelope.records
-
-        );
-
-
-        const validation = validateHistoricalDataset(
-
-            normalizedDataset
-
-        );
+        const validation =
+            validateHistoricalDataset(
+                normalizedDataset
+            );
 
 
         if(!validation.valid){
 
             throw new Error(
-
                 createValidationErrorMessage(
                     validation
                 )
-
             );
 
         }
 
 
-        const importedAt = normalizeTimestamp(
-
-            envelope.importedAt
-
-        );
+        const importedAt =
+            normalizeTimestamp(
+                serverDataset.importedAt
+            );
 
 
         if(!importedAt){
 
             throw new Error(
-
-                "Stored historical data contain an invalid import timestamp."
-
+                "The PostgreSQL historical dataset contains an invalid import timestamp."
             );
 
         }
 
 
-        return {
-
-            version:
-                STORAGE_VERSION,
+        importedDataset = {
 
             importedAt:
                 importedAt.toISOString(),
@@ -467,26 +468,21 @@ StoredHistoricalDataEnvelope | null {
 
         };
 
+
+        serverDatasetInitialized = true;
+
     }
     catch(error){
 
-        console.error(
-
-            "Unable to restore the imported Version 2.1 historical dataset:",
-
+        console.warn(
+            "Unable to load the PostgreSQL historical expectation dataset:",
             error
-
         );
 
+    }
+    finally {
 
-        localStorage.removeItem(
-
-            STORAGE_KEY
-
-        );
-
-
-        return null;
+        serverDatasetInitializationInProgress = false;
 
     }
 
@@ -494,62 +490,97 @@ StoredHistoricalDataEnvelope | null {
 
 
 /**
- * Extract the Version 2.1 storage envelope.
+ * Persist one validated imported dataset.
  */
-function extractEnvelope(
+async function persistHistoricalDatasetToServer(
 
-    value:unknown
+    dataset:HistoricalExpectation[]
 
-):{
+):Promise<void> {
 
-    importedAt:unknown;
+    try {
 
-    records:unknown;
+        const serverDataset =
+            await saveServerHistoricalDataset(
+                cloneDataset(
+                    dataset
+                )
+            );
 
-} | null {
 
-    if(
-        typeof value !== "object"
-        ||
-        value === null
-    ){
+        const normalizedDataset =
+            normalizeDataset(
+                serverDataset.records
+            );
 
-        return null;
+
+        const validation =
+            validateHistoricalDataset(
+                normalizedDataset
+            );
+
+
+        if(!validation.valid){
+
+            throw new Error(
+                createValidationErrorMessage(
+                    validation
+                )
+            );
+
+        }
+
+
+        importedDataset = {
+
+            importedAt:
+                serverDataset.importedAt,
+
+            records:
+                cloneDataset(
+                    normalizedDataset
+                )
+
+        };
+
+
+        serverDatasetInitialized = true;
+
+    }
+    catch(error){
+
+        console.error(
+            "Unable to save the historical expectation dataset to PostgreSQL:",
+            error
+        );
 
     }
 
-
-    const candidate = value as {
-
-        version?:unknown;
-
-        importedAt?:unknown;
-
-        records?:unknown;
-
-    };
+}
 
 
-    if(
-        candidate.version !== STORAGE_VERSION
-        ||
-        candidate.records === undefined
-    ){
+/**
+ * Remove obsolete browser-persistent historical data.
+ */
+function clearLegacyHistoricalStorage():
 
-        return null;
+void {
+
+    try {
+
+        localStorage.removeItem(
+            LEGACY_STORAGE_KEY
+        );
 
     }
+    catch(error){
 
+        console.warn(
+            "Unable to remove legacy historical expectation browser data:",
+            error
+        );
 
-    return {
-
-        importedAt:
-            candidate.importedAt,
-
-        records:
-            candidate.records
-
-    };
+    }
 
 }
 
