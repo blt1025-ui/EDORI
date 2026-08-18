@@ -33,6 +33,13 @@ import {
 
 from "./components/App";
 
+import {
+
+    initializeServerCurrentState
+
+}
+
+from "./services/StateService";
 
 import {
 
@@ -304,6 +311,13 @@ async function initializeApplication():Promise<void> {
          * continues using the built-in TypeScript defaults.
          */
        if(isAuthenticated()){
+
+    /*
+     * Restore the authoritative committed assessment
+     * before any dashboard components render.
+     */
+    await initializeServerCurrentState();
+
 
     await initializeServerConfiguration();
 
