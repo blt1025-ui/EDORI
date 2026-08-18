@@ -1,16 +1,17 @@
 /**
  * AuthenticationService
  *
- * Development authentication/session boundary for EDORI.
+ * Browser boundary for PostgreSQL-backed EDORI
+ * authentication.
  *
- * The UI should call this service rather than selecting
- * users directly.
+ * The server owns:
+ * - password verification
+ * - failed-login protection
+ * - session creation/revocation
+ * - inactivity expiration
  *
- * Production replacement:
- * - POST username/password to EDORI API
- * - server verifies password hash
- * - server creates secure session
- * - browser receives HttpOnly session cookie
+ * The browser receives only a user snapshot and relies
+ * on an HttpOnly session cookie.
  */
 
 import type {
@@ -26,48 +27,21 @@ import {
 
     clearCurrentUser,
     getCurrentUser,
-    setCurrentUser
+    setAuthenticatedSessionUser
 
 }
 
 from "./UserService";
 
 
-import {
-
-    ensureBootstrapCredential,
-    mustChangePassword,
-    setPassword,
-    verifyCredentials
-
-}
-
-from "./CredentialService";
-
-
-import {
-
-    clearFailedLogins,
-    getLoginLockoutState,
-    recordFailedLogin
-
-}
-
-from "./LoginSecurityService";
-
-
-import {
-
-    recordSecurityAuditEvent
-
-}
-
-from "./SecurityAuditService";
-
-
 const PASSWORD_CHANGE_REQUEST_STORAGE_KEY =
 
     "edori_password_change_requested_v1";
+
+
+let serverMustChangePassword =
+
+    false;
 
 
 export interface LoginResult {
@@ -84,17 +58,135 @@ export interface LoginResult {
 
 
 /**
- * Prepare development authentication.
+ * Restore authenticated identity from the server
+ * HttpOnly session cookie.
  */
 export async function initializeAuthentication():Promise<void> {
 
-    await ensureBootstrapCredential();
+    try {
+
+        const response =
+
+            await fetch(
+
+                "/api/auth/session",
+
+                {
+                    method:
+                        "GET",
+
+                    credentials:
+                        "include",
+
+                    headers:{
+                        "Accept":
+                            "application/json"
+                    }
+
+                }
+
+            );
+
+
+        if(response.status === 401){
+
+            serverMustChangePassword =
+                false;
+
+
+            setAuthenticatedSessionUser(
+                null
+            );
+
+
+            return;
+
+        }
+
+
+        if(!response.ok){
+
+            throw new Error(
+
+                `EDORI session check failed with HTTP ${response.status}.`
+
+            );
+
+        }
+
+
+        const payload =
+
+            await readJson<SessionResponse>(
+                response
+            );
+
+
+        if(
+
+            !payload.authenticated
+
+            ||
+
+            !payload.user
+
+        ){
+
+            serverMustChangePassword =
+                false;
+
+
+            setAuthenticatedSessionUser(
+                null
+            );
+
+
+            return;
+
+        }
+
+
+        serverMustChangePassword =
+
+            payload.mustChangePassword
+            ?? false;
+
+
+        setAuthenticatedSessionUser(
+
+            normalizeUser(
+                payload.user
+            )
+
+        );
+
+    }
+    catch(error){
+
+        serverMustChangePassword =
+            false;
+
+
+        setAuthenticatedSessionUser(
+            null
+        );
+
+
+        console.error(
+
+            "EDORI could not restore the server session.",
+
+            error
+
+        );
+
+    }
 
 }
 
 
 /**
- * Authenticate one username/password pair.
+ * Authenticate with the EDORI API.
  */
 export async function login(
 
@@ -106,33 +198,49 @@ export async function login(
 
     try {
 
-        const lockoutState =
+        const response =
 
-            getLoginLockoutState(
-                username
+            await fetch(
+
+                "/api/auth/login",
+
+                {
+                    method:
+                        "POST",
+
+                    credentials:
+                        "include",
+
+                    headers:{
+                        "Accept":
+                            "application/json",
+
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            username,
+
+                            password
+
+                        })
+
+                }
+
             );
 
 
-        if(lockoutState.locked){
+        const payload =
 
-            recordSecurityAuditEvent({
+            await readJson<LoginResponse>(
+                response
+            );
 
-                eventType:
-                    "authentication.login.locked",
 
-                target:{
-                    username:
-                        username.trim()
-                },
-
-                success:
-                    false,
-
-                summary:
-                    "Login blocked because the account is temporarily locked."
-
-            });
-
+        if(!response.ok){
 
             return {
 
@@ -140,60 +248,27 @@ export async function login(
                     false,
 
                 error:
-                    "Sign in is temporarily unavailable for this account. Try again later."
+                    payload.message
+                    ?? (
+                        response.status === 423
+                            ? "Sign in is temporarily unavailable for this account. Try again later."
+                            : "The username or password is incorrect."
+                    )
 
             };
 
         }
 
 
-        const userId =
+        if(
 
-            await verifyCredentials(
+            !payload.authenticated
 
-                username,
+            ||
 
-                password
+            !payload.user
 
-            );
-
-
-        if(!userId){
-
-            recordFailedLogin(
-                username
-            );
-
-
-            const updatedLockoutState =
-
-                getLoginLockoutState(
-                    username
-                );
-
-
-            recordSecurityAuditEvent({
-
-                eventType:
-                    updatedLockoutState.locked
-                        ? "authentication.login.locked"
-                        : "authentication.login.failed",
-
-                target:{
-                    username:
-                        username.trim()
-                },
-
-                success:
-                    false,
-
-                summary:
-                    updatedLockoutState.locked
-                        ? "Account entered temporary lockout after repeated failed login attempts."
-                        : "Login failed because the supplied credentials were not accepted."
-
-            });
-
+        ){
 
             return {
 
@@ -201,34 +276,7 @@ export async function login(
                     false,
 
                 error:
-                    "The username or password is incorrect."
-
-            };
-
-        }
-
-
-        clearFailedLogins(
-            username
-        );
-
-
-        const selected =
-
-            setCurrentUser(
-                userId
-            );
-
-
-        if(!selected){
-
-            return {
-
-                success:
-                    false,
-
-                error:
-                    "This EDORI account is not available."
+                    "EDORI could not establish the authenticated session."
 
             };
 
@@ -237,68 +285,23 @@ export async function login(
 
         const user =
 
-            getCurrentUser();
+            normalizeUser(
+                payload.user
+            );
 
 
-        if(!user){
+        serverMustChangePassword =
 
-            return {
-
-                success:
-                    false,
-
-                error:
-                    "EDORI could not establish the user session."
-
-            };
-
-        }
+            payload.mustChangePassword
+            ?? false;
 
 
         clearRequestedPasswordChange();
 
 
-        recordSecurityAuditEvent({
-
-            eventType:
-                "authentication.login.success",
-
-            actor:{
-                userId:
-                    user.id,
-
-                username:
-                    user.username,
-
-                displayName:
-                    user.displayName
-            },
-
-            target:{
-                userId:
-                    user.id,
-
-                username:
-                    user.username,
-
-                displayName:
-                    user.displayName
-            },
-
-            success:
-                true,
-
-            summary:
-                "User signed in successfully.",
-
-            details:{
-                passwordChangeRequired:
-                    mustChangePassword(
-                        user.id
-                    )
-            }
-
-        });
+        setAuthenticatedSessionUser(
+            user
+        );
 
 
         return {
@@ -309,9 +312,7 @@ export async function login(
             user,
 
             passwordChangeRequired:
-                mustChangePassword(
-                    user.id
-                )
+                serverMustChangePassword
 
         };
 
@@ -320,7 +321,7 @@ export async function login(
 
         console.error(
 
-            "EDORI authentication failed:",
+            "EDORI login request failed:",
 
             error
 
@@ -333,7 +334,7 @@ export async function login(
                 false,
 
             error:
-                "EDORI could not complete sign in."
+                "EDORI could not reach the authentication service."
 
         };
 
@@ -343,57 +344,79 @@ export async function login(
 
 
 /**
- * Sign out the current user.
+ * End the server session and clear browser identity.
  */
-export function logout():void {
+export async function logout():Promise<void> {
 
-    const user =
-        getCurrentUser();
+    try {
+
+        await fetch(
+
+            "/api/auth/logout",
+
+            {
+                method:
+                    "POST",
+
+                credentials:
+                    "include",
+
+                headers:{
+                    "Accept":
+                        "application/json"
+                }
+
+            }
+
+        );
+
+    }
+    catch(error){
+
+        console.error(
+
+            "EDORI logout request failed:",
+
+            error
+
+        );
+
+    }
+    finally {
+
+        serverMustChangePassword =
+            false;
 
 
-    if(user){
+        clearRequestedPasswordChange();
 
-        recordSecurityAuditEvent({
 
-            eventType:
-                "authentication.logout",
-
-            actor:{
-                userId:
-                    user.id,
-
-                username:
-                    user.username,
-
-                displayName:
-                    user.displayName
-            },
-
-            target:{
-                userId:
-                    user.id,
-
-                username:
-                    user.username,
-
-                displayName:
-                    user.displayName
-            },
-
-            success:
-                true,
-
-            summary:
-                "User signed out."
-
-        });
+        clearCurrentUser();
 
     }
 
+}
 
-    clearRequestedPasswordChange();
 
-    clearCurrentUser();
+/**
+ * Determine whether a user is currently authenticated.
+ *
+ * initializeAuthentication() confirms this state with
+ * the server before main.ts renders the application.
+ */
+export function isAuthenticated():boolean {
+
+    return getCurrentUser() !== null;
+
+}
+
+
+/**
+ * Return authenticated identity.
+ */
+export function getAuthenticatedUser():User | null {
+
+    return getCurrentUser();
 
 }
 
@@ -430,27 +453,13 @@ export function requestPasswordChange():void {
 
 
 /**
- * Cancel a voluntary password-change request.
+ * Cancel a voluntary password change.
  *
- * Forced password changes cannot be cancelled.
+ * Server-required password changes cannot be cancelled.
  */
 export function cancelPasswordChange():boolean {
 
-    const user =
-        getCurrentUser();
-
-
-    if(
-
-        user
-
-        &&
-
-        mustChangePassword(
-            user.id
-        )
-
-    ){
+    if(serverMustChangePassword){
 
         return false;
 
@@ -465,29 +474,18 @@ export function cancelPasswordChange():boolean {
 
 
 /**
- * Return true when the authenticated user must or has
- * voluntarily requested to change the password.
+ * Return whether password-change UI should be displayed.
  */
 export function isPasswordChangeRequired():boolean {
 
-    const user =
-        getCurrentUser();
-
-
-    if(!user){
+    if(!isAuthenticated()){
 
         return false;
 
     }
 
 
-    if(
-
-        mustChangePassword(
-            user.id
-        )
-
-    ){
+    if(serverMustChangePassword){
 
         return true;
 
@@ -521,23 +519,17 @@ export function isPasswordChangeRequired():boolean {
 
 
 /**
- * Return whether the password change is mandatory.
+ * Return whether the current password change is forced.
  */
 export function isPasswordChangeForced():boolean {
 
-    const user =
-        getCurrentUser();
-
-
     return (
 
-        user !== null
+        isAuthenticated()
 
         &&
 
-        mustChangePassword(
-            user.id
-        )
+        serverMustChangePassword
 
     );
 
@@ -545,10 +537,8 @@ export function isPasswordChangeForced():boolean {
 
 
 /**
- * Change the authenticated user's password.
- *
- * The current password is verified before the new
- * password is persisted.
+ * Change the authenticated user's password through the
+ * server API.
  */
 export async function changeCurrentPassword(
 
@@ -564,127 +554,71 @@ export async function changeCurrentPassword(
 
 }> {
 
-    const user =
-        getCurrentUser();
-
-
-    if(!user){
-
-        return {
-
-            success:
-                false,
-
-            error:
-                "No authenticated EDORI user is available."
-
-        };
-
-    }
-
-
-    const verifiedUserId =
-
-        await verifyCredentials(
-
-            user.username,
-
-            currentPassword
-
-        );
-
-
-    if(
-
-        verifiedUserId
-
-        !==
-
-        user.id
-
-    ){
-
-        return {
-
-            success:
-                false,
-
-            error:
-                "The current password is incorrect."
-
-        };
-
-    }
-
-
-    if(currentPassword === newPassword){
-
-        return {
-
-            success:
-                false,
-
-            error:
-                "The new password must be different from the current password."
-
-        };
-
-    }
-
-
     try {
 
-        await setPassword(
+        const response =
 
-            user.id,
+            await fetch(
 
-            newPassword,
+                "/api/auth/change-password",
 
-            {
-                mustChangePassword:
-                    false
-            }
+                {
+                    method:
+                        "POST",
 
-        );
+                    credentials:
+                        "include",
+
+                    headers:{
+                        "Accept":
+                            "application/json",
+
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            currentPassword,
+
+                            newPassword
+
+                        })
+
+                }
+
+            );
+
+
+        const payload =
+
+            await readJson<PasswordChangeResponse>(
+                response
+            );
+
+
+        if(!response.ok){
+
+            return {
+
+                success:
+                    false,
+
+                error:
+                    payload.message
+                    ?? "EDORI could not change the password."
+
+            };
+
+        }
+
+
+        serverMustChangePassword =
+            false;
 
 
         clearRequestedPasswordChange();
-
-
-        recordSecurityAuditEvent({
-
-            eventType:
-                "authentication.password.changed",
-
-            actor:{
-                userId:
-                    user.id,
-
-                username:
-                    user.username,
-
-                displayName:
-                    user.displayName
-            },
-
-            target:{
-                userId:
-                    user.id,
-
-                username:
-                    user.username,
-
-                displayName:
-                    user.displayName
-            },
-
-            success:
-                true,
-
-            summary:
-                "User changed their own password."
-
-        });
 
 
         return {
@@ -697,15 +631,22 @@ export async function changeCurrentPassword(
     }
     catch(error){
 
+        console.error(
+
+            "EDORI password-change request failed:",
+
+            error
+
+        );
+
+
         return {
 
             success:
                 false,
 
             error:
-                error instanceof Error
-                    ? error.message
-                    : "EDORI could not change the password."
+                "EDORI could not reach the authentication service."
 
         };
 
@@ -715,7 +656,51 @@ export async function changeCurrentPassword(
 
 
 /**
- * Clear voluntary password-change state.
+ * Normalize server user payload into the existing
+ * frontend User model.
+ */
+function normalizeUser(
+
+    value:ServerUser
+
+):User {
+
+    return {
+
+        id:
+            value.id,
+
+        username:
+            value.username,
+
+        displayName:
+            value.displayName,
+
+        email:
+            value.email
+            ?? "",
+
+        role:
+            value.role,
+
+        active:
+            value.active,
+
+        createdAt:
+            value.createdAt
+            ?? new Date().toISOString(),
+
+        updatedAt:
+            value.updatedAt
+            ?? new Date().toISOString()
+
+    };
+
+}
+
+
+/**
+ * Remove voluntary password-change state.
  */
 function clearRequestedPasswordChange():void {
 
@@ -744,20 +729,84 @@ function clearRequestedPasswordChange():void {
 
 
 /**
- * Determine whether a user is currently authenticated.
+ * Parse JSON safely even when the server returns an
+ * empty response body.
  */
-export function isAuthenticated():boolean {
+async function readJson<T>(
 
-    return getCurrentUser() !== null;
+    response:Response
+
+):Promise<T> {
+
+    const text =
+
+        await response.text();
+
+
+    if(!text){
+
+        return {} as T;
+
+    }
+
+
+    return JSON.parse(
+        text
+    ) as T;
 
 }
 
 
-/**
- * Return authenticated identity.
- */
-export function getAuthenticatedUser():User | null {
+interface ServerUser {
 
-    return getCurrentUser();
+    id:string;
+
+    username:string;
+
+    displayName:string;
+
+    email?:string;
+
+    role:
+        | "viewer"
+        | "operator"
+        | "administrator";
+
+    active:boolean;
+
+    createdAt?:string;
+
+    updatedAt?:string;
+
+}
+
+
+interface SessionResponse {
+
+    authenticated?:boolean;
+
+    user?:ServerUser;
+
+    mustChangePassword?:boolean;
+
+    message?:string;
+
+}
+
+
+interface LoginResponse extends SessionResponse {
+
+    error?:string;
+
+}
+
+
+interface PasswordChangeResponse {
+
+    success?:boolean;
+
+    mustChangePassword?:boolean;
+
+    message?:string;
 
 }

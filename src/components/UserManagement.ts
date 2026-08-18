@@ -1,30 +1,16 @@
 /**
  * UserManagement
  *
- * Administrative EDORI user-management interface.
- *
- * Responsibilities:
- *
- * - Display the local EDORI user directory
- * - Create new users
- * - Edit existing users
- * - Change application roles
- * - Activate and deactivate users
- * - Display the currently authenticated user
- * - Configure initial passwords for new users
- * - Reset passwords for existing users
- * - Display credential status
- * - Enforce users.manage authorization
- * - Refresh automatically when USERS_CHANGED fires
+ * PostgreSQL-backed Administrator user-management UI.
  */
 
 import {
 
-    APP_EVENTS
+    ROLE_DEFINITIONS
 
 }
 
-from "../config/appEvents";
+from "../types/RoleDefinitions";
 
 
 import type {
@@ -34,15 +20,6 @@ import type {
 }
 
 from "../types/Role";
-
-
-import {
-
-    ROLE_DEFINITIONS
-
-}
-
-from "../types/RoleDefinitions";
 
 
 import type {
@@ -56,19 +33,7 @@ from "../types/User";
 
 import {
 
-    hasPermission
-
-}
-
-from "../services/AuthorizationService";
-
-
-import {
-
-    createUser,
-    getCurrentUser,
-    getUsers,
-    updateUser
+    getCurrentUser
 
 }
 
@@ -77,65 +42,24 @@ from "../services/UserService";
 
 import {
 
-    getCredentialStatus,
-    hasCredential,
-    setPassword
+    createServerUser,
+    loadServerUsers,
+    resetServerUserPassword,
+    updateServerUser
 
 }
 
-from "../services/CredentialService";
+from "../services/UserDirectoryApiService";
 
 
-import {
+let users:User[] = [];
 
-    recordSecurityAuditEvent
-
-}
-
-from "../services/SecurityAuditService";
-
-
-import {
-
-    subscribe
-
-}
-
-from "../services/EventService";
-
-
-/**
- * Track the user currently being edited.
- *
- * null means the modal is in Add User mode.
- */
 let editingUserId:string | null = null;
 
-
-/**
- * Prevent duplicate event subscriptions if the
- * component is initialized more than once.
- */
 let initialized = false;
 
 
-/**
- * Render the User Management page.
- */
 export function UserManagement():string {
-
-    if(
-
-        !hasPermission(
-            "users.manage"
-        )
-
-    ){
-
-        return renderAccessDenied();
-
-    }
-
 
     return `
 
@@ -157,7 +81,7 @@ export function UserManagement():string {
                     </h2>
 
                     <p>
-                        Manage EDORI users, application roles, and access status.
+                        Manage centralized EDORI user accounts, roles, access status, and temporary passwords.
                     </p>
 
                 </div>
@@ -188,12 +112,11 @@ export function UserManagement():string {
             <div class="user-management-notice">
 
                 <strong>
-                    EDORI account access
+                    Centralized authentication
                 </strong>
 
                 <span>
-                    User roles control application permissions. Passwords are configured
-                    separately and are never displayed after they are saved.
+                    Users and credentials are stored in PostgreSQL. New users receive a temporary password and must change it after signing in.
                 </span>
 
             </div>
@@ -279,70 +202,20 @@ export function UserManagement():string {
             ></div>
 
 
-            <div class="user-management-table-wrapper">
-
-                <table class="user-management-table">
-
-                    <thead>
-
-                        <tr>
-
-                            <th>
-                                User
-                            </th>
-
-                            <th>
-                                Username
-                            </th>
-
-                            <th>
-                                Role
-                            </th>
-
-                            <th>
-                                Status
-                            </th>
-
-                            <th>
-                                Password
-                            </th>
-
-                            <th>
-                                Last Updated
-                            </th>
-
-                            <th>
-                                Actions
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-
-                    <tbody id="userManagementTableBody">
-
-                        ${renderUserRows()}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-
             <div
-                id="userManagementEmptyState"
-                class="user-management-empty-state"
-                hidden
+                id="userDirectoryTableContainer"
+                class="user-directory-table-container"
             >
-
-                No users match the selected filters.
-
+                <div class="user-management-empty">
+                    Loading users...
+                </div>
             </div>
 
 
-            ${renderUserEditor()}
+            ${createEditorModal()}
+
+
+            ${createPasswordResetModal()}
 
         </section>
 
@@ -351,810 +224,152 @@ export function UserManagement():string {
 }
 
 
-/**
- * Initialize User Management interactions.
- */
 export function initializeUserManagement():void {
 
-    if(
+    if(initialized){
 
-        !hasPermission(
-            "users.manage"
-        )
-
-    ){
+        void refreshUsers();
 
         return;
 
     }
 
 
-    bindUserManagementControls();
+    initialized =
+        true;
 
 
-    refreshUserManagement();
+    document
+        .getElementById(
+            "addUserButton"
+        )
+        ?.addEventListener(
+            "click",
+            openCreateEditor
+        );
 
 
-    /*
-     * Subscribe only once for the application lifetime.
-     */
-    if(!initialized){
+    document
+        .getElementById(
+            "userSearchInput"
+        )
+        ?.addEventListener(
+            "input",
+            renderUsers
+        );
 
-        subscribe(
 
-            APP_EVENTS.USERS_CHANGED,
+    document
+        .getElementById(
+            "userRoleFilter"
+        )
+        ?.addEventListener(
+            "change",
+            renderUsers
+        );
+
+
+    document
+        .getElementById(
+            "userStatusFilter"
+        )
+        ?.addEventListener(
+            "change",
+            renderUsers
+        );
+
+
+    document
+        .getElementById(
+            "userEditorCancelButton"
+        )
+        ?.addEventListener(
+            "click",
+            closeEditor
+        );
+
+
+    document
+        .getElementById(
+            "userEditorSaveButton"
+        )
+        ?.addEventListener(
+
+            "click",
 
             () => {
 
-                refreshUserManagement();
+                void saveEditor();
 
             }
 
         );
 
 
-        initialized = true;
-
-    }
-
-}
-
-
-/**
- * Bind controls currently rendered in the page.
- */
-function bindUserManagementControls():void {
-
-    const addUserButton =
-
-        document.getElementById(
-            "addUserButton"
+    document
+        .getElementById(
+            "passwordResetCancelButton"
+        )
+        ?.addEventListener(
+            "click",
+            closePasswordReset
         );
 
 
-    addUserButton?.addEventListener(
+    document
+        .getElementById(
+            "passwordResetSaveButton"
+        )
+        ?.addEventListener(
 
-        "click",
+            "click",
 
-        () => {
+            () => {
 
-            openUserEditor(
-                null
-            );
-
-        }
-
-    );
-
-
-    const searchInput =
-
-        document.getElementById(
-            "userSearchInput"
-        ) as HTMLInputElement | null;
-
-
-    searchInput?.addEventListener(
-
-        "input",
-
-        () => {
-
-            refreshUserTable();
-
-        }
-
-    );
-
-
-    const roleFilter =
-
-        document.getElementById(
-            "userRoleFilter"
-        ) as HTMLSelectElement | null;
-
-
-    roleFilter?.addEventListener(
-
-        "change",
-
-        () => {
-
-            refreshUserTable();
-
-        }
-
-    );
-
-
-    const statusFilter =
-
-        document.getElementById(
-            "userStatusFilter"
-        ) as HTMLSelectElement | null;
-
-
-    statusFilter?.addEventListener(
-
-        "change",
-
-        () => {
-
-            refreshUserTable();
-
-        }
-
-    );
-
-
-    bindUserEditorControls();
-
-}
-
-
-/**
- * Bind modal/editor controls.
- */
-function bindUserEditorControls():void {
-
-    const form =
-
-        document.getElementById(
-            "userEditorForm"
-        ) as HTMLFormElement | null;
-
-
-    form?.addEventListener(
-
-        "submit",
-
-        event => {
-
-            event.preventDefault();
-
-            void saveUserEditor();
-
-        }
-
-    );
-
-
-    const cancelButton =
-
-        document.getElementById(
-            "cancelUserEditorButton"
-        );
-
-
-    cancelButton?.addEventListener(
-
-        "click",
-
-        () => {
-
-            closeUserEditor();
-
-        }
-
-    );
-
-
-    const closeButton =
-
-        document.getElementById(
-            "closeUserEditorButton"
-        );
-
-
-    closeButton?.addEventListener(
-
-        "click",
-
-        () => {
-
-            closeUserEditor();
-
-        }
-
-    );
-
-
-    const backdrop =
-
-        document.getElementById(
-            "userEditorBackdrop"
-        );
-
-
-    backdrop?.addEventListener(
-
-        "click",
-
-        event => {
-
-            if(
-
-                event.target
-                ===
-                backdrop
-
-            ){
-
-                closeUserEditor();
+                void savePasswordReset();
 
             }
 
-        }
-
-    );
-
-
-    document.addEventListener(
-
-        "keydown",
-
-        handleUserEditorEscape
-
-    );
-
-}
-
-
-/**
- * Close editor with Escape.
- */
-function handleUserEditorEscape(
-
-    event:KeyboardEvent
-
-):void {
-
-    if(event.key !== "Escape"){
-
-        return;
-
-    }
-
-
-    const backdrop =
-
-        document.getElementById(
-            "userEditorBackdrop"
         );
 
 
-    if(
-
-        backdrop
-
-        &&
-
-        !backdrop.hasAttribute(
-            "hidden"
-        )
-
-    ){
-
-        closeUserEditor();
-
-    }
+    void refreshUsers();
 
 }
 
 
-/**
- * Refresh all dynamic User Management content.
- */
-function refreshUserManagement():void {
+async function refreshUsers():Promise<void> {
 
-    if(
+    try {
 
-        !document.getElementById(
-            "userManagement"
-        )
+        users =
+            await loadServerUsers();
 
-    ){
 
-        return;
+        renderUsers();
 
     }
+    catch(error){
 
-
-    refreshUserTable();
-
-}
-
-
-/**
- * Refresh user table and directory summary.
- */
-function refreshUserTable():void {
-
-    const tbody =
-
-        document.getElementById(
-            "userManagementTableBody"
+        showPageMessage(
+            getErrorMessage(
+                error,
+                "EDORI could not load users."
+            ),
+            true
         );
 
-
-    if(!tbody){
-
-        return;
-
     }
 
-
-    const users =
-
-        getFilteredUsers();
-
-
-    tbody.innerHTML =
-
-        users
-            .map(
-                renderUserRow
-            )
-            .join("");
-
-
-    bindUserRowControls();
-
-
-    const emptyState =
-
-        document.getElementById(
-            "userManagementEmptyState"
-        );
-
-
-    if(emptyState){
-
-        emptyState.hidden =
-
-            users.length > 0;
-
-    }
-
-
-    renderDirectorySummary();
-
 }
 
 
-/**
- * Bind Edit buttons after table rendering.
- */
-function bindUserRowControls():void {
-
-    const buttons =
-
-        document.querySelectorAll<HTMLButtonElement>(
-            "[data-edit-user-id]"
-        );
-
-
-    buttons.forEach(
-
-        button => {
-
-            button.addEventListener(
-
-                "click",
-
-                () => {
-
-                    const userId =
-
-                        button.dataset.editUserId;
-
-
-                    if(!userId){
-
-                        return;
-
-                    }
-
-
-                    openUserEditor(
-                        userId
-                    );
-
-                }
-
-            );
-
-        }
-
-    );
-
-}
-
-
-/**
- * Filter users according to toolbar state.
- */
-function getFilteredUsers():User[] {
-
-    const users =
-
-        getUsers();
-
-
-    const searchInput =
-
-        document.getElementById(
-            "userSearchInput"
-        ) as HTMLInputElement | null;
-
-
-    const roleFilter =
-
-        document.getElementById(
-            "userRoleFilter"
-        ) as HTMLSelectElement | null;
-
-
-    const statusFilter =
-
-        document.getElementById(
-            "userStatusFilter"
-        ) as HTMLSelectElement | null;
-
-
-    const search =
-
-        searchInput?.value
-            .trim()
-            .toLowerCase()
-
-        ?? "";
-
-
-    const role =
-
-        roleFilter?.value
-
-        ?? "all";
-
-
-    const status =
-
-        statusFilter?.value
-
-        ?? "all";
-
-
-    return users.filter(
-
-        user => {
-
-            const matchesSearch =
-
-                search.length === 0
-
-                ||
-
-                user.displayName
-                    .toLowerCase()
-                    .includes(
-                        search
-                    )
-
-                ||
-
-                user.username
-                    .toLowerCase()
-                    .includes(
-                        search
-                    )
-
-                ||
-
-                user.email
-                    .toLowerCase()
-                    .includes(
-                        search
-                    );
-
-
-            const matchesRole =
-
-                role === "all"
-
-                ||
-
-                user.role === role;
-
-
-            const matchesStatus =
-
-                status === "all"
-
-                ||
-
-                (
-                    status === "active"
-                    &&
-                    user.active
-                )
-
-                ||
-
-                (
-                    status === "inactive"
-                    &&
-                    !user.active
-                );
-
-
-            return (
-
-                matchesSearch
-
-                &&
-
-                matchesRole
-
-                &&
-
-                matchesStatus
-
-            );
-
-        }
-
-    );
-
-}
-
-
-/**
- * Render initial rows.
- */
-function renderUserRows():string {
-
-    return getUsers()
-
-        .map(
-            renderUserRow
-        )
-
-        .join("");
-
-}
-
-
-/**
- * Render one user.
- */
-function renderUserRow(
-
-    user:User
-
-):string {
-
-    const currentUser =
-
-        getCurrentUser();
-
-
-    const roleDefinition =
-
-        ROLE_DEFINITIONS[
-            user.role
-        ];
-
-
-    const isCurrentUser =
-
-        currentUser?.id
-        ===
-        user.id;
-
-
-    return `
-
-        <tr
-            class="
-                user-management-row
-                ${!user.active
-                    ? "user-management-row-inactive"
-                    : ""
-                }
-            "
-        >
-
-            <td>
-
-                <div class="user-identity-cell">
-
-                    <div class="user-avatar">
-
-                        ${escapeHtml(
-                            getUserInitials(
-                                user.displayName
-                            )
-                        )}
-
-                    </div>
-
-
-                    <div>
-
-                        <div class="user-display-name">
-
-                            ${escapeHtml(
-                                user.displayName
-                            )}
-
-                            ${isCurrentUser
-
-                                ? `
-                                    <span class="user-current-badge">
-                                        Current
-                                    </span>
-                                `
-
-                                : ""
-
-                            }
-
-                        </div>
-
-
-                        <div class="user-email">
-
-                            ${user.email
-
-                                ? escapeHtml(
-                                    user.email
-                                )
-
-                                : "No email entered"
-
-                            }
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </td>
-
-
-            <td>
-
-                <span class="user-username">
-
-                    ${escapeHtml(
-                        user.username
-                    )}
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                <span
-                    class="
-                        user-role-badge
-                        user-role-${user.role}
-                    "
-                    title="${escapeHtml(
-                        roleDefinition.description
-                    )}"
-                >
-
-                    ${escapeHtml(
-                        roleDefinition.title
-                    )}
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                <span
-                    class="
-                        user-status-badge
-                        ${user.active
-                            ? "user-status-active"
-                            : "user-status-inactive"
-                        }
-                    "
-                >
-
-                    ${user.active
-                        ? "Active"
-                        : "Inactive"
-                    }
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                <span
-                    class="
-                        user-credential-badge
-                        ${!hasCredential(user.id)
-                            ? "user-credential-missing"
-                            : (
-                                getCredentialStatus(
-                                    user.id
-                                ).mustChangePassword
-                                    ? "user-credential-change-required"
-                                    : "user-credential-configured"
-                            )
-                        }
-                    "
-                >
-
-                    ${!hasCredential(user.id)
-                        ? "Not configured"
-                        : (
-                            getCredentialStatus(
-                                user.id
-                            ).mustChangePassword
-                                ? "Change required"
-                                : "Configured"
-                        )
-                    }
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                ${escapeHtml(
-                    formatDateTime(
-                        user.updatedAt
-                    )
-                )}
-
-            </td>
-
-
-            <td>
-
-                <button
-                    type="button"
-                    class="button button-secondary button-small"
-                    data-edit-user-id="${escapeHtml(
-                        user.id
-                    )}"
-                >
-                    Edit
-                </button>
-
-            </td>
-
-        </tr>
-
-    `;
-
-}
-
-
-/**
- * Render directory summary.
- */
-function renderDirectorySummary():void {
+function renderUsers():void {
 
     const container =
 
         document.getElementById(
-            "userDirectorySummary"
+            "userDirectoryTableContainer"
         );
 
 
@@ -1165,333 +380,961 @@ function renderDirectorySummary():void {
     }
 
 
-    const users =
+    const filtered =
+        getFilteredUsers();
 
-        getUsers();
 
-
-    const activeUsers =
-
+    const activeCount =
         users.filter(
-            user =>
-                user.active
+            user => user.active
         ).length;
 
 
-    const administrators =
-
+    const adminCount =
         users.filter(
-
             user =>
                 user.active
                 &&
                 user.role === "administrator"
-
         ).length;
 
 
-    const credentialedUsers =
+    const summary =
 
-        users.filter(
+        document.getElementById(
+            "userDirectorySummary"
+        );
 
-            user =>
-                hasCredential(
-                    user.id
-                )
 
-        ).length;
+    if(summary){
+
+        summary.textContent =
+
+            `${users.length} users · ${activeCount} active · ${adminCount} active Administrator${adminCount === 1 ? "" : "s"}`;
+
+    }
+
+
+    if(filtered.length === 0){
+
+        container.innerHTML = `
+
+            <div class="user-management-empty">
+                No users match the selected filters.
+            </div>
+
+        `;
+
+
+        return;
+
+    }
+
+
+    const currentUser =
+        getCurrentUser();
 
 
     container.innerHTML = `
 
-        <span>
-            <strong>${users.length}</strong>
-            total user${users.length === 1 ? "" : "s"}
-        </span>
+        <table class="user-directory-table">
 
-        <span>
-            <strong>${activeUsers}</strong>
-            active
-        </span>
+            <thead>
 
-        <span>
-            <strong>${credentialedUsers}</strong>
-            password${credentialedUsers === 1 ? "" : "s"} configured
-        </span>
+                <tr>
+                    <th>User</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
 
-        <span>
-            <strong>${administrators}</strong>
-            active administrator${administrators === 1 ? "" : "s"}
-        </span>
+            </thead>
+
+            <tbody>
+
+                ${filtered
+                    .map(
+                        user =>
+                            createUserRow(
+                                user,
+                                currentUser?.id === user.id
+                            )
+                    )
+                    .join("")
+                }
+
+            </tbody>
+
+        </table>
+
+    `;
+
+
+    container
+        .querySelectorAll<HTMLButtonElement>(
+            "[data-edit-user]"
+        )
+        .forEach(
+
+            button => {
+
+                button.addEventListener(
+
+                    "click",
+
+                    () => {
+
+                        openEditEditor(
+                            button.dataset.editUser
+                            ?? ""
+                        );
+
+                    }
+
+                );
+
+            }
+
+        );
+
+
+    container
+        .querySelectorAll<HTMLButtonElement>(
+            "[data-reset-user-password]"
+        )
+        .forEach(
+
+            button => {
+
+                button.addEventListener(
+
+                    "click",
+
+                    () => {
+
+                        openPasswordReset(
+                            button.dataset.resetUserPassword
+                            ?? ""
+                        );
+
+                    }
+
+                );
+
+            }
+
+        );
+
+}
+
+
+function createUserRow(
+
+    user:User,
+
+    current:boolean
+
+):string {
+
+    const role =
+
+        ROLE_DEFINITIONS[
+            user.role
+        ];
+
+
+    return `
+
+        <tr>
+
+            <td>
+
+                <div class="user-directory-identity">
+
+                    <strong>
+                        ${escapeHtml(
+                            user.displayName
+                        )}
+                    </strong>
+
+                    <span>
+                        ${escapeHtml(
+                            user.email
+                            || "No email"
+                        )}
+                    </span>
+
+                    ${current
+                        ? `
+                            <small>
+                                Current session
+                            </small>
+                        `
+                        : ""
+                    }
+
+                </div>
+
+            </td>
+
+            <td>
+                ${escapeHtml(
+                    user.username
+                )}
+            </td>
+
+            <td>
+                ${escapeHtml(
+                    role.title
+                )}
+            </td>
+
+            <td>
+
+                <span class="
+                    user-status-badge
+                    ${
+                        user.active
+                            ? "user-status-active"
+                            : "user-status-inactive"
+                    }
+                ">
+                    ${user.active
+                        ? "Active"
+                        : "Inactive"
+                    }
+                </span>
+
+            </td>
+
+            <td>
+
+                <div class="user-directory-actions">
+
+                    <button
+                        type="button"
+                        class="button button-secondary"
+                        data-edit-user="${escapeAttribute(user.id)}"
+                    >
+                        Edit
+                    </button>
+
+                    <button
+                        type="button"
+                        class="button button-secondary"
+                        data-reset-user-password="${escapeAttribute(user.id)}"
+                    >
+                        Reset Password
+                    </button>
+
+                </div>
+
+            </td>
+
+        </tr>
 
     `;
 
 }
 
 
-/**
- * Render Add/Edit User editor.
- */
-function renderUserEditor():string {
+function getFilteredUsers():User[] {
+
+    const search =
+
+        (
+            document.getElementById(
+                "userSearchInput"
+            ) as HTMLInputElement | null
+        )?.value
+            .trim()
+            .toLowerCase()
+        ?? "";
+
+
+    const role =
+
+        (
+            document.getElementById(
+                "userRoleFilter"
+            ) as HTMLSelectElement | null
+        )?.value
+        ?? "all";
+
+
+    const status =
+
+        (
+            document.getElementById(
+                "userStatusFilter"
+            ) as HTMLSelectElement | null
+        )?.value
+        ?? "all";
+
+
+    return users.filter(
+
+        user => {
+
+            if(
+
+                search
+
+                &&
+
+                ![
+                    user.displayName,
+                    user.username,
+                    user.email
+                ]
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(
+                        search
+                    )
+
+            ){
+
+                return false;
+
+            }
+
+
+            if(
+
+                role !== "all"
+
+                &&
+
+                user.role !== role
+
+            ){
+
+                return false;
+
+            }
+
+
+            if(
+
+                status === "active"
+
+                &&
+
+                !user.active
+
+            ){
+
+                return false;
+
+            }
+
+
+            if(
+
+                status === "inactive"
+
+                &&
+
+                user.active
+
+            ){
+
+                return false;
+
+            }
+
+
+            return true;
+
+        }
+
+    );
+
+}
+
+
+function openCreateEditor():void {
+
+    editingUserId =
+        null;
+
+
+    setText(
+        "userEditorTitle",
+        "Add User"
+    );
+
+
+    setInput(
+        "userDisplayNameInput",
+        ""
+    );
+
+    setInput(
+        "userUsernameInput",
+        ""
+    );
+
+    setInput(
+        "userEmailInput",
+        ""
+    );
+
+    setSelect(
+        "userRoleInput",
+        "viewer"
+    );
+
+    setCheckbox(
+        "userActiveInput",
+        true
+    );
+
+
+    const temporaryGroup =
+
+        document.getElementById(
+            "userTemporaryPasswordGroup"
+        );
+
+
+    if(temporaryGroup){
+
+        temporaryGroup.hidden =
+            false;
+
+    }
+
+
+    setInput(
+        "userTemporaryPasswordInput",
+        ""
+    );
+
+
+    showEditorMessage(
+        "",
+        false
+    );
+
+
+    showModal(
+        "userEditorModal"
+    );
+
+}
+
+
+function openEditEditor(
+
+    userId:string
+
+):void {
+
+    const user =
+
+        users.find(
+            candidate =>
+                candidate.id === userId
+        );
+
+
+    if(!user){
+
+        return;
+
+    }
+
+
+    editingUserId =
+        user.id;
+
+
+    setText(
+        "userEditorTitle",
+        "Edit User"
+    );
+
+
+    setInput(
+        "userDisplayNameInput",
+        user.displayName
+    );
+
+    setInput(
+        "userUsernameInput",
+        user.username
+    );
+
+    setInput(
+        "userEmailInput",
+        user.email
+    );
+
+    setSelect(
+        "userRoleInput",
+        user.role
+    );
+
+    setCheckbox(
+        "userActiveInput",
+        user.active
+    );
+
+
+    const temporaryGroup =
+
+        document.getElementById(
+            "userTemporaryPasswordGroup"
+        );
+
+
+    if(temporaryGroup){
+
+        temporaryGroup.hidden =
+            true;
+
+    }
+
+
+    showEditorMessage(
+        "",
+        false
+    );
+
+
+    showModal(
+        "userEditorModal"
+    );
+
+}
+
+
+async function saveEditor():Promise<void> {
+
+    const displayName =
+        getInputValue(
+            "userDisplayNameInput"
+        );
+
+    const username =
+        getInputValue(
+            "userUsernameInput"
+        );
+
+    const email =
+        getInputValue(
+            "userEmailInput"
+        );
+
+    const role =
+        getRoleValue(
+            "userRoleInput"
+        );
+
+    const active =
+        getCheckboxValue(
+            "userActiveInput"
+        );
+
+
+    if(
+
+        !displayName
+
+        ||
+
+        !username
+
+    ){
+
+        showEditorMessage(
+            "Display name and username are required.",
+            true
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        if(editingUserId){
+
+            await updateServerUser(
+
+                editingUserId,
+
+                {
+                    displayName,
+                    username,
+                    email,
+                    role,
+                    active
+                }
+
+            );
+
+
+            showPageMessage(
+                "User updated successfully.",
+                false
+            );
+
+        }
+        else {
+
+            const temporaryPassword =
+
+                getInputValue(
+                    "userTemporaryPasswordInput"
+                );
+
+
+            if(!temporaryPassword){
+
+                showEditorMessage(
+                    "A temporary password is required.",
+                    true
+                );
+
+                return;
+
+            }
+
+
+            await createServerUser({
+
+                displayName,
+                username,
+                email,
+                role,
+                temporaryPassword
+
+            });
+
+
+            showPageMessage(
+                "User created successfully. The user must change the temporary password after signing in.",
+                false
+            );
+
+        }
+
+
+        closeEditor();
+
+        await refreshUsers();
+
+    }
+    catch(error){
+
+        showEditorMessage(
+            getErrorMessage(
+                error,
+                "EDORI could not save the user."
+            ),
+            true
+        );
+
+    }
+
+}
+
+
+function openPasswordReset(
+
+    userId:string
+
+):void {
+
+    const user =
+
+        users.find(
+            candidate =>
+                candidate.id === userId
+        );
+
+
+    if(!user){
+
+        return;
+
+    }
+
+
+    const modal =
+
+        document.getElementById(
+            "passwordResetModal"
+        );
+
+
+    if(!modal){
+
+        return;
+
+    }
+
+
+    modal.dataset.userId =
+        user.id;
+
+
+    setText(
+        "passwordResetUserName",
+        `${user.displayName} (${user.username})`
+    );
+
+
+    setInput(
+        "passwordResetTemporaryInput",
+        ""
+    );
+
+
+    setText(
+        "passwordResetMessage",
+        ""
+    );
+
+
+    showModal(
+        "passwordResetModal"
+    );
+
+}
+
+
+async function savePasswordReset():Promise<void> {
+
+    const modal =
+
+        document.getElementById(
+            "passwordResetModal"
+        );
+
+
+    const userId =
+
+        modal?.dataset.userId
+        ?? "";
+
+
+    const temporaryPassword =
+
+        getInputValue(
+            "passwordResetTemporaryInput"
+        );
+
+
+    if(
+
+        !userId
+
+        ||
+
+        !temporaryPassword
+
+    ){
+
+        setText(
+            "passwordResetMessage",
+            "Enter a temporary password."
+        );
+
+        return;
+
+    }
+
+
+    try {
+
+        await resetServerUserPassword(
+
+            userId,
+
+            temporaryPassword
+
+        );
+
+
+        closePasswordReset();
+
+
+        showPageMessage(
+            "Password reset successfully. Existing sessions were revoked and the user must change the temporary password after signing in.",
+            false
+        );
+
+    }
+    catch(error){
+
+        setText(
+            "passwordResetMessage",
+            getErrorMessage(
+                error,
+                "EDORI could not reset the password."
+            )
+        );
+
+    }
+
+}
+
+
+function closeEditor():void {
+
+    editingUserId =
+        null;
+
+
+    hideModal(
+        "userEditorModal"
+    );
+
+}
+
+
+function closePasswordReset():void {
+
+    hideModal(
+        "passwordResetModal"
+    );
+
+}
+
+
+function createEditorModal():string {
 
     return `
 
         <div
-            id="userEditorBackdrop"
-            class="user-editor-backdrop"
+            id="userEditorModal"
+            class="user-editor-modal"
             hidden
         >
 
-            <div
-                class="user-editor-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="userEditorTitle"
-            >
+            <div class="user-editor-dialog">
 
-                <div class="user-editor-header">
+                <h3 id="userEditorTitle">
+                    Add User
+                </h3>
 
-                    <div>
 
-                        <span class="application-page-eyebrow">
-                            User Access
+                <div class="user-editor-grid">
+
+                    ${inputField(
+                        "userDisplayNameInput",
+                        "Display Name",
+                        "text"
+                    )}
+
+                    ${inputField(
+                        "userUsernameInput",
+                        "Username",
+                        "text"
+                    )}
+
+                    ${inputField(
+                        "userEmailInput",
+                        "Email",
+                        "email"
+                    )}
+
+
+                    <label class="user-editor-field">
+
+                        <span>
+                            Role
                         </span>
 
-                        <h3 id="userEditorTitle">
-                            Add User
-                        </h3>
+                        <select id="userRoleInput">
 
-                    </div>
+                            <option value="viewer">
+                                Viewer
+                            </option>
+
+                            <option value="operator">
+                                Operator
+                            </option>
+
+                            <option value="administrator">
+                                Administrator
+                            </option>
+
+                        </select>
+
+                    </label>
 
 
-                    <button
-                        id="closeUserEditorButton"
-                        type="button"
-                        class="user-editor-close"
-                        aria-label="Close"
+                    <label class="user-editor-checkbox">
+
+                        <input
+                            id="userActiveInput"
+                            type="checkbox"
+                            checked
+                        />
+
+                        <span>
+                            Active account
+                        </span>
+
+                    </label>
+
+
+                    <label
+                        id="userTemporaryPasswordGroup"
+                        class="user-editor-field"
                     >
-                        ×
-                    </button>
+
+                        <span>
+                            Temporary Password
+                        </span>
+
+                        <input
+                            id="userTemporaryPasswordInput"
+                            type="password"
+                            autocomplete="new-password"
+                        />
+
+                        <small>
+                            Minimum 12 characters. The user must change this password after first sign-in.
+                        </small>
+
+                    </label>
 
                 </div>
 
 
-                <form id="userEditorForm">
-
-                    <div
-                        id="userEditorMessage"
-                        class="user-editor-message"
-                        aria-live="polite"
-                    ></div>
-
-
-                    <div class="user-editor-grid">
-
-                        <div class="form-field">
-
-                            <label for="userDisplayNameInput">
-                                Display name
-                            </label>
-
-                            <input
-                                id="userDisplayNameInput"
-                                type="text"
-                                required
-                                maxlength="120"
-                                autocomplete="off"
-                            />
-
-                        </div>
-
-
-                        <div class="form-field">
-
-                            <label for="userUsernameInput">
-                                Username
-                            </label>
-
-                            <input
-                                id="userUsernameInput"
-                                type="text"
-                                required
-                                maxlength="80"
-                                autocomplete="off"
-                            />
-
-                        </div>
-
-
-                        <div class="form-field user-editor-full-width">
-
-                            <label for="userEmailInput">
-                                Email
-                            </label>
-
-                            <input
-                                id="userEmailInput"
-                                type="email"
-                                maxlength="160"
-                                autocomplete="off"
-                            />
-
-                        </div>
-
-
-                        <div class="form-field user-editor-full-width">
-
-                            <label for="userRoleInput">
-                                Application role
-                            </label>
-
-                            <select
-                                id="userRoleInput"
-                                required
-                            >
-
-                                ${renderRoleOptions()}
-
-                            </select>
-
-
-                            <div
-                                id="userRoleDescription"
-                                class="user-role-description"
-                            ></div>
-
-                        </div>
-
-
-                        <div
-                            id="userPasswordSection"
-                            class="
-                                user-password-section
-                                user-editor-full-width
-                            "
-                        >
-
-                            <div class="user-password-section-header">
-
-                                <div>
-
-                                    <strong id="userPasswordSectionTitle">
-                                        Initial password
-                                    </strong>
-
-                                    <small id="userPasswordSectionDescription">
-                                        Set a temporary password. The user must change it at first sign-in.
-                                    </small>
-
-                                </div>
-
-                                <span
-                                    id="userCredentialStatus"
-                                    class="user-credential-inline-status"
-                                >
-                                </span>
-
-                            </div>
-
-
-                            <div class="user-password-grid">
-
-                                <div class="form-field">
-
-                                    <label for="userPasswordInput">
-                                        Password
-                                    </label>
-
-                                    <input
-                                        id="userPasswordInput"
-                                        type="password"
-                                        minlength="12"
-                                        maxlength="128"
-                                        autocomplete="new-password"
-                                    />
-
-                                </div>
-
-
-                                <div class="form-field">
-
-                                    <label for="userPasswordConfirmInput">
-                                        Confirm password
-                                    </label>
-
-                                    <input
-                                        id="userPasswordConfirmInput"
-                                        type="password"
-                                        minlength="12"
-                                        maxlength="128"
-                                        autocomplete="new-password"
-                                    />
-
-                                </div>
-
-                            </div>
-
-
-                            <div class="user-password-help">
-                                Passwords must contain at least 12 characters.
-                                Existing passwords are never displayed.
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            id="userActiveField"
-                            class="form-field user-editor-full-width"
-                        >
-
-                            <label class="user-active-control">
-
-                                <input
-                                    id="userActiveInput"
-                                    type="checkbox"
-                                    checked
-                                />
-
-                                <span>
-
-                                    <strong>
-                                        Active user
-                                    </strong>
-
-                                    <small>
-                                        Inactive users cannot sign in to EDORI.
-                                    </small>
-
-                                </span>
-
-                            </label>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="user-editor-actions">
-
-                        <button
-                            id="cancelUserEditorButton"
-                            type="button"
-                            class="button button-secondary"
-                        >
-                            Cancel
-                        </button>
-
-
-                        <button
-                            id="saveUserButton"
-                            type="submit"
-                            class="button button-primary"
-                        >
-                            Save User
-                        </button>
-
-                    </div>
-
-                </form>
+                <div
+                    id="userEditorMessage"
+                    class="user-management-message"
+                ></div>
+
+
+                <div class="user-editor-actions">
+
+                    <button
+                        id="userEditorCancelButton"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        id="userEditorSaveButton"
+                        class="button button-primary"
+                        type="button"
+                    >
+                        Save User
+                    </button>
+
+                </div>
 
             </div>
 
@@ -1502,1283 +1345,153 @@ function renderUserEditor():string {
 }
 
 
-/**
- * Render role selector choices from the authoritative
- * role-definition object.
- */
-function renderRoleOptions():string {
+function createPasswordResetModal():string {
 
-    const roleIds:RoleId[] = [
+    return `
 
-        "viewer",
-        "operator",
-        "administrator"
+        <div
+            id="passwordResetModal"
+            class="user-editor-modal"
+            hidden
+        >
 
-    ];
+            <div class="user-editor-dialog">
 
+                <h3>
+                    Reset Password
+                </h3>
 
-    return roleIds
-
-        .map(
-
-            roleId => {
-
-                const definition =
-
-                    ROLE_DEFINITIONS[
-                        roleId
-                    ];
+                <p id="passwordResetUserName"></p>
 
 
-                return `
+                <label class="user-editor-field">
 
-                    <option value="${definition.id}">
+                    <span>
+                        Temporary Password
+                    </span>
 
-                        ${escapeHtml(
-                            definition.title
-                        )}
+                    <input
+                        id="passwordResetTemporaryInput"
+                        type="password"
+                        autocomplete="new-password"
+                    />
 
-                    </option>
+                    <small>
+                        Minimum 12 characters. All current sessions for this user will be revoked.
+                    </small>
 
-                `;
+                </label>
 
-            }
 
-        )
+                <div
+                    id="passwordResetMessage"
+                    class="user-management-message"
+                ></div>
 
-        .join("");
+
+                <div class="user-editor-actions">
+
+                    <button
+                        id="passwordResetCancelButton"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        id="passwordResetSaveButton"
+                        class="button button-primary"
+                        type="button"
+                    >
+                        Reset Password
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    `;
 
 }
 
 
-/**
- * Open editor in Add or Edit mode.
- */
-function openUserEditor(
+function inputField(
 
-    userId:string | null
+    id:string,
+
+    label:string,
+
+    type:string
+
+):string {
+
+    return `
+
+        <label class="user-editor-field">
+
+            <span>
+                ${escapeHtml(label)}
+            </span>
+
+            <input
+                id="${escapeAttribute(id)}"
+                type="${escapeAttribute(type)}"
+            />
+
+        </label>
+
+    `;
+
+}
+
+
+function showModal(
+
+    id:string
 
 ):void {
 
-    editingUserId =
-
-        userId;
-
-
-    const backdrop =
-
+    const modal =
         document.getElementById(
-            "userEditorBackdrop"
+            id
         );
 
 
-    const title =
+    if(modal){
 
-        document.getElementById(
-            "userEditorTitle"
-        );
-
-
-    const displayNameInput =
-
-        document.getElementById(
-            "userDisplayNameInput"
-        ) as HTMLInputElement | null;
-
-
-    const usernameInput =
-
-        document.getElementById(
-            "userUsernameInput"
-        ) as HTMLInputElement | null;
-
-
-    const emailInput =
-
-        document.getElementById(
-            "userEmailInput"
-        ) as HTMLInputElement | null;
-
-
-    const roleInput =
-
-        document.getElementById(
-            "userRoleInput"
-        ) as HTMLSelectElement | null;
-
-
-    const activeInput =
-
-        document.getElementById(
-            "userActiveInput"
-        ) as HTMLInputElement | null;
-
-
-    const activeField =
-
-        document.getElementById(
-            "userActiveField"
-        );
-
-
-    const passwordInput =
-
-        document.getElementById(
-            "userPasswordInput"
-        ) as HTMLInputElement | null;
-
-
-    const passwordConfirmInput =
-
-        document.getElementById(
-            "userPasswordConfirmInput"
-        ) as HTMLInputElement | null;
-
-
-    const passwordSectionTitle =
-
-        document.getElementById(
-            "userPasswordSectionTitle"
-        );
-
-
-    const passwordSectionDescription =
-
-        document.getElementById(
-            "userPasswordSectionDescription"
-        );
-
-
-    const credentialStatus =
-
-        document.getElementById(
-            "userCredentialStatus"
-        );
-
-
-    clearEditorMessage();
-
-
-    if(
-
-        !backdrop
-
-        ||
-
-        !displayNameInput
-
-        ||
-
-        !usernameInput
-
-        ||
-
-        !emailInput
-
-        ||
-
-        !roleInput
-
-        ||
-
-        !activeInput
-
-        ||
-
-        !passwordInput
-
-        ||
-
-        !passwordConfirmInput
-
-    ){
-
-        return;
-
-    }
-
-
-    if(userId){
-
-        const user =
-
-            getUsers().find(
-
-                candidate =>
-                    candidate.id === userId
-
-            );
-
-
-        if(!user){
-
-            showPageMessage(
-                "The selected user could not be found.",
-                true
-            );
-
-            return;
-
-        }
-
-
-        if(title){
-
-            title.textContent =
-                "Edit User";
-
-        }
-
-
-        displayNameInput.value =
-            user.displayName;
-
-
-        usernameInput.value =
-            user.username;
-
-
-        emailInput.value =
-            user.email;
-
-
-        roleInput.value =
-            user.role;
-
-
-        activeInput.checked =
-            user.active;
-
-
-        if(activeField){
-
-            activeField.hidden =
-                false;
-
-        }
-
-
-        passwordInput.value =
-            "";
-
-
-        passwordConfirmInput.value =
-            "";
-
-
-        passwordInput.required =
+        modal.hidden =
             false;
 
-
-        passwordConfirmInput.required =
-            false;
-
-
-        if(passwordSectionTitle){
-
-            passwordSectionTitle.textContent =
-                "Reset password";
-
-        }
-
-
-        if(passwordSectionDescription){
-
-            passwordSectionDescription.textContent =
-                "Leave both fields blank to keep the current password. A reset requires a change at next sign-in.";
-
-        }
-
-
-        if(credentialStatus){
-
-            const configured =
-                hasCredential(
-                    user.id
-                );
-
-
-            const credentialState =
-                getCredentialStatus(
-                    user.id
-                );
-
-
-            credentialStatus.textContent =
-
-                !configured
-                    ? "No password configured"
-                    : (
-                        credentialState.mustChangePassword
-                            ? "Change required"
-                            : "Password configured"
-                    );
-
-
-            credentialStatus.className =
-
-                `user-credential-inline-status ${
-                    !configured
-                        ? "user-credential-inline-missing"
-                        : (
-                            credentialState.mustChangePassword
-                                ? "user-credential-inline-change-required"
-                                : "user-credential-inline-configured"
-                        )
-                }`;
-
-        }
-
-    }
-
-    else{
-
-        if(title){
-
-            title.textContent =
-                "Add User";
-
-        }
-
-
-        displayNameInput.value =
-            "";
-
-
-        usernameInput.value =
-            "";
-
-
-        emailInput.value =
-            "";
-
-
-        roleInput.value =
-            "viewer";
-
-
-        activeInput.checked =
-            true;
-
-
-        /*
-         * New users are always created active.
-         */
-        if(activeField){
-
-            activeField.hidden =
-                true;
-
-        }
-
-
-        passwordInput.value =
-            "";
-
-
-        passwordConfirmInput.value =
-            "";
-
-
-        passwordInput.required =
-            true;
-
-
-        passwordConfirmInput.required =
-            true;
-
-
-        if(passwordSectionTitle){
-
-            passwordSectionTitle.textContent =
-                "Initial password";
-
-        }
-
-
-        if(passwordSectionDescription){
-
-            passwordSectionDescription.textContent =
-                "Set a temporary password. The user must change it at first sign-in.";
-
-        }
-
-
-        if(credentialStatus){
-
-            credentialStatus.textContent =
-                "Required";
-
-
-            credentialStatus.className =
-                "user-credential-inline-status user-credential-inline-missing";
-
-        }
-
-    }
-
-
-    updateRoleDescription();
-
-
-    roleInput.onchange =
-
-        () => {
-
-            updateRoleDescription();
-
-        };
-
-
-    backdrop.removeAttribute(
-        "hidden"
-    );
-
-
-    /*
-     * Move keyboard focus into the dialog.
-     */
-    window.setTimeout(
-
-        () => {
-
-            displayNameInput.focus();
-
-        },
-
-        0
-
-    );
-
-}
-
-
-/**
- * Close user editor.
- */
-function closeUserEditor():void {
-
-    const backdrop =
-
-        document.getElementById(
-            "userEditorBackdrop"
-        );
-
-
-    if(backdrop){
-
-        backdrop.setAttribute(
-            "hidden",
-            ""
-        );
-
-    }
-
-
-    editingUserId =
-        null;
-
-
-    clearEditorMessage();
-
-}
-
-
-/**
- * Save Add/Edit form.
- */
-async function saveUserEditor():Promise<void> {
-
-    if(
-
-        !hasPermission(
-            "users.manage"
-        )
-
-    ){
-
-        showEditorMessage(
-            "You do not have permission to manage users.",
-            true
-        );
-
-        return;
-
-    }
-
-
-    const displayNameInput =
-
-        document.getElementById(
-            "userDisplayNameInput"
-        ) as HTMLInputElement | null;
-
-
-    const usernameInput =
-
-        document.getElementById(
-            "userUsernameInput"
-        ) as HTMLInputElement | null;
-
-
-    const emailInput =
-
-        document.getElementById(
-            "userEmailInput"
-        ) as HTMLInputElement | null;
-
-
-    const roleInput =
-
-        document.getElementById(
-            "userRoleInput"
-        ) as HTMLSelectElement | null;
-
-
-    const activeInput =
-
-        document.getElementById(
-            "userActiveInput"
-        ) as HTMLInputElement | null;
-
-
-    const passwordInput =
-
-        document.getElementById(
-            "userPasswordInput"
-        ) as HTMLInputElement | null;
-
-
-    const passwordConfirmInput =
-
-        document.getElementById(
-            "userPasswordConfirmInput"
-        ) as HTMLInputElement | null;
-
-
-    if(
-
-        !displayNameInput
-
-        ||
-
-        !usernameInput
-
-        ||
-
-        !emailInput
-
-        ||
-
-        !roleInput
-
-        ||
-
-        !activeInput
-
-        ||
-
-        !passwordInput
-
-        ||
-
-        !passwordConfirmInput
-
-    ){
-
-        showEditorMessage(
-            "The user form could not be read.",
-            true
-        );
-
-        return;
-
-    }
-
-
-    const role =
-
-        roleInput.value as RoleId;
-
-
-    if(
-
-        role !== "viewer"
-
-        &&
-
-        role !== "operator"
-
-        &&
-
-        role !== "administrator"
-
-    ){
-
-        showEditorMessage(
-            "Select a valid EDORI role.",
-            true
-        );
-
-        return;
-
-    }
-
-
-    const password =
-        passwordInput.value;
-
-
-    const passwordConfirmation =
-        passwordConfirmInput.value;
-
-
-    const passwordChangeRequested =
-
-        password.length > 0
-
-        ||
-
-        passwordConfirmation.length > 0;
-
-
-    if(
-        !editingUserId
-        &&
-        !passwordChangeRequested
-    ){
-
-        showEditorMessage(
-            "An initial password is required for a new user.",
-            true
-        );
-
-        return;
-
-    }
-
-
-    if(passwordChangeRequested){
-
-        if(password.length < 12){
-
-            showEditorMessage(
-                "Passwords must contain at least 12 characters.",
-                true
-            );
-
-            return;
-
-        }
-
-
-        if(password.length > 128){
-
-            showEditorMessage(
-                "Passwords cannot exceed 128 characters.",
-                true
-            );
-
-            return;
-
-        }
-
-
-        if(password !== passwordConfirmation){
-
-            showEditorMessage(
-                "The password and confirmation do not match.",
-                true
-            );
-
-            return;
-
-        }
-
-    }
-
-
-    setUserEditorSubmittingState(
-        true
-    );
-
-
-    const actor =
-        getCurrentUser();
-
-
-    try {
-
-        if(editingUserId){
-
-            const existingUser =
-
-                getUsers().find(
-
-                    user =>
-                        user.id
-                        ===
-                        editingUserId
-
-                )
-
-                ?? null;
-
-
-            const updatedUser =
-
-                updateUser(
-
-                    editingUserId,
-
-                    {
-                        displayName:
-                            displayNameInput.value,
-
-                        username:
-                            usernameInput.value,
-
-                        email:
-                            emailInput.value,
-
-                        role,
-
-                        active:
-                            activeInput.checked
-                    }
-
-                );
-
-
-            recordSecurityAuditEvent({
-
-                eventType:
-                    "user.updated",
-
-                actor:
-                    actor
-                        ? {
-                            userId:
-                                actor.id,
-
-                            username:
-                                actor.username,
-
-                            displayName:
-                                actor.displayName
-                        }
-                        : null,
-
-                target:{
-                    userId:
-                        updatedUser.id,
-
-                    username:
-                        updatedUser.username,
-
-                    displayName:
-                        updatedUser.displayName
-                },
-
-                success:
-                    true,
-
-                summary:
-                    "Administrator updated an EDORI user account."
-
-            });
-
-
-            if(
-
-                existingUser
-
-                &&
-
-                existingUser.role
-                !==
-                updatedUser.role
-
-            ){
-
-                recordSecurityAuditEvent({
-
-                    eventType:
-                        "user.role.changed",
-
-                    actor:
-                        actor
-                            ? {
-                                userId:
-                                    actor.id,
-
-                                username:
-                                    actor.username,
-
-                                displayName:
-                                    actor.displayName
-                            }
-                            : null,
-
-                    target:{
-                        userId:
-                            updatedUser.id,
-
-                        username:
-                            updatedUser.username,
-
-                        displayName:
-                            updatedUser.displayName
-                    },
-
-                    success:
-                        true,
-
-                    summary:
-                        "Administrator changed an EDORI user role.",
-
-                    details:{
-                        previousRole:
-                            existingUser.role,
-
-                        newRole:
-                            updatedUser.role
-                    }
-
-                });
-
-            }
-
-
-            if(
-
-                existingUser
-
-                &&
-
-                existingUser.active
-                !==
-                updatedUser.active
-
-            ){
-
-                recordSecurityAuditEvent({
-
-                    eventType:
-                        "user.status.changed",
-
-                    actor:
-                        actor
-                            ? {
-                                userId:
-                                    actor.id,
-
-                                username:
-                                    actor.username,
-
-                                displayName:
-                                    actor.displayName
-                            }
-                            : null,
-
-                    target:{
-                        userId:
-                            updatedUser.id,
-
-                        username:
-                            updatedUser.username,
-
-                        displayName:
-                            updatedUser.displayName
-                    },
-
-                    success:
-                        true,
-
-                    summary:
-                        updatedUser.active
-                            ? "Administrator activated an EDORI user."
-                            : "Administrator deactivated an EDORI user.",
-
-                    details:{
-                        active:
-                            updatedUser.active
-                    }
-
-                });
-
-            }
-
-
-            if(passwordChangeRequested){
-
-                await setPassword(
-
-                    editingUserId,
-
-                    password,
-
-                    {
-                        mustChangePassword:
-                            true
-                    }
-
-                );
-
-
-                recordSecurityAuditEvent({
-
-                    eventType:
-                        "authentication.password.reset",
-
-                    actor:
-                        actor
-                            ? {
-                                userId:
-                                    actor.id,
-
-                                username:
-                                    actor.username,
-
-                                displayName:
-                                    actor.displayName
-                            }
-                            : null,
-
-                    target:{
-                        userId:
-                            updatedUser.id,
-
-                        username:
-                            updatedUser.username,
-
-                        displayName:
-                            updatedUser.displayName
-                    },
-
-                    success:
-                        true,
-
-                    summary:
-                        "Administrator reset an EDORI user password.",
-
-                    details:{
-                        mustChangePassword:
-                            true
-                    }
-
-                });
-
-            }
-
-
-            showPageMessage(
-
-                passwordChangeRequested
-                    ? "User updated and password reset successfully."
-                    : "User updated successfully.",
-
-                false
-
-            );
-
-        }
-
-        else{
-
-            const createdUser =
-
-                createUser({
-
-                    displayName:
-                        displayNameInput.value,
-
-                    username:
-                        usernameInput.value,
-
-                    email:
-                        emailInput.value,
-
-                    role
-
-                });
-
-
-            await setPassword(
-
-                createdUser.id,
-
-                password,
-
-                {
-                    mustChangePassword:
-                        true
-                }
-
-            );
-
-
-            recordSecurityAuditEvent({
-
-                eventType:
-                    "user.created",
-
-                actor:
-                    actor
-                        ? {
-                            userId:
-                                actor.id,
-
-                            username:
-                                actor.username,
-
-                            displayName:
-                                actor.displayName
-                        }
-                        : null,
-
-                target:{
-                    userId:
-                        createdUser.id,
-
-                    username:
-                        createdUser.username,
-
-                    displayName:
-                        createdUser.displayName
-                },
-
-                success:
-                    true,
-
-                summary:
-                    "Administrator created an EDORI user account.",
-
-                details:{
-                    role:
-                        createdUser.role,
-
-                    active:
-                        createdUser.active
-                }
-
-            });
-
-
-            recordSecurityAuditEvent({
-
-                eventType:
-                    "authentication.password.reset",
-
-                actor:
-                    actor
-                        ? {
-                            userId:
-                                actor.id,
-
-                            username:
-                                actor.username,
-
-                            displayName:
-                                actor.displayName
-                        }
-                        : null,
-
-                target:{
-                    userId:
-                        createdUser.id,
-
-                    username:
-                        createdUser.username,
-
-                    displayName:
-                        createdUser.displayName
-                },
-
-                success:
-                    true,
-
-                summary:
-                    "Administrator configured a temporary password for a new EDORI user.",
-
-                details:{
-                    mustChangePassword:
-                        true
-                }
-
-            });
-
-
-            showPageMessage(
-                "User created successfully. Login credentials are configured.",
-                false
-            );
-
-        }
-
-
-        closeUserEditor();
-
-    }
-
-    catch(error){
-
-        const message =
-
-            error instanceof Error
-
-                ? error.message
-
-                : "EDORI could not save the user.";
-
-
-        showEditorMessage(
-            message,
-            true
-        );
-
-    }
-
-    finally {
-
-        setUserEditorSubmittingState(
-            false
-        );
-
     }
 
 }
 
 
-/**
- * Toggle user-editor submit controls.
- */
-function setUserEditorSubmittingState(
+function hideModal(
 
-    submitting:boolean
+    id:string
 
 ):void {
 
-    const saveButton =
-
+    const modal =
         document.getElementById(
-            "saveUserButton"
-        ) as HTMLButtonElement | null;
-
-
-    const cancelButton =
-
-        document.getElementById(
-            "cancelUserEditorButton"
-        ) as HTMLButtonElement | null;
-
-
-    const closeButton =
-
-        document.getElementById(
-            "closeUserEditorButton"
-        ) as HTMLButtonElement | null;
-
-
-    if(saveButton){
-
-        saveButton.disabled =
-            submitting;
-
-
-        saveButton.textContent =
-
-            submitting
-                ? "Saving..."
-                : "Save User";
-
-    }
-
-
-    if(cancelButton){
-
-        cancelButton.disabled =
-            submitting;
-
-    }
-
-
-    if(closeButton){
-
-        closeButton.disabled =
-            submitting;
-
-    }
-
-}
-
-
-/**
- * Update role-description help text.
- */
-function updateRoleDescription():void {
-
-    const roleInput =
-
-        document.getElementById(
-            "userRoleInput"
-        ) as HTMLSelectElement | null;
-
-
-    const description =
-
-        document.getElementById(
-            "userRoleDescription"
+            id
         );
 
 
-    if(
+    if(modal){
 
-        !roleInput
-
-        ||
-
-        !description
-
-    ){
-
-        return;
+        modal.hidden =
+            true;
 
     }
-
-
-    const role =
-
-        roleInput.value as RoleId;
-
-
-    const definition =
-
-        ROLE_DEFINITIONS[
-            role
-        ];
-
-
-    if(!definition){
-
-        description.textContent =
-            "";
-
-        return;
-
-    }
-
-
-    description.textContent =
-
-        definition.description;
 
 }
 
 
-/**
- * Show page-level feedback.
- */
 function showPageMessage(
 
     message:string,
@@ -2819,9 +1532,6 @@ function showPageMessage(
 }
 
 
-/**
- * Show editor validation/error feedback.
- */
 function showEditorMessage(
 
     message:string,
@@ -2849,203 +1559,205 @@ function showEditorMessage(
 
 
     element.classList.toggle(
-        "user-editor-message-error",
+        "user-management-message-error",
         error
     );
 
 }
 
 
-/**
- * Clear modal message.
- */
-function clearEditorMessage():void {
+function getInputValue(
 
-    const element =
-
-        document.getElementById(
-            "userEditorMessage"
-        );
-
-
-    if(!element){
-
-        return;
-
-    }
-
-
-    element.textContent =
-        "";
-
-
-    element.classList.remove(
-        "user-editor-message-error"
-    );
-
-}
-
-
-/**
- * Render permission-denied page.
- */
-function renderAccessDenied():string {
-
-    return `
-
-        <section class="user-management">
-
-            <div class="user-management-header">
-
-                <div>
-
-                    <span class="application-page-eyebrow">
-                        Administration
-                    </span>
-
-                    <h2>
-                        User Management
-                    </h2>
-
-                </div>
-
-            </div>
-
-
-            <div class="user-management-access-denied">
-
-                <h3>
-                    Access Restricted
-                </h3>
-
-                <p>
-                    Your EDORI role does not include permission
-                    to manage application users.
-                </p>
-
-            </div>
-
-        </section>
-
-    `;
-
-}
-
-
-/**
- * Return initials for avatar rendering.
- */
-function getUserInitials(
-
-    displayName:string
+    id:string
 
 ):string {
-
-    const parts =
-
-        displayName
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean);
-
-
-    if(parts.length === 0){
-
-        return "?";
-
-    }
-
-
-    if(parts.length === 1){
-
-        return parts[0]
-            ?.substring(
-                0,
-                2
-            )
-            .toUpperCase()
-
-            ?? "?";
-
-    }
-
-
-    const first =
-
-        parts[0]?.charAt(0)
-
-        ?? "";
-
-
-    const last =
-
-        parts[
-            parts.length - 1
-        ]?.charAt(0)
-
-        ?? "";
-
 
     return (
 
-        first
-        +
-        last
+        document.getElementById(
+            id
+        ) as HTMLInputElement | null
 
-    ).toUpperCase();
+    )?.value.trim()
+    ?? "";
 
 }
 
 
-/**
- * Human-readable date/time.
- */
-function formatDateTime(
+function getCheckboxValue(
 
-    value:string
+    id:string
 
-):string {
+):boolean {
 
-    const date =
+    return (
 
-        new Date(
-            value
-        );
+        document.getElementById(
+            id
+        ) as HTMLInputElement | null
+
+    )?.checked
+    ?? false;
+
+}
+
+
+function getRoleValue(
+
+    id:string
+
+):RoleId {
+
+    const value =
+
+        (
+            document.getElementById(
+                id
+            ) as HTMLSelectElement | null
+        )?.value;
 
 
     if(
 
-        Number.isNaN(
-            date.getTime()
-        )
+        value === "administrator"
+
+        ||
+
+        value === "operator"
+
+        ||
+
+        value === "viewer"
 
     ){
 
-        return "Unknown";
+        return value;
 
     }
 
 
-    return date.toLocaleString(
-
-        undefined,
-
-        {
-            dateStyle:
-                "medium",
-
-            timeStyle:
-                "short"
-        }
-
-    );
+    return "viewer";
 
 }
 
 
-/**
- * Basic HTML encoding for persisted user-entered text.
- */
+function setInput(
+
+    id:string,
+
+    value:string
+
+):void {
+
+    const element =
+
+        document.getElementById(
+            id
+        ) as HTMLInputElement | null;
+
+
+    if(element){
+
+        element.value =
+            value;
+
+    }
+
+}
+
+
+function setSelect(
+
+    id:string,
+
+    value:string
+
+):void {
+
+    const element =
+
+        document.getElementById(
+            id
+        ) as HTMLSelectElement | null;
+
+
+    if(element){
+
+        element.value =
+            value;
+
+    }
+
+}
+
+
+function setCheckbox(
+
+    id:string,
+
+    value:boolean
+
+):void {
+
+    const element =
+
+        document.getElementById(
+            id
+        ) as HTMLInputElement | null;
+
+
+    if(element){
+
+        element.checked =
+            value;
+
+    }
+
+}
+
+
+function setText(
+
+    id:string,
+
+    value:string
+
+):void {
+
+    const element =
+
+        document.getElementById(
+            id
+        );
+
+
+    if(element){
+
+        element.textContent =
+            value;
+
+    }
+
+}
+
+
+function getErrorMessage(
+
+    error:unknown,
+
+    fallback:string
+
+):string {
+
+    return error instanceof Error
+
+        ? error.message
+
+        : fallback;
+
+}
+
+
 function escapeHtml(
 
     value:string
@@ -3053,30 +1765,23 @@ function escapeHtml(
 ):string {
 
     return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
 
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
+}
 
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
 
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
+function escapeAttribute(
 
-        .replaceAll(
-            "\"",
-            "&quot;"
-        )
+    value:string
 
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
+):string {
+
+    return escapeHtml(
+        value
+    );
 
 }

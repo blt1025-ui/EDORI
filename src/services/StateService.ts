@@ -31,39 +31,62 @@ import type {
 from "../types/SituationAssessment";
 
 
+import {
+
+    clearServerCurrentState,
+    loadServerCurrentState,
+    saveServerCurrentState
+
+}
+
+from "./CurrentOperationalStateApiService";
+
+
+import {
+
+    subscribe
+
+}
+
+from "./EventService";
+
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
 /*
  * =====================================================
- * Storage configuration
+ * Server persistence configuration
  * =====================================================
  */
-
-const STATE_STORAGE_KEY =
-
-    "edori_current_assessment";
-
 
 /**
  * Version 3 corresponds to the Version 2.1 Hospital
  * Readiness SituationAssessment structure.
- *
- * Earlier state schemas are intentionally not
- * automatically migrated because they do not contain
- * the historical acute-care baseline and projected
- * bed-balance fields required by Version 2.1.
  */
 const STATE_STORAGE_VERSION = 3;
 
 
 /**
- * Browser-storage wrapper.
+ * Previous browser-persistent state key.
+ *
+ * This is retained only so Phase 13B can remove obsolete
+ * local state after PostgreSQL becomes authoritative.
  */
-interface StoredStateEnvelope {
+const LEGACY_STATE_STORAGE_KEY =
 
-    version:number;
+    "edori_current_assessment";
 
-    assessment:SituationAssessment;
 
-}
+let serverStateInitialized = false;
+
+let serverStateInitializationInProgress = false;
 
 
 /*
@@ -71,6 +94,7 @@ interface StoredStateEnvelope {
  * Default state
  * =====================================================
  */
+
 
 /**
  * Default state used before the first completed
@@ -201,7 +225,30 @@ const DEFAULT_STATE:SituationAssessment = {
  */
 let state:SituationAssessment =
 
-    loadStoredState();
+    cloneAssessment(
+        DEFAULT_STATE
+    );
+
+
+clearLegacyStateStorage();
+
+
+/**
+ * AuthenticationService publishes USERS_CHANGED when the
+ * authenticated server identity is established or changes.
+ * At that point PostgreSQL can safely become authoritative.
+ */
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    () => {
+
+        void initializeServerCurrentState();
+
+    }
+
+);
 
 
 /*
@@ -277,7 +324,9 @@ export function updateState(
     );
 
 
-    persistState();
+    void persistCurrentStateToServer(
+        state
+    );
 
 }
 
@@ -318,7 +367,9 @@ export function setState(
     );
 
 
-    persistState();
+    void persistCurrentStateToServer(
+        state
+    );
 
 }
 
@@ -375,26 +426,20 @@ void {
     );
 
 
-    try {
+    void clearServerCurrentState()
+        .catch(
+            error => {
 
-        localStorage.removeItem(
+                console.error(
 
-            STATE_STORAGE_KEY
+                    "Unable to clear the PostgreSQL Hospital Readiness current state:",
 
+                    error
+
+                );
+
+            }
         );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to clear the stored Hospital Readiness assessment:",
-
-            error
-
-        );
-
-    }
 
 }
 
@@ -466,202 +511,182 @@ export function getStateServiceStatus():{
 
 /*
  * =====================================================
- * Persistence
+ * PostgreSQL persistence
  * =====================================================
  */
 
 /**
- * Persist the committed state.
+ * Load the authoritative current assessment from
+ * PostgreSQL after authentication is established.
  */
-function persistState():
+export async function initializeServerCurrentState():
 
-void {
+Promise<void> {
 
-    const envelope:StoredStateEnvelope = {
+    if(
 
-        version:
-            STATE_STORAGE_VERSION,
+        serverStateInitialized
 
-        assessment:
-            cloneAssessment(
+        ||
 
-                state
+        serverStateInitializationInProgress
 
-            )
+    ){
 
-    };
+        return;
+
+    }
+
+
+    serverStateInitializationInProgress = true;
 
 
     try {
 
-        localStorage.setItem(
+        const serverState =
 
-            STATE_STORAGE_KEY,
-
-            JSON.stringify(
-
-                envelope
-
-            )
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to save the current Hospital Readiness assessment:",
-
-            error
-
-        );
+            await loadServerCurrentState();
 
 
-        throw new Error(
+        if(!serverState){
 
-            "The Hospital Readiness assessment could not be saved to browser storage."
-
-        );
-
-    }
-
-}
-
-
-/**
- * Restore and validate the committed assessment.
- */
-function loadStoredState():
-
-SituationAssessment {
-
-    try {
-
-        const stored =
-
-            localStorage.getItem(
-
-                STATE_STORAGE_KEY
-
-            );
-
-
-        if(!stored){
-
-            return cloneAssessment(
-
+            state = cloneAssessment(
                 DEFAULT_STATE
-
             );
+
+            serverStateInitialized = true;
+
+            return;
 
         }
 
 
-        const parsed =
-
-            JSON.parse(
-
-                stored
-
-            ) as unknown;
-
-
-        const storedAssessment =
-
-            extractStoredAssessment(
-
-                parsed
-
-            );
-
-
-        if(!storedAssessment){
-
-            /*
-             * This commonly occurs after upgrading
-             * from Version 1 to Version 2.
-             */
-
-            localStorage.removeItem(
-
-                STATE_STORAGE_KEY
-
-            );
-
-
-            return cloneAssessment(
-
-                DEFAULT_STATE
-
-            );
-
-        }
-
-
-        const normalizedAssessment =
+        const normalizedState =
 
             normalizeAssessment(
-
-                storedAssessment
-
+                serverState.assessment
             );
 
 
-        if(!normalizedAssessment){
+        if(!normalizedState){
 
             throw new Error(
 
-                "Stored Hospital Readiness assessment contains invalid values."
+                "The PostgreSQL current Hospital Readiness assessment contains invalid values."
 
             );
 
         }
 
 
-        return cloneAssessment(
+        state = cloneAssessment(
+            normalizedState
+        );
 
-            normalizedAssessment
+
+        serverStateInitialized = true;
+
+    }
+    catch(error){
+
+        /*
+         * A temporary 401 before authentication completes,
+         * or a transient API failure, must not crash EDORI.
+         * A later USERS_CHANGED event can retry.
+         */
+        console.warn(
+
+            "Unable to load the PostgreSQL Hospital Readiness current state:",
+
+            error
 
         );
+
+    }
+    finally {
+
+        serverStateInitializationInProgress = false;
+
+    }
+
+}
+
+
+/**
+ * Persist one validated committed assessment through the
+ * authenticated current-state API.
+ */
+async function persistCurrentStateToServer(
+
+    assessment:SituationAssessment
+
+):Promise<void> {
+
+    try {
+
+        const serverState =
+
+            await saveServerCurrentState(
+
+                cloneAssessment(
+                    assessment
+                ),
+
+                STATE_STORAGE_VERSION
+
+            );
+
+
+        const normalizedState =
+
+            normalizeAssessment(
+                serverState.assessment
+            );
+
+
+        if(!normalizedState){
+
+            throw new Error(
+
+                "The server returned an invalid Hospital Readiness current state."
+
+            );
+
+        }
+
+
+        /*
+         * Do not allow an older asynchronous response to
+         * overwrite a newer assessment already committed
+         * locally.
+         */
+        if(
+
+            state.assessmentTime
+
+            ===
+
+            assessment.assessmentTime
+
+        ){
+
+            state = cloneAssessment(
+                normalizedState
+            );
+
+        }
+
+
+        serverStateInitialized = true;
 
     }
     catch(error){
 
         console.error(
 
-            "Unable to restore the current Hospital Readiness assessment:",
+            "Unable to save the current Hospital Readiness assessment to PostgreSQL:",
 
             error
-
-        );
-
-
-        try {
-
-            localStorage.removeItem(
-
-                STATE_STORAGE_KEY
-
-            );
-
-        }
-        catch(storageError){
-
-            console.error(
-
-                "Unable to remove invalid Hospital Readiness browser state:",
-
-                storageError
-
-            );
-
-        }
-
-
-        return cloneAssessment(
-
-            DEFAULT_STATE
 
         );
 
@@ -671,78 +696,30 @@ SituationAssessment {
 
 
 /**
- * Extract a Version 2.1 stored assessment.
- *
- * Version 1 state is intentionally rejected because
- * the previous model does not contain enough
- * information to safely reconstruct:
- *
- * - separate acute-care capacity;
- * - separate critical-care capacity;
- * - known hospital inflow;
- * - four-hour historical hospital flow.
+ * Remove obsolete browser-persistent current state.
  */
-function extractStoredAssessment(
+function clearLegacyStateStorage():
 
-    value:unknown
+void {
 
-):unknown {
+    try {
 
-    if(
-
-        typeof value !== "object"
-
-        ||
-
-        value === null
-
-    ){
-
-        return null;
+        localStorage.removeItem(
+            LEGACY_STATE_STORAGE_KEY
+        );
 
     }
+    catch(error){
 
+        console.warn(
 
-    const candidate = value as {
+            "Unable to remove legacy Hospital Readiness browser state:",
 
-        version?:unknown;
+            error
 
-        assessment?:unknown;
-
-    };
-
-
-    if(
-
-        typeof candidate.version !== "number"
-
-        ||
-
-        candidate.assessment === undefined
-
-    ){
-
-        return null;
+        );
 
     }
-
-
-    if(
-
-        candidate.version
-
-        !==
-
-        STATE_STORAGE_VERSION
-
-    ){
-
-        return null;
-
-    }
-
-
-    return candidate.assessment;
 
 }
 

@@ -11,7 +11,9 @@
     "server:build": "tsc -p server/tsconfig.json",
     "server:start": "node server/dist/server.js",
     "db:migrate": "tsx server/src/database/migrate.ts",
-    "db:verify": "tsx server/src/database/verifySchema.ts"
+    "db:verify": "tsx server/src/database/verifySchema.ts",
+    "auth:bootstrap": "tsx server/src/auth/bootstrapAdministrator.ts",
+    "auth:verify": "tsx server/src/auth/verifyUsers.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

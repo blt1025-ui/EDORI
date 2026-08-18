@@ -24157,3 +24157,571 @@ small {
 .edori-session-warning-dialog .button {
     min-width:170px;
 }
+
+/* =========================================================
+   EDORI USER MANAGEMENT
+   Visual refresh
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   Main section
+   --------------------------------------------------------- */
+
+.user-management {
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    width:100%;
+}
+
+.user-management-header {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:24px;
+}
+
+.user-management-header > div:first-child {
+    min-width:0;
+}
+
+.user-management-header h2 {
+    margin:3px 0 4px;
+    font-size:25px;
+    line-height:1.15;
+    font-weight:800;
+    color:#0f172a;
+    letter-spacing:-0.02em;
+}
+
+.user-management-header p {
+    margin:0;
+    max-width:760px;
+    color:#64748b;
+    font-size:13px;
+    line-height:1.55;
+}
+
+.user-management-header-actions {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    flex-shrink:0;
+}
+
+
+/* ---------------------------------------------------------
+   User management buttons
+   --------------------------------------------------------- */
+
+.user-management .button {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:36px;
+    padding:8px 14px;
+    border:1px solid transparent;
+    border-radius:8px;
+    font-family:inherit;
+    font-size:11px;
+    font-weight:800;
+    line-height:1;
+    cursor:pointer;
+    transition:
+        background-color .15s ease,
+        border-color .15s ease,
+        box-shadow .15s ease,
+        transform .15s ease;
+}
+
+.user-management .button:hover {
+    transform:translateY(-1px);
+}
+
+.user-management .button:focus-visible {
+    outline:3px solid rgba(37,99,235,.18);
+    outline-offset:2px;
+}
+
+.user-management .button-primary {
+    background:#2563eb;
+    border-color:#2563eb;
+    color:#ffffff;
+    box-shadow:0 4px 10px rgba(37,99,235,.18);
+}
+
+.user-management .button-primary:hover {
+    background:#1d4ed8;
+    border-color:#1d4ed8;
+}
+
+.user-management .button-secondary {
+    background:#ffffff;
+    border-color:#cbd5e1;
+    color:#334155;
+}
+
+.user-management .button-secondary:hover {
+    background:#f8fafc;
+    border-color:#94a3b8;
+}
+
+
+/* ---------------------------------------------------------
+   Centralized authentication notice
+   --------------------------------------------------------- */
+
+.user-management-notice {
+    display:flex;
+    align-items:flex-start;
+    gap:14px;
+    padding:14px 16px;
+    border:1px solid #bfdbfe;
+    border-radius:10px;
+    background:#eff6ff;
+}
+
+.user-management-notice strong {
+    flex-shrink:0;
+    color:#1d4ed8;
+    font-size:11px;
+    font-weight:800;
+}
+
+.user-management-notice span {
+    color:#475569;
+    font-size:11px;
+    line-height:1.55;
+}
+
+
+/* ---------------------------------------------------------
+   Search and filters
+   --------------------------------------------------------- */
+
+.user-management-toolbar {
+    display:grid;
+    grid-template-columns:minmax(260px,1fr) 200px 200px;
+    gap:14px;
+    align-items:end;
+}
+
+.user-management-search,
+.user-management-filter {
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.user-management-search label,
+.user-management-filter label {
+    color:#475569;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
+
+.user-management-search input,
+.user-management-filter select {
+    width:100%;
+    min-height:40px;
+    padding:8px 11px;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    background:#ffffff;
+    color:#0f172a;
+    font-family:inherit;
+    font-size:12px;
+    transition:
+        border-color .15s ease,
+        box-shadow .15s ease;
+}
+
+.user-management-search input::placeholder {
+    color:#94a3b8;
+}
+
+.user-management-search input:focus,
+.user-management-filter select:focus {
+    border-color:#60a5fa;
+    outline:none;
+    box-shadow:0 0 0 3px rgba(59,130,246,.12);
+}
+
+
+/* ---------------------------------------------------------
+   Summary strip
+   --------------------------------------------------------- */
+
+.user-directory-summary {
+    display:flex;
+    align-items:center;
+    min-height:40px;
+    padding:10px 14px;
+    border:1px solid #e2e8f0;
+    border-radius:9px;
+    background:#f8fafc;
+    color:#475569;
+    font-size:10px;
+    font-weight:700;
+}
+
+
+/* ---------------------------------------------------------
+   Directory card and table
+   --------------------------------------------------------- */
+
+.user-directory-table-container {
+    overflow:hidden;
+    width:100%;
+    border:1px solid #e2e8f0;
+    border-radius:12px;
+    background:#ffffff;
+    box-shadow:0 1px 3px rgba(15,23,42,.04);
+}
+
+.user-directory-table {
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    table-layout:auto;
+}
+
+.user-directory-table thead {
+    background:#f8fafc;
+}
+
+.user-directory-table th {
+    padding:11px 14px;
+    border-bottom:1px solid #e2e8f0;
+    color:#64748b;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.07em;
+    text-align:left;
+    text-transform:uppercase;
+    white-space:nowrap;
+}
+
+.user-directory-table td {
+    padding:14px;
+    border-bottom:1px solid #eef2f7;
+    color:#334155;
+    font-size:11px;
+    vertical-align:middle;
+}
+
+.user-directory-table tbody tr:last-child td {
+    border-bottom:0;
+}
+
+.user-directory-table tbody tr {
+    transition:background-color .15s ease;
+}
+
+.user-directory-table tbody tr:hover {
+    background:#fbfdff;
+}
+
+
+/* ---------------------------------------------------------
+   User identity cell
+   --------------------------------------------------------- */
+
+.user-directory-identity {
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    min-width:170px;
+}
+
+.user-directory-identity strong {
+    color:#0f172a;
+    font-size:12px;
+    font-weight:800;
+    line-height:1.3;
+}
+
+.user-directory-identity span {
+    color:#64748b;
+    font-size:10px;
+}
+
+.user-directory-identity small {
+    display:inline-flex;
+    align-items:center;
+    width:max-content;
+    margin-top:3px;
+    padding:3px 7px;
+    border-radius:999px;
+    background:#dbeafe;
+    color:#1d4ed8;
+    font-size:8px;
+    font-weight:900;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+}
+
+
+/* ---------------------------------------------------------
+   Status badge
+   --------------------------------------------------------- */
+
+.user-status-badge {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:58px;
+    padding:5px 9px;
+    border-radius:999px;
+    font-size:8px;
+    font-weight:900;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+}
+
+.user-status-active {
+    background:#dcfce7;
+    color:#166534;
+}
+
+.user-status-inactive {
+    background:#e2e8f0;
+    color:#475569;
+}
+
+
+/* ---------------------------------------------------------
+   Row actions
+   --------------------------------------------------------- */
+
+.user-directory-actions {
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:7px;
+}
+
+.user-directory-actions .button {
+    min-height:31px;
+    padding:6px 10px;
+    font-size:9px;
+}
+
+
+/* ---------------------------------------------------------
+   Messages
+   --------------------------------------------------------- */
+
+.user-management-message {
+    min-height:0;
+    color:#475569;
+    font-size:10px;
+    line-height:1.5;
+}
+
+.user-management-message:empty {
+    display:none;
+}
+
+.user-management-message-success:not(:empty) {
+    display:block;
+    padding:10px 12px;
+    border:1px solid #bbf7d0;
+    border-radius:8px;
+    background:#f0fdf4;
+    color:#166534;
+}
+
+.user-management-message-error:not(:empty) {
+    display:block;
+    padding:10px 12px;
+    border:1px solid #fecaca;
+    border-radius:8px;
+    background:#fef2f2;
+    color:#b91c1c;
+}
+
+
+/* ---------------------------------------------------------
+   Empty state
+   --------------------------------------------------------- */
+
+.user-management-empty {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:130px;
+    padding:30px;
+    color:#64748b;
+    font-size:11px;
+    text-align:center;
+}
+
+
+/* ---------------------------------------------------------
+   User editor / password reset modal
+   --------------------------------------------------------- */
+
+.user-editor-modal {
+    position:fixed;
+    inset:0;
+    z-index:12000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:22px;
+    background:rgba(15,23,42,.58);
+    backdrop-filter:blur(2px);
+}
+
+.user-editor-modal[hidden] {
+    display:none !important;
+}
+
+.user-editor-dialog {
+    width:min(640px,100%);
+    max-height:90vh;
+    overflow:auto;
+    padding:26px;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    background:#ffffff;
+    box-shadow:0 28px 80px rgba(15,23,42,.30);
+}
+
+.user-editor-dialog h3 {
+    margin:0 0 5px;
+    color:#0f172a;
+    font-size:20px;
+    font-weight:800;
+}
+
+.user-editor-dialog > p {
+    margin:0 0 18px;
+    color:#64748b;
+    font-size:11px;
+}
+
+.user-editor-grid {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:15px;
+    margin-top:18px;
+}
+
+.user-editor-field {
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.user-editor-field > span,
+.user-editor-checkbox > span {
+    color:#475569;
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.user-editor-field input,
+.user-editor-field select {
+    width:100%;
+    min-height:40px;
+    padding:8px 10px;
+    border:1px solid #cbd5e1;
+    border-radius:8px;
+    background:#ffffff;
+    color:#0f172a;
+    font-family:inherit;
+    font-size:11px;
+}
+
+.user-editor-field input:focus,
+.user-editor-field select:focus {
+    border-color:#60a5fa;
+    outline:none;
+    box-shadow:0 0 0 3px rgba(59,130,246,.12);
+}
+
+.user-editor-field small {
+    color:#64748b;
+    font-size:8px;
+    line-height:1.45;
+}
+
+.user-editor-checkbox {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    align-self:center;
+    margin-top:22px;
+}
+
+.user-editor-checkbox input {
+    width:16px;
+    height:16px;
+}
+
+.user-editor-actions {
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:22px;
+    padding-top:18px;
+    border-top:1px solid #e2e8f0;
+}
+
+
+/* ---------------------------------------------------------
+   Responsive
+   --------------------------------------------------------- */
+
+@media(max-width:1000px) {
+
+    .user-management-toolbar {
+        grid-template-columns:1fr 1fr;
+    }
+
+    .user-management-search {
+        grid-column:1 / -1;
+    }
+
+}
+
+
+@media(max-width:760px) {
+
+    .user-management-header {
+        flex-direction:column;
+    }
+
+    .user-management-header-actions {
+        width:100%;
+        justify-content:flex-start;
+    }
+
+    .user-management-toolbar {
+        grid-template-columns:1fr;
+    }
+
+    .user-management-search {
+        grid-column:auto;
+    }
+
+    .user-directory-table-container {
+        overflow-x:auto;
+    }
+
+    .user-directory-table {
+        min-width:760px;
+    }
+
+    .user-editor-grid {
+        grid-template-columns:1fr;
+    }
+
+}

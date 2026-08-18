@@ -16,6 +16,42 @@ import {
 from "./database/database.js";
 
 
+import {
+
+    assessmentSnapshotRouter
+
+}
+
+from "./routes/AssessmentSnapshotRoutes.js";
+
+
+import {
+
+    currentOperationalStateRouter
+
+}
+
+from "./routes/CurrentOperationalStateRoutes.js";
+
+
+import {
+
+    authRouter
+
+}
+
+from "./routes/AuthRoutes.js";
+
+
+import {
+
+    adminUserRouter
+
+}
+
+from "./routes/AdminUserRoutes.js";
+
+
 /**
  * Create and configure the EDORI API.
  */
@@ -44,6 +80,54 @@ export function createApp() {
 
 
     /**
+     * Authentication API.
+     */
+    app.use(
+
+        "/api/auth",
+
+        authRouter
+
+    );
+
+
+    /**
+     * Administrator user-management API.
+     */
+    app.use(
+
+        "/api/admin/users",
+
+        adminUserRouter
+
+    );
+
+
+    /**
+     * Completed Hospital Readiness assessment history.
+     */
+    app.use(
+
+        "/api/assessments",
+
+        assessmentSnapshotRouter
+
+    );
+
+
+    /**
+     * Shared current Hospital Readiness operational state.
+     */
+    app.use(
+
+        "/api/state",
+
+        currentOperationalStateRouter
+
+    );
+
+
+    /**
      * API + PostgreSQL health endpoint.
      */
     app.get(
@@ -57,7 +141,13 @@ export function createApp() {
                 await checkDatabaseConnection();
 
 
-            const responseBody = {
+            response.status(
+
+                database.connected
+                    ? 200
+                    : 503
+
+            ).json({
 
                 status:
                     database.connected
@@ -79,20 +169,7 @@ export function createApp() {
                     database.databaseTime
                     ?? null
 
-            };
-
-
-            response.status(
-
-                database.connected
-                    ? 200
-                    : 503
-
-            ).json(
-
-                responseBody
-
-            );
+            });
 
         }
 
@@ -100,7 +177,7 @@ export function createApp() {
 
 
     /**
-     * Unknown API routes return JSON rather than HTML.
+     * Unknown API routes return JSON.
      */
     app.use(
 
@@ -115,6 +192,42 @@ export function createApp() {
 
                 message:
                     "The requested EDORI API endpoint does not exist."
+
+            });
+
+        }
+
+    );
+
+
+    /**
+     * Final API error handler.
+     */
+    app.use(
+
+        (
+            error:unknown,
+            _request:express.Request,
+            response:express.Response,
+            _next:express.NextFunction
+        ) => {
+
+            console.error(
+
+                "Unhandled EDORI API error:",
+
+                error
+
+            );
+
+
+            response.status(500).json({
+
+                error:
+                    "internal_server_error",
+
+                message:
+                    "EDORI could not complete the request."
 
             });
 

@@ -1,5 +1,34 @@
-import { defineConfig } from "vite";
+import {
+
+    defineConfig
+
+}
+
+from "vite";
+
 
 export default defineConfig({
-    base: "/EDORI/"
+
+    base:
+        "/EDORI/",
+
+
+    server:{
+
+        proxy:{
+
+            "/api":{
+
+                target:
+                    "http://localhost:3001",
+
+                changeOrigin:
+                    true
+
+            }
+
+        }
+
+    }
+
 });

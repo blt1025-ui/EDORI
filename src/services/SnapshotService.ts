@@ -9,6 +9,16 @@
  */
 
 import { APP_EVENTS } from "../config/appEvents";
+
+import {
+    clearServerSnapshots,
+    loadServerSnapshots,
+    saveServerSnapshot
+} from "./AssessmentSnapshotApiService";
+
+import {
+    subscribe
+} from "./EventService";
 import { emit } from "./EventService";
 import type { OperationalState } from "../config/operationalStates";
 import type { OperationalStateTitle } from "../types/OperationalStateTitle";
@@ -17,11 +27,35 @@ import {
 } from "../types/EdoriSnapshot";
 import type { EdoriSnapshot } from "../types/EdoriSnapshot";
 
-const SNAPSHOT_STORAGE_KEY = "edori_snapshots_v2";
+const LEGACY_SNAPSHOT_STORAGE_KEY = "edori_snapshots_v2";
 const MAXIMUM_SNAPSHOT_COUNT = 500;
 const DUPLICATE_TIME_WINDOW_MILLISECONDS = 5_000;
 
-let snapshots:EdoriSnapshot[] = restoreSnapshots();
+let snapshots:EdoriSnapshot[] = [];
+
+let serverHistoryInitialized = false;
+let serverHistoryInitializationInProgress = false;
+
+
+/**
+ * Remove obsolete browser-persistent history from the old
+ * localStorage implementation.
+ */
+clearLegacySnapshotStorage();
+
+
+/**
+ * AuthenticationService publishes USERS_CHANGED after the
+ * server session has been restored or a login succeeds.
+ * That gives SnapshotService a safe point to load
+ * PostgreSQL history without changing main.ts.
+ */
+subscribe(
+    APP_EVENTS.USERS_CHANGED,
+    () => {
+        void initializeServerSnapshotHistory();
+    }
+);
 
 export function getSnapshots():EdoriSnapshot[] {
     return snapshots
@@ -67,8 +101,18 @@ export function saveSnapshot(
     snapshots.sort(compareSnapshotsChronologically);
 
     trimSnapshotHistory();
-    persistSnapshots();
     publishHistoryChanged();
+
+
+    /*
+     * Preserve the existing synchronous SnapshotService
+     * contract while PostgreSQL persistence occurs through
+     * the authenticated API.
+     */
+    void persistSnapshotToServer(
+        normalizedSnapshot
+    );
+
 
     return true;
 }
@@ -117,57 +161,67 @@ export function replaceSnapshots(
     snapshots = removeDuplicateSnapshots(normalizedSnapshots);
 
     trimSnapshotHistory();
-    persistSnapshots();
     publishHistoryChanged();
+
+
+    /*
+     * Restore workflows replace the complete persisted
+     * history. The server API remains authoritative.
+     */
+    void replaceServerSnapshotHistory(
+        snapshots
+    );
 }
 
 export function clearSnapshots():void {
     snapshots = [];
 
-    try {
-        localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
-    }
-    catch(error){
-        console.error(
-            "SnapshotService could not remove saved Hospital Readiness history.",
-            error
-        );
-    }
-
     publishHistoryChanged();
+
+
+    void clearServerSnapshots()
+        .catch(
+            error => {
+                console.error(
+                    "SnapshotService could not clear PostgreSQL Hospital Readiness history.",
+                    error
+                );
+            }
+        );
 }
 
 export function getSnapshotCount():number {
     return snapshots.length;
 }
 
-function restoreSnapshots():EdoriSnapshot[] {
-    let storedValue:string | null = null;
+/**
+ * Load the authoritative assessment history from
+ * PostgreSQL after authentication has been established.
+ */
+export async function initializeServerSnapshotHistory():
+
+Promise<void> {
+
+    if(
+        serverHistoryInitialized
+        ||
+        serverHistoryInitializationInProgress
+    ){
+        return;
+    }
+
+
+    serverHistoryInitializationInProgress = true;
+
 
     try {
-        storedValue = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
-    }
-    catch(error){
-        console.error(
-            "SnapshotService could not read saved Hospital Readiness history.",
-            error
-        );
-        return [];
-    }
+        const serverSnapshots =
+            await loadServerSnapshots(
+                MAXIMUM_SNAPSHOT_COUNT
+            );
 
-    if(!storedValue){
-        return [];
-    }
 
-    try {
-        const parsed:unknown = JSON.parse(storedValue);
-
-        if(!Array.isArray(parsed)){
-            removeCorruptedStorage();
-            return [];
-        }
-
-        const restoredSnapshots = parsed
+        const normalizedSnapshots = serverSnapshots
             .map(normalizeSnapshot)
             .filter(
                 (snapshot):snapshot is EdoriSnapshot =>
@@ -175,139 +229,150 @@ function restoreSnapshots():EdoriSnapshot[] {
             )
             .sort(compareSnapshotsChronologically);
 
-        return removeDuplicateSnapshots(restoredSnapshots)
-            .slice(-MAXIMUM_SNAPSHOT_COUNT);
+
+        snapshots =
+            removeDuplicateSnapshots(
+                normalizedSnapshots
+            );
+
+
+        trimSnapshotHistory();
+
+
+        serverHistoryInitialized = true;
+
+
+        publishHistoryChanged();
     }
     catch(error){
+        /*
+         * A 401 before login or a temporary API outage must
+         * not crash EDORI. USERS_CHANGED will provide
+         * another initialization opportunity after login.
+         */
         console.warn(
-            "SnapshotService discarded corrupted Hospital Readiness history.",
+            "SnapshotService could not load PostgreSQL Hospital Readiness history.",
             error
         );
-        removeCorruptedStorage();
-        return [];
+    }
+    finally {
+        serverHistoryInitializationInProgress = false;
     }
 }
 
-function persistSnapshots():void {
+
+/**
+ * Persist one accepted in-memory snapshot to PostgreSQL.
+ */
+async function persistSnapshotToServer(
+    snapshot:EdoriSnapshot
+):Promise<void> {
     try {
-        localStorage.setItem(
-            SNAPSHOT_STORAGE_KEY,
-            JSON.stringify(
-                snapshots.map(serializeSnapshot)
-            )
-        );
+        const result =
+            await saveServerSnapshot(
+                snapshot
+            );
+
+
+        /*
+         * The server overwrites entered-by attribution with
+         * the authenticated session identity. Replace the
+         * in-memory copy with that authoritative version.
+         */
+        const normalized =
+            normalizeSnapshot(
+                result.snapshot
+            );
+
+
+        if(normalized){
+            const index =
+                snapshots.findIndex(
+                    existing =>
+                        existing.id === normalized.id
+                );
+
+
+            if(index >= 0){
+                snapshots[index] =
+                    cloneSnapshot(
+                        normalized
+                    );
+
+
+                snapshots.sort(
+                    compareSnapshotsChronologically
+                );
+
+
+                publishHistoryChanged();
+            }
+        }
     }
     catch(error){
         console.error(
-            "SnapshotService could not persist Hospital Readiness history.",
+            "SnapshotService could not persist the completed assessment to PostgreSQL.",
             error
         );
     }
 }
 
-function serializeSnapshot(
-    snapshot:EdoriSnapshot
-):Record<string, unknown> {
-    return {
-        schemaVersion: EDORI_SNAPSHOT_SCHEMA_VERSION,
-        id: snapshot.id,
-        timestamp: new Date(snapshot.timestamp).toISOString(),
 
-        score: snapshot.score,
-        status: snapshot.status,
-        operationalState:{
-            title: snapshot.operationalState.title,
-            icon: snapshot.operationalState.icon,
-            color: snapshot.operationalState.color,
-            recommendation: snapshot.operationalState.recommendation
-        },
+/**
+ * Replace complete PostgreSQL history after an authorized
+ * history-restore operation.
+ */
+async function replaceServerSnapshotHistory(
+    replacementSnapshots:EdoriSnapshot[]
+):Promise<void> {
+    try {
+        await clearServerSnapshots();
 
-        day: snapshot.day,
-        hour: snapshot.hour,
-        forecastHours: snapshot.forecastHours,
 
-        totalEDVolume: snapshot.totalEDVolume,
-        boardedPatients: snapshot.boardedPatients,
-        esi1: snapshot.esi1,
-        esi2: snapshot.esi2,
+        for(const snapshot of replacementSnapshots){
+            await saveServerSnapshot(
+                snapshot
+            );
+        }
 
-        staffedAcuteCareBeds: snapshot.staffedAcuteCareBeds,
-        occupiedAcuteCareBeds: snapshot.occupiedAcuteCareBeds,
-        staffedCriticalCareBeds: snapshot.staffedCriticalCareBeds,
-        occupiedCriticalCareBeds: snapshot.occupiedCriticalCareBeds,
-
-        currentDirectAdmissions: snapshot.currentDirectAdmissions,
-        currentSurgicalAdmissions: snapshot.currentSurgicalAdmissions,
-        knownNonEDInflow: snapshot.knownNonEDInflow,
-        expectedNonEDInflow: snapshot.expectedNonEDInflow,
-
-        expectedEDVolume: snapshot.expectedEDVolume,
-        expectedEDBoarders: snapshot.expectedEDBoarders,
-
-        expectedStaffedAcuteCareBeds:
-            snapshot.expectedStaffedAcuteCareBeds,
-        expectedOccupiedAcuteCareBeds:
-            snapshot.expectedOccupiedAcuteCareBeds,
-        expectedAvailableAcuteCareBeds:
-            snapshot.expectedAvailableAcuteCareBeds,
-
-        expectedEDAdmissions4h: snapshot.expectedEDAdmissions4h,
-        expectedDirectAdmissions4h:
-            snapshot.expectedDirectAdmissions4h,
-        expectedSurgicalAdmissions4h:
-            snapshot.expectedSurgicalAdmissions4h,
-        expectedHospitalInflow4h:
-            snapshot.expectedHospitalInflow4h,
-        expectedInpatientDepartures4h:
-            snapshot.expectedInpatientDepartures4h,
-
-        projectedDirectAdmissions:
-            snapshot.projectedDirectAdmissions,
-        projectedSurgicalAdmissions:
-            snapshot.projectedSurgicalAdmissions,
-        projectedNewAdmissions:
-            snapshot.projectedNewAdmissions,
-        projectedTotalBedDemand:
-            snapshot.projectedTotalBedDemand,
-        historicalProjectedBedDemand4h:
-            snapshot.historicalProjectedBedDemand4h,
-
-        currentAvailableAcuteCareBeds:
-            snapshot.currentAvailableAcuteCareBeds,
-        projectedAvailableAcuteCareBeds:
-            snapshot.projectedAvailableAcuteCareBeds,
-        historicalProjectedBedBalance4h:
-            snapshot.historicalProjectedBedBalance4h,
-        projectedCapacityVariance:
-            snapshot.projectedCapacityVariance,
-
-        edPressureScore: snapshot.edPressureScore,
-        acuteCapacityScore: snapshot.acuteCapacityScore,
-        criticalCapacityScore: snapshot.criticalCapacityScore,
-        inflowScore: snapshot.inflowScore,
-        projectedCapacityScore: snapshot.projectedCapacityScore,
-
-        edVolumeScore: snapshot.edVolumeScore,
-        edBoardingScore: snapshot.edBoardingScore,
-        edAcuityScore: snapshot.edAcuityScore,
 
         /*
-         * Temporary compatibility fields.
-         *
-         * currentEDAdmissions is always zero in Version 2.1.
-         * currentHospitalInflow aliases knownNonEDInflow.
-         * projectedHospitalInflow aliases projectedNewAdmissions.
+         * Reload after the server has applied authoritative
+         * current-user attribution.
          */
-        currentEDAdmissions: snapshot.currentEDAdmissions,
-        currentHospitalInflow: snapshot.currentHospitalInflow,
-        projectedHospitalInflow: snapshot.projectedHospitalInflow,
+        serverHistoryInitialized = false;
 
-        scoreChange: snapshot.scoreChange,
-        trendDirection: snapshot.trendDirection,
-        activeTriggerIds: snapshot.activeTriggerIds,
-        activeTriggerTitles: snapshot.activeTriggerTitles
-    };
+
+        await initializeServerSnapshotHistory();
+    }
+    catch(error){
+        console.error(
+            "SnapshotService could not replace PostgreSQL Hospital Readiness history.",
+            error
+        );
+    }
 }
+
+
+/**
+ * Remove the old browser-persistent snapshot history.
+ */
+function clearLegacySnapshotStorage():void {
+    try {
+        localStorage.removeItem(
+            LEGACY_SNAPSHOT_STORAGE_KEY
+        );
+    }
+    catch(error){
+        console.warn(
+            "SnapshotService could not clear legacy browser snapshot history.",
+            error
+        );
+    }
+}
+
+
+
 
 function normalizeSnapshot(
     value:unknown
@@ -1177,18 +1242,6 @@ function createSnapshotId(
             .toString(36)
             .slice(2, 10)
     );
-}
-
-function removeCorruptedStorage():void {
-    try {
-        localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
-    }
-    catch(error){
-        console.error(
-            "SnapshotService could not remove corrupted Hospital Readiness history.",
-            error
-        );
-    }
 }
 
 function publishHistoryChanged():void {
