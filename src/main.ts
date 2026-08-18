@@ -91,6 +91,45 @@ import {
 
 from "./services/SessionSecurityService";
 
+import {
+
+    initializeServerTriggerConfiguration
+
+}
+
+from "./services/TriggerConfigurationService";
+
+import {
+
+    initializeServerSurgePlan
+
+}
+
+from "./services/SurgePlanService";
+
+import {
+
+    initializeServerResultState
+
+}
+
+from "./services/ResultService";
+
+import {
+
+    initializeServerSecurityAuditLog
+
+}
+
+from "./services/SecurityAuditService";
+
+import {
+
+    initializeServerConfiguration
+
+}
+
+from "./services/ConfigurationService";
 
 import {
 
@@ -236,6 +275,29 @@ async function initializeApplication():Promise<void> {
     try {
 
         await initializeAuthentication();
+
+
+        /*
+         * Load the shared PostgreSQL-backed EDORI model
+         * configuration before rendering the authenticated
+         * application.
+         *
+         * If no saved override exists, ConfigurationService
+         * continues using the built-in TypeScript defaults.
+         */
+       if(isAuthenticated()){
+
+    await initializeServerConfiguration();
+
+    await initializeServerTriggerConfiguration();
+
+    await initializeServerSurgePlan();
+
+    await initializeServerResultState();
+
+    await initializeServerSecurityAuditLog();
+
+}
 
 
         initializeSessionSecurity();

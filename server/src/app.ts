@@ -33,6 +33,49 @@ import {
 
 from "./routes/HistoricalExpectationRoutes.js";
 
+
+import {
+
+    modelConfigurationRouter
+
+}
+
+from "./routes/ModelConfigurationRoutes.js";
+
+import {
+
+    triggerConfigurationRouter
+
+}
+
+from "./routes/TriggerConfigurationRoutes.js";
+
+
+import {
+
+    securityAuditRouter
+
+}
+
+from "./routes/SecurityAuditRoutes.js";
+
+import {
+
+    surgePlanRouter
+
+}
+
+from "./routes/SurgePlanRoutes.js";
+
+import {
+
+    currentResultRouter
+
+}
+
+from "./routes/CurrentResultRoutes.js";
+
+
 import {
 
     currentOperationalStateRouter
@@ -122,16 +165,18 @@ export function createApp() {
 
     );
 
+
     /**
- * Shared historical expectation dataset.
- */
-app.use(
+     * Shared historical expectation dataset.
+     */
+    app.use(
 
-    "/api/historical-expectations",
+        "/api/historical-expectations",
 
-    historicalExpectationRouter
+        historicalExpectationRouter
 
-);
+    );
+
 
     /**
      * Shared current Hospital Readiness operational state.
@@ -141,6 +186,18 @@ app.use(
         "/api/state",
 
         currentOperationalStateRouter
+
+    );
+
+
+    /**
+     * Shared EDORI model configuration override.
+     */
+    app.use(
+
+        "/api/model-configuration",
+
+        modelConfigurationRouter
 
     );
 
@@ -195,7 +252,53 @@ app.use(
 
 
     /**
+ * Shared operational-trigger configuration.
+ */
+app.use(
+
+    "/api/trigger-configuration",
+
+    triggerConfigurationRouter
+
+);
+
+/**
+ * Shared Hospital Surge Plan.
+ */
+app.use(
+
+    "/api/surge-plan",
+
+    surgePlanRouter
+
+);
+
+/**
+ * Shared current Hospital Readiness result state.
+ */
+app.use(
+
+    "/api/result-state",
+
+    currentResultRouter
+
+);
+
+/**
+ * Read-only PostgreSQL security audit log.
+ */
+app.use(
+
+    "/api/security-audit",
+
+    securityAuditRouter
+
+);
+    /**
      * Unknown API routes return JSON.
+     *
+     * IMPORTANT:
+     * This must remain after every real /api route.
      */
     app.use(
 

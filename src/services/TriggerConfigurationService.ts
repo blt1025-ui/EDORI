@@ -32,6 +32,17 @@ import {
 from "./AuthorizationService";
 
 
+import {
+
+    clearServerTriggerConfiguration,
+    loadServerTriggerConfiguration,
+    saveServerTriggerConfiguration
+
+}
+
+from "./TriggerConfigurationApiService";
+
+
 
 
 import {
@@ -54,7 +65,8 @@ from "../config/operationalTriggers";
 
 import {
 
-    emit
+    emit,
+    subscribe
 
 }
 
@@ -83,14 +95,6 @@ from "../types/OperationalTrigger";
  * Persisted schema version.
  */
 const SCHEMA_VERSION = 1;
-
-
-/**
- * Browser-storage key.
- */
-const STORAGE_KEY =
-
-    "edori_trigger_configuration";
 
 
 /**
@@ -132,17 +136,42 @@ export interface TriggerConfigurationValidationResult {
 
 
 /**
- * Stored envelope.
+ * Previous workstation-local storage key.
+ *
+ * Retained only so Phase 16B can remove obsolete browser
+ * trigger configuration.
  */
-interface StoredTriggerConfiguration {
+const LEGACY_STORAGE_KEY =
 
-    schemaVersion:number;
+    "edori_trigger_configuration";
 
-    savedAt:string;
 
-    configuration:TriggerConfiguration;
+let serverTriggerConfiguration:TriggerConfiguration | null = null;
 
-}
+let serverTriggerConfigurationSavedAt:string | null = null;
+
+let serverTriggerConfigurationInitialized = false;
+
+let serverTriggerConfigurationInitializationInProgress = false;
+
+
+clearLegacyTriggerConfigurationStorage();
+
+
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    () => {
+
+        serverTriggerConfigurationInitialized = false;
+
+
+        void initializeServerTriggerConfiguration();
+
+    }
+
+);
 
 
 /**
@@ -179,7 +208,7 @@ OperationalTrigger[] {
 
     const stored =
 
-        readStoredConfiguration();
+        serverTriggerConfiguration;
 
 
     if(!stored){
@@ -193,7 +222,7 @@ OperationalTrigger[] {
 
         new Map(
 
-            stored.configuration.overrides.map(
+            stored.overrides.map(
 
                 override => [
 
@@ -286,7 +315,7 @@ export function hasTriggerConfigurationOverrides():
 
 boolean {
 
-    return readStoredConfiguration() !== null;
+    return serverTriggerConfiguration !== null;
 
 }
 
@@ -299,11 +328,7 @@ export function getTriggerConfigurationSavedAt():
 
 string | null {
 
-    return readStoredConfiguration()
-
-        ?.savedAt
-
-        ?? null;
+    return serverTriggerConfigurationSavedAt;
 
 }
 
@@ -369,18 +394,14 @@ export function saveTriggerConfiguration(
     const normalized =
 
         normalizeConfiguration(
-
             configuration
-
         );
 
 
     const validation =
 
         validateTriggerConfiguration(
-
             normalized
-
         );
 
 
@@ -391,59 +412,24 @@ export function saveTriggerConfiguration(
     }
 
 
-    const stored:StoredTriggerConfiguration = {
+    serverTriggerConfiguration =
 
-        schemaVersion:
-            SCHEMA_VERSION,
-
-        savedAt:
-            new Date().toISOString(),
-
-        configuration:
+        cloneConfiguration(
             normalized
-
-    };
-
-
-    try {
-
-        window.localStorage.setItem(
-
-            STORAGE_KEY,
-
-            JSON.stringify(
-
-                stored
-
-            )
-
-        );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "Unable to save operational trigger configuration:",
-
-            error
-
         );
 
 
-        return {
+    serverTriggerConfigurationSavedAt =
 
-            valid:
-                false,
+        new Date().toISOString();
 
-            errors:[
-                "The trigger configuration could not be saved to browser storage."
-            ]
 
-        };
+    serverTriggerConfigurationInitialized = true;
 
-    }
+
+    void persistTriggerConfigurationToServer(
+        normalized
+    );
 
 
     publishTriggerConfigurationChanged();
@@ -474,27 +460,24 @@ void {
     );
 
 
-    try {
+    serverTriggerConfiguration = null;
 
-        window.localStorage.removeItem(
+    serverTriggerConfigurationSavedAt = null;
 
-            STORAGE_KEY
+    serverTriggerConfigurationInitialized = true;
 
+
+    void clearServerTriggerConfiguration()
+        .catch(
+            error => {
+
+                console.error(
+                    "Unable to restore built-in trigger configuration in PostgreSQL:",
+                    error
+                );
+
+            }
         );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "Unable to restore built-in trigger configuration:",
-
-            error
-
-        );
-
-    }
 
 
     publishTriggerConfigurationChanged();
@@ -953,7 +936,7 @@ export function getTriggerConfigurationStorageKey():
 
 string {
 
-    return STORAGE_KEY;
+    return LEGACY_STORAGE_KEY;
 
 }
 
@@ -1068,165 +1051,198 @@ function normalizeConfiguration(
 
 
 /**
- * Read stored configuration safely.
+ * Load the authoritative optional trigger configuration
+ * from PostgreSQL after authentication has been
+ * established.
  */
-function readStoredConfiguration():
+export async function initializeServerTriggerConfiguration():
 
-StoredTriggerConfiguration | null {
+Promise<void> {
 
-    let raw:string | null = null;
+    if(
+        serverTriggerConfigurationInitialized
+        ||
+        serverTriggerConfigurationInitializationInProgress
+    ){
+
+        return;
+
+    }
+
+
+    serverTriggerConfigurationInitializationInProgress = true;
 
 
     try {
 
-        raw = window.localStorage.getItem(
+        const serverOverride =
 
-            STORAGE_KEY
-
-        );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "Unable to read operational trigger configuration:",
-
-            error
-
-        );
+            await loadServerTriggerConfiguration();
 
 
-        return null;
+        if(!serverOverride){
 
-    }
+            serverTriggerConfiguration = null;
+
+            serverTriggerConfigurationSavedAt = null;
+
+            serverTriggerConfigurationInitialized = true;
+
+            return;
+
+        }
 
 
-    if(!raw){
+        const normalized =
 
-        return null;
-
-    }
-
-
-    try {
-
-        const parsed:unknown =
-
-            JSON.parse(
-
-                raw
-
+            normalizeConfiguration(
+                serverOverride.configuration as TriggerConfiguration
             );
-
-
-        if(
-
-            !isObject(
-
-                parsed
-
-            )
-
-        ){
-
-            return null;
-
-        }
-
-
-        const candidate =
-
-            parsed as unknown as StoredTriggerConfiguration;
-
-
-        if(
-
-            candidate.schemaVersion
-
-            !==
-
-            SCHEMA_VERSION
-
-        ){
-
-            return null;
-
-        }
-
-
-        if(
-
-            typeof candidate.savedAt
-
-            !==
-
-            "string"
-
-        ){
-
-            return null;
-
-        }
 
 
         const validation =
 
             validateTriggerConfiguration(
-
-                candidate.configuration
-
+                normalized
             );
 
 
         if(!validation.valid){
 
-            console.warn(
-
-                "Saved trigger configuration is invalid. Built-in trigger behavior will be used.",
-
-                validation.errors
-
+            throw new Error(
+                validation.errors.join(
+                    " "
+                )
             );
-
-
-            return null;
 
         }
 
 
-        return {
+        serverTriggerConfiguration =
 
-            schemaVersion:
-                candidate.schemaVersion,
+            cloneConfiguration(
+                normalized
+            );
 
-            savedAt:
-                candidate.savedAt,
 
-            configuration:
-                cloneConfiguration(
+        serverTriggerConfigurationSavedAt =
 
-                    candidate.configuration
+            serverOverride.savedAt;
 
-                )
 
-        };
+        serverTriggerConfigurationInitialized = true;
+
+    }
+    catch(error){
+
+        console.warn(
+            "Unable to load the PostgreSQL trigger configuration:",
+            error
+        );
+
+    }
+    finally {
+
+        serverTriggerConfigurationInitializationInProgress = false;
 
     }
 
+}
+
+
+/**
+ * Persist one validated trigger override.
+ */
+async function persistTriggerConfigurationToServer(
+
+    configuration:TriggerConfiguration
+
+):Promise<void> {
+
+    try {
+
+        const serverOverride =
+
+            await saveServerTriggerConfiguration(
+                cloneConfiguration(
+                    configuration
+                )
+            );
+
+
+        const normalized =
+
+            normalizeConfiguration(
+                serverOverride.configuration as TriggerConfiguration
+            );
+
+
+        const validation =
+
+            validateTriggerConfiguration(
+                normalized
+            );
+
+
+        if(!validation.valid){
+
+            throw new Error(
+                validation.errors.join(
+                    " "
+                )
+            );
+
+        }
+
+
+        serverTriggerConfiguration =
+
+            cloneConfiguration(
+                normalized
+            );
+
+
+        serverTriggerConfigurationSavedAt =
+
+            serverOverride.savedAt;
+
+
+        serverTriggerConfigurationInitialized = true;
+
+    }
     catch(error){
 
         console.error(
-
-            "Unable to parse operational trigger configuration:",
-
+            "Unable to save the PostgreSQL trigger configuration:",
             error
-
         );
 
+    }
 
-        return null;
+}
+
+
+/**
+ * Remove obsolete workstation-local trigger
+ * configuration.
+ */
+function clearLegacyTriggerConfigurationStorage():
+
+void {
+
+    try {
+
+        window.localStorage.removeItem(
+            LEGACY_STORAGE_KEY
+        );
+
+    }
+    catch(error){
+
+        console.warn(
+            "Unable to remove legacy trigger configuration from browser storage:",
+            error
+        );
 
     }
 

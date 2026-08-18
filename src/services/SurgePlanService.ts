@@ -33,6 +33,17 @@ import {
 from "./AuthorizationService";
 
 
+import {
+
+    clearServerSurgePlan,
+    loadServerSurgePlan,
+    saveServerSurgePlan
+
+}
+
+from "./SurgePlanApiService";
+
+
 
 
 import {
@@ -55,7 +66,8 @@ from "../config/defaultSurgePlan";
 
 import {
 
-    emit
+    emit,
+    subscribe
 
 }
 
@@ -92,7 +104,6 @@ from "../types/OperationalRecommendation";
 
 import type {
 
-    StoredSurgePlanConfiguration,
     SurgePlanConfiguration,
     SurgePlanValidationResult
 
@@ -102,11 +113,42 @@ from "../types/SurgePlanConfiguration";
 
 
 /**
- * Browser-storage key.
+ * Previous workstation-local browser-storage key.
+ *
+ * Retained only so Phase 17B can remove obsolete surge
+ * plan storage.
  */
-const STORAGE_KEY =
+const LEGACY_STORAGE_KEY =
 
     "edori_surge_plan_configuration";
+
+
+let serverSurgePlan:SurgePlanConfiguration | null = null;
+
+let serverSurgePlanSavedAt:string | null = null;
+
+let serverSurgePlanInitialized = false;
+
+let serverSurgePlanInitializationInProgress = false;
+
+
+clearLegacySurgePlanStorage();
+
+
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    () => {
+
+        serverSurgePlanInitialized = false;
+
+
+        void initializeServerSurgePlan();
+
+    }
+
+);
 
 
 /**
@@ -154,19 +196,14 @@ OperationalRecommendationPriority[] = [
 /**
  * Return the currently effective hospital surge plan.
  *
- * Invalid or unavailable saved configuration falls
- * back safely to the built-in plan.
+ * A validated PostgreSQL-backed override is returned when
+ * present. Otherwise the built-in plan is used.
  */
 export function getSurgePlan():
 
 SurgePlanConfiguration {
 
-    const stored =
-
-        readStoredConfiguration();
-
-
-    if(!stored){
+    if(!serverSurgePlan){
 
         return getDefaultSurgePlan();
 
@@ -176,20 +213,15 @@ SurgePlanConfiguration {
     const validation =
 
         validateSurgePlan(
-
-            stored.configuration
-
+            serverSurgePlan
         );
 
 
     if(!validation.valid){
 
         console.warn(
-
             "Saved Hospital Surge Plan is invalid. Built-in defaults will be used.",
-
             validation.errors
-
         );
 
 
@@ -199,9 +231,7 @@ SurgePlanConfiguration {
 
 
     return cloneConfiguration(
-
-        stored.configuration
-
+        serverSurgePlan
     );
 
 }
@@ -213,7 +243,7 @@ SurgePlanConfiguration {
  */
 export function hasSurgePlanOverrides():boolean {
 
-    return readStoredConfiguration() !== null;
+    return serverSurgePlan !== null;
 
 }
 
@@ -225,12 +255,7 @@ export function getSurgePlanSavedAt():
 
 string | null {
 
-    const stored =
-
-        readStoredConfiguration();
-
-
-    return stored?.savedAt ?? null;
+    return serverSurgePlanSavedAt;
 
 }
 
@@ -252,18 +277,14 @@ export function saveSurgePlan(
     const normalized =
 
         normalizeConfiguration(
-
             configuration
-
         );
 
 
     const validation =
 
         validateSurgePlan(
-
             normalized
-
         );
 
 
@@ -274,61 +295,24 @@ export function saveSurgePlan(
     }
 
 
-    const stored:
+    serverSurgePlan =
 
-    StoredSurgePlanConfiguration = {
-
-        schemaVersion:
-            SURGE_PLAN_SCHEMA_VERSION,
-
-        savedAt:
-            new Date().toISOString(),
-
-        configuration:
+        cloneConfiguration(
             normalized
-
-    };
-
-
-    try {
-
-        window.localStorage.setItem(
-
-            STORAGE_KEY,
-
-            JSON.stringify(
-
-                stored
-
-            )
-
-        );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "Unable to save Hospital Surge Plan:",
-
-            error
-
         );
 
 
-        return {
+    serverSurgePlanSavedAt =
 
-            valid:
-                false,
+        new Date().toISOString();
 
-            errors:[
-                "The Hospital Surge Plan could not be saved to browser storage."
-            ]
 
-        };
+    serverSurgePlanInitialized = true;
 
-    }
+
+    void persistSurgePlanToServer(
+        normalized
+    );
 
 
     publishSurgePlanChanged();
@@ -357,27 +341,24 @@ export function restoreDefaultSurgePlan():void {
     );
 
 
-    try {
+    serverSurgePlan = null;
 
-        window.localStorage.removeItem(
+    serverSurgePlanSavedAt = null;
 
-            STORAGE_KEY
+    serverSurgePlanInitialized = true;
 
+
+    void clearServerSurgePlan()
+        .catch(
+            error => {
+
+                console.error(
+                    "Unable to restore the built-in Hospital Surge Plan in PostgreSQL:",
+                    error
+                );
+
+            }
         );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "Unable to restore the built-in Hospital Surge Plan:",
-
-            error
-
-        );
-
-    }
 
 
     publishSurgePlanChanged();
@@ -929,7 +910,7 @@ export function importSurgePlan(
  */
 export function getSurgePlanStorageKey():string {
 
-    return STORAGE_KEY;
+    return LEGACY_STORAGE_KEY;
 
 }
 
@@ -967,147 +948,198 @@ function publishSurgePlanChanged():void {
 
 
 /**
- * Read persisted configuration safely.
+ * Load the authoritative optional Hospital Surge Plan
+ * override from PostgreSQL after authentication is
+ * established.
  */
-function readStoredConfiguration():
+export async function initializeServerSurgePlan():
 
-StoredSurgePlanConfiguration | null {
+Promise<void> {
 
-    let raw:string | null = null;
+    if(
+        serverSurgePlanInitialized
+        ||
+        serverSurgePlanInitializationInProgress
+    ){
+
+        return;
+
+    }
+
+
+    serverSurgePlanInitializationInProgress = true;
 
 
     try {
 
-        raw = window.localStorage.getItem(
+        const serverOverride =
 
-            STORAGE_KEY
-
-        );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "Unable to read Hospital Surge Plan:",
-
-            error
-
-        );
+            await loadServerSurgePlan();
 
 
-        return null;
+        if(!serverOverride){
 
-    }
+            serverSurgePlan = null;
+
+            serverSurgePlanSavedAt = null;
+
+            serverSurgePlanInitialized = true;
+
+            return;
+
+        }
 
 
-    if(!raw){
+        const normalized =
 
-        return null;
-
-    }
-
-
-    try {
-
-        const parsed:unknown =
-
-            JSON.parse(
-
-                raw
-
+            normalizeConfiguration(
+                serverOverride.configuration
             );
 
 
-        if(
+        const validation =
 
-            !isObject(
-
-                parsed
-
-            )
-
-        ){
-
-            return null;
-
-        }
+            validateSurgePlan(
+                normalized
+            );
 
 
-        const candidate =
+        if(!validation.valid){
 
-            parsed as unknown as StoredSurgePlanConfiguration;
-
-
-        if(
-
-            candidate.schemaVersion
-
-            !==
-
-            SURGE_PLAN_SCHEMA_VERSION
-
-        ){
-
-            return null;
-
-        }
-
-
-        if(
-
-            typeof candidate.savedAt !== "string"
-
-        ){
-
-            return null;
-
-        }
-
-
-        if(
-
-            !candidate.configuration
-
-        ){
-
-            return null;
-
-        }
-
-
-        return {
-
-            schemaVersion:
-                candidate.schemaVersion,
-
-            savedAt:
-                candidate.savedAt,
-
-            configuration:
-                cloneConfiguration(
-
-                    candidate.configuration
-
+            throw new Error(
+                validation.errors.join(
+                    " "
                 )
+            );
 
-        };
+        }
+
+
+        serverSurgePlan =
+
+            cloneConfiguration(
+                normalized
+            );
+
+
+        serverSurgePlanSavedAt =
+
+            serverOverride.savedAt;
+
+
+        serverSurgePlanInitialized = true;
+
+    }
+    catch(error){
+
+        console.warn(
+            "Unable to load the PostgreSQL Hospital Surge Plan:",
+            error
+        );
+
+    }
+    finally {
+
+        serverSurgePlanInitializationInProgress = false;
 
     }
 
+}
+
+
+/**
+ * Persist one validated Hospital Surge Plan override.
+ */
+async function persistSurgePlanToServer(
+
+    configuration:SurgePlanConfiguration
+
+):Promise<void> {
+
+    try {
+
+        const serverOverride =
+
+            await saveServerSurgePlan(
+                cloneConfiguration(
+                    configuration
+                )
+            );
+
+
+        const normalized =
+
+            normalizeConfiguration(
+                serverOverride.configuration
+            );
+
+
+        const validation =
+
+            validateSurgePlan(
+                normalized
+            );
+
+
+        if(!validation.valid){
+
+            throw new Error(
+                validation.errors.join(
+                    " "
+                )
+            );
+
+        }
+
+
+        serverSurgePlan =
+
+            cloneConfiguration(
+                normalized
+            );
+
+
+        serverSurgePlanSavedAt =
+
+            serverOverride.savedAt;
+
+
+        serverSurgePlanInitialized = true;
+
+    }
     catch(error){
 
         console.error(
-
-            "Unable to parse Hospital Surge Plan:",
-
+            "Unable to save the PostgreSQL Hospital Surge Plan:",
             error
-
         );
 
+    }
 
-        return null;
+}
+
+
+/**
+ * Remove obsolete workstation-local Hospital Surge Plan
+ * storage.
+ */
+function clearLegacySurgePlanStorage():
+
+void {
+
+    try {
+
+        window.localStorage.removeItem(
+            LEGACY_STORAGE_KEY
+        );
+
+    }
+    catch(error){
+
+        console.warn(
+            "Unable to remove legacy Hospital Surge Plan browser storage:",
+            error
+        );
 
     }
 

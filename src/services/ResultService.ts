@@ -57,44 +57,63 @@ import type {
 from "../types/EdoriResult";
 
 
+import {
+
+    clearServerCurrentResultState,
+    loadServerCurrentResultState,
+    saveServerCurrentResultState
+
+}
+
+from "./CurrentResultApiService";
+
+
+import {
+
+    subscribe
+
+}
+
+from "./EventService";
+
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
+
 /*
  * =====================================================
- * Storage configuration
+ * Server persistence configuration
  * =====================================================
  */
 
-const RESULT_STORAGE_KEY =
+
+
+
+/**
+ * Previous workstation-local storage keys.
+ *
+ * Retained only so Phase 18B can remove obsolete browser
+ * result persistence.
+ */
+const LEGACY_RESULT_STORAGE_KEY =
 
     "edori_latest_result";
 
 
-const INVALIDATION_STORAGE_KEY =
+const LEGACY_INVALIDATION_STORAGE_KEY =
 
     "edori_result_invalidation";
 
 
-/**
- * Version 3 corresponds to the Version 2.1 Hospital
- * Readiness EdoriResult structure.
- *
- * Older result schemas are intentionally rejected
- * because they do not contain the historical
- * projected-capacity comparison fields required by
- * Version 2.1.
- */
-const RESULT_STORAGE_VERSION = 3;
+let serverResultInitialized = false;
 
-
-/**
- * Wrapper stored in localStorage.
- */
-interface StoredResultEnvelope {
-
-    version:number;
-
-    result:EdoriResult;
-
-}
+let serverResultInitializationInProgress = false;
 
 
 /*
@@ -102,6 +121,7 @@ interface StoredResultEnvelope {
  * In-memory state
  * =====================================================
  */
+
 
 /**
  * Current authoritative result.
@@ -116,9 +136,29 @@ let invalidationReason:string | null = null;
 
 
 /**
- * Restore persisted state when the module loads.
+ * Remove obsolete browser-persistent result state.
  */
-restoreResultState();
+clearLegacyResultStorage();
+
+
+/**
+ * Refresh shared result state whenever authenticated
+ * identity/session changes.
+ */
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    () => {
+
+        serverResultInitialized = false;
+
+
+        void initializeServerResultState();
+
+    }
+
+);
 
 
 /*
@@ -144,18 +184,14 @@ export function setLatestResult(
     const normalizedResult =
 
         normalizeResult(
-
             result
-
         );
 
 
     if(!normalizedResult){
 
         throw new Error(
-
             "The Hospital Readiness result is invalid and could not be stored."
-
         );
 
     }
@@ -164,38 +200,17 @@ export function setLatestResult(
     latestResult =
 
         cloneResult(
-
             normalizedResult
-
         );
 
 
     invalidationReason = null;
 
 
-    try {
-
-        localStorage.removeItem(
-
-            INVALIDATION_STORAGE_KEY
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to clear the Hospital Readiness invalidation reason:",
-
-            error
-
-        );
-
-    }
+    serverResultInitialized = true;
 
 
-    persistLatestResult();
+    void persistCurrentResultStateToServer();
 
 }
 
@@ -257,35 +272,11 @@ export function invalidateLatestResult(
     const normalizedReason =
 
         normalizeInvalidationReason(
-
             reason
-
         );
 
 
     latestResult = null;
-
-
-    try {
-
-        localStorage.removeItem(
-
-            RESULT_STORAGE_KEY
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to remove the invalidated Hospital Readiness result:",
-
-            error
-
-        );
-
-    }
 
 
     invalidationReason =
@@ -297,7 +288,10 @@ export function invalidateLatestResult(
         "The previous Hospital Readiness result is no longer current.";
 
 
-    persistInvalidationReason();
+    serverResultInitialized = true;
+
+
+    void persistCurrentResultStateToServer();
 
 }
 
@@ -343,34 +337,20 @@ void {
 
     invalidationReason = null;
 
+    serverResultInitialized = true;
 
-    try {
 
-        localStorage.removeItem(
+    void clearServerCurrentResultState()
+        .catch(
+            error => {
 
-            RESULT_STORAGE_KEY
+                console.error(
+                    "Unable to clear the PostgreSQL Hospital Readiness result state:",
+                    error
+                );
 
+            }
         );
-
-
-        localStorage.removeItem(
-
-            INVALIDATION_STORAGE_KEY
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to clear Hospital Readiness result storage:",
-
-            error
-
-        );
-
-    }
 
 }
 
@@ -419,154 +399,223 @@ export function getResultServiceStatus():{
 
 /*
  * =====================================================
- * Persistence
+ * PostgreSQL persistence
  * =====================================================
  */
 
 
 /**
- * Restore the result and invalidation state.
+ * Load the authoritative shared current-result state from
+ * PostgreSQL after authentication has been established.
  */
-function restoreResultState():
+export async function initializeServerResultState():
 
-void {
+Promise<void> {
 
-    const restoredInvalidationReason =
+    if(
+        serverResultInitialized
+        ||
+        serverResultInitializationInProgress
+    ){
 
-        loadInvalidationReason();
+        return;
+
+    }
 
 
-    /*
-     * An invalidation state takes priority.
-     *
-     * If both a result and an invalidation reason are
-     * present because of an interrupted browser write,
-     * the result must not be trusted.
-     */
-    if(restoredInvalidationReason){
+    serverResultInitializationInProgress = true;
+
+
+    try {
+
+        const serverState =
+
+            await loadServerCurrentResultState();
+
+
+        if(!serverState){
+
+            latestResult = null;
+
+            invalidationReason = null;
+
+            serverResultInitialized = true;
+
+            return;
+
+        }
+
+
+        const normalizedInvalidationReason =
+
+            normalizeInvalidationReason(
+                serverState.invalidationReason
+            );
+
+
+        if(normalizedInvalidationReason){
+
+            latestResult = null;
+
+            invalidationReason =
+                normalizedInvalidationReason;
+
+            serverResultInitialized = true;
+
+            return;
+
+        }
+
+
+        if(serverState.result){
+
+            const normalizedResult =
+
+                normalizeResult(
+                    serverState.result
+                );
+
+
+            if(!normalizedResult){
+
+                throw new Error(
+                    "The PostgreSQL Hospital Readiness result contains invalid values."
+                );
+
+            }
+
+
+            latestResult =
+
+                cloneResult(
+                    normalizedResult
+                );
+
+
+            invalidationReason = null;
+
+            serverResultInitialized = true;
+
+            return;
+
+        }
+
 
         latestResult = null;
 
-        invalidationReason =
-            restoredInvalidationReason;
+        invalidationReason = null;
 
-
-        try {
-
-            localStorage.removeItem(
-
-                RESULT_STORAGE_KEY
-
-            );
-
-        }
-        catch(error){
-
-            console.error(
-
-                "Unable to remove a result superseded by an invalidation state:",
-
-                error
-
-            );
-
-        }
-
-
-        return;
+        serverResultInitialized = true;
 
     }
+    catch(error){
 
+        console.warn(
+            "Unable to load the PostgreSQL Hospital Readiness result state:",
+            error
+        );
 
-    latestResult =
-        loadStoredResult();
+    }
+    finally {
 
-    invalidationReason = null;
+        serverResultInitializationInProgress = false;
+
+    }
 
 }
 
 
 /**
- * Persist the latest result.
+ * Persist the current result/invalidation state.
  */
-function persistLatestResult():
+async function persistCurrentResultStateToServer():
 
-void {
+Promise<void> {
 
-    if(!latestResult){
+    try {
 
-        try {
+        const serverState =
 
-            localStorage.removeItem(
-
-                RESULT_STORAGE_KEY
-
-            );
-
-        }
-        catch(error){
-
-            console.error(
-
-                "Unable to remove empty Hospital Readiness result storage:",
-
-                error
-
-            );
-
-        }
-
-
-        return;
-
-    }
-
-
-    const envelope:StoredResultEnvelope = {
-
-        version:
-            RESULT_STORAGE_VERSION,
-
-        result:
-            cloneResult(
+            await saveServerCurrentResultState(
 
                 latestResult
+                    ? cloneResult(
+                        latestResult
+                    )
+                    : null,
 
-            )
+                invalidationReason
 
-    };
+            );
 
 
-    try {
+        const normalizedInvalidationReason =
 
-        localStorage.setItem(
+            normalizeInvalidationReason(
+                serverState.invalidationReason
+            );
 
-            RESULT_STORAGE_KEY,
 
-            JSON.stringify(
+        if(normalizedInvalidationReason){
 
-                envelope
+            latestResult = null;
 
-            )
+            invalidationReason =
+                normalizedInvalidationReason;
 
-        );
+            serverResultInitialized = true;
+
+            return;
+
+        }
+
+
+        if(serverState.result){
+
+            const normalizedResult =
+
+                normalizeResult(
+                    serverState.result
+                );
+
+
+            if(!normalizedResult){
+
+                throw new Error(
+                    "The server returned an invalid Hospital Readiness result."
+                );
+
+            }
+
+
+            latestResult =
+
+                cloneResult(
+                    normalizedResult
+                );
+
+
+            invalidationReason = null;
+
+            serverResultInitialized = true;
+
+            return;
+
+        }
+
+
+        latestResult = null;
+
+        invalidationReason = null;
+
+        serverResultInitialized = true;
 
     }
     catch(error){
 
         console.error(
-
-            "Unable to save the latest Hospital Readiness result:",
-
+            "Unable to save the PostgreSQL Hospital Readiness result state:",
             error
-
-        );
-
-
-        throw new Error(
-
-            "The latest Hospital Readiness result could not be saved to browser storage."
-
         );
 
     }
@@ -575,305 +624,30 @@ void {
 
 
 /**
- * Persist the recalculation-required reason.
+ * Remove obsolete workstation-local result persistence.
  */
-function persistInvalidationReason():
+function clearLegacyResultStorage():
 
 void {
 
-    if(!invalidationReason){
-
-        try {
-
-            localStorage.removeItem(
-
-                INVALIDATION_STORAGE_KEY
-
-            );
-
-        }
-        catch(error){
-
-            console.error(
-
-                "Unable to remove empty Hospital Readiness invalidation storage:",
-
-                error
-
-            );
-
-        }
-
-
-        return;
-
-    }
-
-
     try {
 
-        localStorage.setItem(
+        localStorage.removeItem(
+            LEGACY_RESULT_STORAGE_KEY
+        );
 
-            INVALIDATION_STORAGE_KEY,
 
-            invalidationReason
-
+        localStorage.removeItem(
+            LEGACY_INVALIDATION_STORAGE_KEY
         );
 
     }
     catch(error){
 
-        console.error(
-
-            "Unable to save the Hospital Readiness invalidation reason:",
-
+        console.warn(
+            "Unable to remove legacy Hospital Readiness browser result storage:",
             error
-
         );
-
-
-        /*
-         * The in-memory invalidation remains active
-         * even if browser persistence fails.
-         */
-    }
-
-}
-
-
-/**
- * Load and validate the stored result.
- */
-function loadStoredResult():
-
-EdoriResult | null {
-
-    try {
-
-        const stored =
-
-            localStorage.getItem(
-
-                RESULT_STORAGE_KEY
-
-            );
-
-
-        if(!stored){
-
-            return null;
-
-        }
-
-
-        const parsed =
-
-            JSON.parse(
-
-                stored
-
-            ) as unknown;
-
-
-        const storedResult =
-
-            extractStoredResult(
-
-                parsed
-
-            );
-
-
-        if(!storedResult){
-
-            throw new Error(
-
-                "Stored Hospital Readiness result has an unsupported format."
-
-            );
-
-        }
-
-
-        const normalizedResult =
-
-            normalizeResult(
-
-                storedResult
-
-            );
-
-
-        if(!normalizedResult){
-
-            throw new Error(
-
-                "Stored Hospital Readiness result contains invalid values."
-
-            );
-
-        }
-
-
-        return cloneResult(
-
-            normalizedResult
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to restore the latest Hospital Readiness result:",
-
-            error
-
-        );
-
-
-        try {
-
-            localStorage.removeItem(
-
-                RESULT_STORAGE_KEY
-
-            );
-
-        }
-        catch(storageError){
-
-            console.error(
-
-                "Unable to remove invalid Hospital Readiness result storage:",
-
-                storageError
-
-            );
-
-        }
-
-
-        return null;
-
-    }
-
-}
-
-
-/**
- * Extract the current versioned stored result.
- */
-function extractStoredResult(
-
-    value:unknown
-
-):unknown {
-
-    if(
-
-        typeof value !== "object"
-
-        ||
-
-        value === null
-
-    ){
-
-        return null;
-
-    }
-
-
-    const candidate = value as {
-
-        version?:unknown;
-
-        result?:unknown;
-
-    };
-
-
-    if(
-
-        candidate.version !== RESULT_STORAGE_VERSION
-
-        ||
-
-        candidate.result === undefined
-
-    ){
-
-        return null;
-
-    }
-
-
-    return candidate.result;
-
-}
-
-
-/**
- * Load the persisted invalidation reason.
- */
-function loadInvalidationReason():
-
-string | null {
-
-    try {
-
-        const stored =
-
-            localStorage.getItem(
-
-                INVALIDATION_STORAGE_KEY
-
-            );
-
-
-        return normalizeInvalidationReason(
-
-            stored
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "Unable to restore the Hospital Readiness invalidation reason:",
-
-            error
-
-        );
-
-
-        try {
-
-            localStorage.removeItem(
-
-                INVALIDATION_STORAGE_KEY
-
-            );
-
-        }
-        catch(storageError){
-
-            console.error(
-
-                "Unable to remove invalid Hospital Readiness invalidation storage:",
-
-                storageError
-
-            );
-
-        }
-
-
-        return null;
 
     }
 
@@ -885,6 +659,7 @@ string | null {
  * Result normalization
  * =====================================================
  */
+
 
 
 /**

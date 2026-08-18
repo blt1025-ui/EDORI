@@ -1,13 +1,31 @@
 /**
  * SecurityAuditService
  *
- * Development-only security/account audit log.
+ * Frontend read-only cache for PostgreSQL-backed EDORI
+ * security-audit records.
  *
- * IMPORTANT:
- * Production EDORI must persist audit records on the
- * backend/database where normal browser users cannot
- * modify or delete them.
+ * The public synchronous API is intentionally retained so
+ * the existing SecurityAuditLog component does not need to
+ * change.
  */
+
+import {
+
+    subscribe
+
+}
+
+from "./EventService";
+
+
+import {
+
+    APP_EVENTS
+
+}
+
+from "../config/appEvents";
+
 
 export type SecurityAuditEventType =
 
@@ -52,142 +70,189 @@ export interface SecurityAuditRecord {
 }
 
 
-const SECURITY_AUDIT_STORAGE_KEY =
+interface ServerSecurityAuditRecord {
 
-    "edori_security_audit_v1";
+    id:string;
+
+    timestamp:string;
+
+    eventType:string;
+
+    actorUserId:string;
+
+    actorUsername:string;
+
+    actorDisplayName:string;
+
+    targetUserId:string;
+
+    targetUsername:string;
+
+    targetDisplayName:string;
+
+    success:boolean;
+
+    summary:string;
+
+    details:Record<string,unknown>;
+
+    remoteAddress?:string;
+
+    userAgent?:string;
+
+}
 
 
-const MAX_AUDIT_RECORDS =
+let auditRecords:SecurityAuditRecord[] = [];
 
-    5000;
+let auditInitialized = false;
+
+let auditInitializationInProgress = false;
 
 
-/**
- * Append one audit record.
- *
- * Callers supply identity snapshots explicitly so this
- * service does not depend on UserService and cannot
- * create circular imports.
- */
-export function recordSecurityAuditEvent(
+clearLegacySecurityAuditStorage();
 
-    input:{
 
-        eventType:SecurityAuditEventType;
+subscribe(
 
-        actor?:{
+    APP_EVENTS.USERS_CHANGED,
 
-            userId?:string;
+    () => {
 
-            username?:string;
+        auditInitialized = false;
 
-            displayName?:string;
 
-        } | null;
-
-        target?:{
-
-            userId?:string;
-
-            username?:string;
-
-            displayName?:string;
-
-        } | null;
-
-        success:boolean;
-
-        summary:string;
-
-        details?:Record<
-            string,
-            string | number | boolean | null
-        >;
+        void initializeServerSecurityAuditLog();
 
     }
 
-):SecurityAuditRecord {
+);
 
-    const record:SecurityAuditRecord = {
 
-        id:
-            createAuditId(),
+/**
+ * Load the PostgreSQL audit log.
+ */
+export async function initializeServerSecurityAuditLog():
 
-        timestamp:
-            new Date().toISOString(),
+Promise<void> {
 
-        eventType:
-            input.eventType,
+    if(
+        auditInitialized
+        ||
+        auditInitializationInProgress
+    ){
 
-        actorUserId:
-            input.actor?.userId
-            ?? "",
+        return;
 
-        actorUsername:
-            input.actor?.username
-            ?? "",
+    }
 
-        actorDisplayName:
-            input.actor?.displayName
-            ?? "",
 
-        targetUserId:
-            input.target?.userId
-            ?? "",
+    auditInitializationInProgress = true;
 
-        targetUsername:
-            input.target?.username
-            ?? "",
 
-        targetDisplayName:
-            input.target?.displayName
-            ?? "",
+    try {
 
-        success:
-            input.success,
+        const response =
 
-        summary:
-            input.summary.trim(),
+            await fetch(
 
-        details:
-            {
-                ...(input.details ?? {})
+                "/api/security-audit?limit=5000",
+
+                {
+                    method:
+                        "GET",
+
+                    credentials:
+                        "include",
+
+                    headers:{
+                        "Accept":
+                            "application/json"
+                    }
+                }
+
+            );
+
+
+        const payload =
+
+            await readJson<{
+
+                records?:ServerSecurityAuditRecord[];
+
+                message?:string;
+
+            }>(
+                response
+            );
+
+
+        if(!response.ok){
+
+            /*
+             * Non-administrators may legitimately receive
+             * 403. Keep an empty read-only cache.
+             */
+            if(response.status === 403){
+
+                auditRecords = [];
+
+                auditInitialized = true;
+
+                return;
+
             }
 
-    };
+
+            throw new Error(
+
+                payload.message
+                ?? "EDORI could not load the security audit log."
+
+            );
+
+        }
 
 
-    const records =
+        auditRecords =
 
-        readSecurityAuditLog();
-
-
-    records.push(
-        record
-    );
-
-
-    const trimmedRecords =
-
-        records.length > MAX_AUDIT_RECORDS
-
-            ? records.slice(
-                records.length
-                -
-                MAX_AUDIT_RECORDS
+            Array.isArray(
+                payload.records
             )
 
-            : records;
+                ? payload.records
+                    .map(
+                        normalizeServerRecord
+                    )
+                    .filter(
+                        (
+                            record
+                        ):record is SecurityAuditRecord =>
+                            record !== null
+                    )
+
+                : [];
 
 
-    writeSecurityAuditLog(
-        trimmedRecords
-    );
+        auditInitialized = true;
 
+    }
+    catch(error){
 
-    return cloneRecord(
-        record
-    );
+        console.warn(
+
+            "EDORI could not load the PostgreSQL security audit log.",
+
+            error
+
+        );
+
+    }
+    finally {
+
+        auditInitializationInProgress = false;
+
+    }
 
 }
 
@@ -195,27 +260,11 @@ export function recordSecurityAuditEvent(
 /**
  * Return newest records first.
  */
-export function getSecurityAuditLog():SecurityAuditRecord[] {
+export function getSecurityAuditLog():
 
-    return readSecurityAuditLog()
+SecurityAuditRecord[] {
 
-        .slice()
-
-        .sort(
-
-            (first, second) =>
-
-                new Date(
-                    second.timestamp
-                ).getTime()
-
-                -
-
-                new Date(
-                    first.timestamp
-                ).getTime()
-
-        )
+    return auditRecords
 
         .map(
             cloneRecord
@@ -225,267 +274,198 @@ export function getSecurityAuditLog():SecurityAuditRecord[] {
 
 
 /**
- * Return the storage key for migration/debugging.
+ * Legacy compatibility diagnostic.
+ *
+ * No active browser audit storage remains.
  */
 export function getSecurityAuditStorageKey():string {
 
-    return SECURITY_AUDIT_STORAGE_KEY;
+    return "edori_security_audit_v1";
 
 }
 
 
 /**
- * Read stored records defensively.
+ * Legacy compatibility stub.
+ *
+ * Security audit writes are server-authoritative and are
+ * no longer accepted from browser code.
  */
-function readSecurityAuditLog():SecurityAuditRecord[] {
+export function recordSecurityAuditEvent(
 
-    let raw:string | null = null;
+    _input:unknown
 
+):SecurityAuditRecord {
 
-    try {
+    throw new Error(
 
-        raw =
+        "Browser-side security audit writes are disabled. EDORI security audit events are written by the server."
 
-            localStorage.getItem(
-
-                SECURITY_AUDIT_STORAGE_KEY
-
-            );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "EDORI could not read the security audit log.",
-
-            error
-
-        );
-
-
-        return [];
-
-    }
-
-
-    if(!raw){
-
-        return [];
-
-    }
-
-
-    try {
-
-        const parsed:unknown =
-
-            JSON.parse(
-                raw
-            );
-
-
-        if(!Array.isArray(parsed)){
-
-            return [];
-
-        }
-
-
-        return parsed
-
-            .map(
-                normalizeAuditRecord
-            )
-
-            .filter(
-
-                (
-                    record
-                ):record is SecurityAuditRecord =>
-
-                    record !== null
-
-            );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "EDORI could not parse the security audit log.",
-
-            error
-
-        );
-
-
-        return [];
-
-    }
+    );
 
 }
 
 
-/**
- * Persist the complete development audit log.
- */
-function writeSecurityAuditLog(
+function normalizeServerRecord(
 
-    records:SecurityAuditRecord[]
-
-):void {
-
-    try {
-
-        localStorage.setItem(
-
-            SECURITY_AUDIT_STORAGE_KEY,
-
-            JSON.stringify(
-                records
-            )
-
-        );
-
-    }
-    catch(error){
-
-        console.error(
-
-            "EDORI could not persist the security audit log.",
-
-            error
-
-        );
-
-    }
-
-}
-
-
-/**
- * Normalize one persisted record.
- */
-function normalizeAuditRecord(
-
-    value:unknown
+    record:ServerSecurityAuditRecord
 
 ):SecurityAuditRecord | null {
 
-    if(
+    const eventType =
 
-        typeof value !== "object"
-
-        ||
-
-        value === null
-
-    ){
-
-        return null;
-
-    }
-
-
-    const candidate =
-
-        value as Partial<SecurityAuditRecord>;
-
-
-    if(
-
-        typeof candidate.id !== "string"
-
-        ||
-
-        typeof candidate.timestamp !== "string"
-
-        ||
-
-        !isAuditEventType(
-            candidate.eventType
-        )
-
-        ||
-
-        typeof candidate.success !== "boolean"
-
-        ||
-
-        typeof candidate.summary !== "string"
-
-    ){
-
-        return null;
-
-    }
-
-
-    const details =
-
-        normalizeDetails(
-            candidate.details
+        mapServerEventType(
+            record.eventType,
+            record.details
         );
+
+
+    if(!eventType){
+
+        return null;
+
+    }
+
+
+    if(
+        typeof record.id !== "string"
+        ||
+        typeof record.timestamp !== "string"
+        ||
+        typeof record.success !== "boolean"
+        ||
+        typeof record.summary !== "string"
+    ){
+
+        return null;
+
+    }
 
 
     return {
 
         id:
-            candidate.id,
+            record.id,
 
         timestamp:
-            candidate.timestamp,
+            record.timestamp,
 
-        eventType:
-            candidate.eventType,
+        eventType,
 
         actorUserId:
-            typeof candidate.actorUserId === "string"
-                ? candidate.actorUserId
+            typeof record.actorUserId === "string"
+                ? record.actorUserId
                 : "",
 
         actorUsername:
-            typeof candidate.actorUsername === "string"
-                ? candidate.actorUsername
+            typeof record.actorUsername === "string"
+                ? record.actorUsername
                 : "",
 
         actorDisplayName:
-            typeof candidate.actorDisplayName === "string"
-                ? candidate.actorDisplayName
+            typeof record.actorDisplayName === "string"
+                ? record.actorDisplayName
                 : "",
 
         targetUserId:
-            typeof candidate.targetUserId === "string"
-                ? candidate.targetUserId
+            typeof record.targetUserId === "string"
+                ? record.targetUserId
                 : "",
 
         targetUsername:
-            typeof candidate.targetUsername === "string"
-                ? candidate.targetUsername
+            typeof record.targetUsername === "string"
+                ? record.targetUsername
                 : "",
 
         targetDisplayName:
-            typeof candidate.targetDisplayName === "string"
-                ? candidate.targetDisplayName
+            typeof record.targetDisplayName === "string"
+                ? record.targetDisplayName
                 : "",
 
         success:
-            candidate.success,
+            record.success,
 
         summary:
-            candidate.summary,
+            record.summary,
 
-        details
+        details:
+            normalizeDetails(
+                record.details
+            )
 
     };
 
 }
 
 
-/**
- * Normalize arbitrary detail values.
- */
+function mapServerEventType(
+
+    eventType:string,
+
+    details:Record<string,unknown>
+
+):SecurityAuditEventType | null {
+
+    switch(eventType){
+
+        case "auth.login.success":
+
+            return "authentication.login.success";
+
+
+        case "auth.login.failure":
+
+            return details.locked === true
+
+                ? "authentication.login.locked"
+
+                : "authentication.login.failed";
+
+
+        case "auth.logout":
+
+            return "authentication.logout";
+
+
+        case "auth.password.change":
+
+            return "authentication.password.changed";
+
+
+        case "user.password.reset":
+
+            return "authentication.password.reset";
+
+
+        case "user.create":
+
+            return "user.created";
+
+
+        case "user.update":
+
+            return "user.updated";
+
+
+        case "user.role.change":
+
+            return "user.role.changed";
+
+
+        case "user.status.change":
+
+            return "user.status.changed";
+
+
+        default:
+
+            return null;
+
+    }
+
+}
+
+
 function normalizeDetails(
 
     value:unknown
@@ -493,19 +473,13 @@ function normalizeDetails(
 ):Record<string,string | number | boolean | null> {
 
     if(
-
         typeof value !== "object"
-
         ||
-
         value === null
-
         ||
-
         Array.isArray(
             value
         )
-
     ){
 
         return {};
@@ -521,24 +495,16 @@ function normalizeDetails(
         value
     ).forEach(
 
-        ([key, item]) => {
+        ([key,item]) => {
 
             if(
-
                 typeof item === "string"
-
                 ||
-
                 typeof item === "number"
-
                 ||
-
                 typeof item === "boolean"
-
                 ||
-
                 item === null
-
             ){
 
                 output[key] =
@@ -556,63 +522,6 @@ function normalizeDetails(
 }
 
 
-/**
- * Runtime event-name validation.
- */
-function isAuditEventType(
-
-    value:unknown
-
-):value is SecurityAuditEventType {
-
-    return (
-
-        value === "authentication.login.success"
-
-        ||
-
-        value === "authentication.login.failed"
-
-        ||
-
-        value === "authentication.login.locked"
-
-        ||
-
-        value === "authentication.logout"
-
-        ||
-
-        value === "authentication.password.changed"
-
-        ||
-
-        value === "authentication.password.reset"
-
-        ||
-
-        value === "user.created"
-
-        ||
-
-        value === "user.updated"
-
-        ||
-
-        value === "user.role.changed"
-
-        ||
-
-        value === "user.status.changed"
-
-    );
-
-}
-
-
-/**
- * Defensive copy.
- */
 function cloneRecord(
 
     record:SecurityAuditRecord
@@ -632,28 +541,51 @@ function cloneRecord(
 }
 
 
-/**
- * Create a browser-safe audit identifier.
- */
-function createAuditId():string {
+function clearLegacySecurityAuditStorage():
 
-    if(
+void {
 
-        typeof crypto !== "undefined"
+    try {
 
-        &&
+        localStorage.removeItem(
+            "edori_security_audit_v1"
+        );
 
-        typeof crypto.randomUUID === "function"
+    }
+    catch(error){
 
-    ){
+        console.warn(
 
-        return crypto.randomUUID();
+            "EDORI could not remove legacy browser security-audit storage.",
+
+            error
+
+        );
+
+    }
+
+}
+
+
+async function readJson<T>(
+
+    response:Response
+
+):Promise<T> {
+
+    const text =
+        await response.text();
+
+
+    if(!text){
+
+        return {} as T;
 
     }
 
 
-    return `audit-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2,10)}`;
+    return JSON.parse(
+        text
+    ) as T;
 
 }

@@ -37,6 +37,17 @@ import {
 from "./AuthorizationService";
 
 
+import {
+
+    clearServerModelConfiguration,
+    loadServerModelConfiguration,
+    saveServerModelConfiguration
+
+}
+
+from "./ModelConfigurationApiService";
+
+
 
 
 import {
@@ -79,7 +90,8 @@ from "../config/weights";
 
 import {
 
-    emit
+    emit,
+    subscribe
 
 }
 
@@ -96,9 +108,7 @@ import type {
 
     HospitalConfiguration,
 
-    OperationalLevelConfiguration,
-
-    StoredConfigurationOverrides
+    OperationalLevelConfiguration
 
 }
 
@@ -106,18 +116,53 @@ from "../types/ConfigurationOverrides";
 
 
 /**
- * localStorage key.
+ * Legacy browser-storage key.
+ *
+ * Retained only so Phase 15B can remove obsolete
+ * workstation-local model configuration.
  */
-const CONFIGURATION_STORAGE_KEY =
+const LEGACY_CONFIGURATION_STORAGE_KEY =
 
     "edori_configuration_overrides";
 
 
-/**
- * Current stored-schema version.
- */
-const CONFIGURATION_VERSION = 1;
+let serverConfiguration:ConfigurationOverrides | null = null;
 
+let serverConfigurationSavedAt:string | null = null;
+
+let serverConfigurationInitialized = false;
+
+let serverConfigurationInitializationInProgress = false;
+
+
+clearLegacyConfigurationStorage();
+
+
+/**
+ * Reload the shared configuration when EDORI's
+ * authenticated identity/session changes.
+ *
+ * This covers a successful login that occurs without
+ * reloading the browser.
+ */
+subscribe(
+
+    APP_EVENTS.USERS_CHANGED,
+
+    () => {
+
+        /*
+         * Allow a new authenticated session to refresh
+         * the authoritative configuration from PostgreSQL.
+         */
+        serverConfigurationInitialized = false;
+
+
+        void initializeServerConfiguration();
+
+    }
+
+);
 
 /**
  * Floating-point tolerance used when validating
@@ -217,61 +262,136 @@ ConfigurationOverrides {
 /**
  * Return the currently effective configuration.
  *
- * Valid saved overrides are returned when present.
- * Otherwise built-in defaults are returned.
+ * Valid PostgreSQL-backed overrides are returned when
+ * present. Otherwise built-in defaults are returned.
  */
 export function getConfiguration():
 
 ConfigurationOverrides {
 
-    const stored =
+    return serverConfiguration
 
-        loadStoredConfiguration();
+        ? cloneConfiguration(
+            serverConfiguration
+        )
 
-
-    if(!stored){
-
-        return getDefaultConfiguration();
-
-    }
-
-
-    return cloneConfiguration(
-
-        stored.configuration
-
-    );
+        : getDefaultConfiguration();
 
 }
 
 
 /**
- * Determine whether valid saved overrides exist.
+ * Determine whether valid shared overrides exist.
  */
 export function hasConfigurationOverrides():boolean {
 
-    return loadStoredConfiguration() !== null;
+    return serverConfiguration !== null;
 
 }
 
 
 /**
- * Return the date/time when overrides were saved.
+ * Return the date/time when the shared override was saved.
  */
 export function getConfigurationSavedAt():
 
 string | null {
 
-    const stored =
+    return serverConfigurationSavedAt;
 
-        loadStoredConfiguration();
+}
 
 
-    return stored
+/**
+ * Load the authoritative optional model override from
+ * PostgreSQL after authentication has been established.
+ */
+export async function initializeServerConfiguration():
 
-        ? stored.savedAt
+Promise<void> {
 
-        : null;
+    if(
+        serverConfigurationInitialized
+        ||
+        serverConfigurationInitializationInProgress
+    ){
+
+        return;
+
+    }
+
+
+    serverConfigurationInitializationInProgress = true;
+
+
+    try {
+
+        const serverOverride =
+            await loadServerModelConfiguration();
+
+
+        if(!serverOverride){
+
+            serverConfiguration = null;
+
+            serverConfigurationSavedAt = null;
+
+            serverConfigurationInitialized = true;
+
+            return;
+
+        }
+
+
+        const normalized =
+            normalizeConfiguration(
+                serverOverride.configuration
+            );
+
+
+        const validation =
+            validateConfiguration(
+                normalized
+            );
+
+
+        if(!validation.valid){
+
+            throw new Error(
+                validation.errors.join(
+                    " "
+                )
+            );
+
+        }
+
+
+        serverConfiguration =
+            cloneConfiguration(
+                normalized
+            );
+
+
+        serverConfigurationSavedAt =
+            serverOverride.savedAt;
+
+
+        serverConfigurationInitialized = true;
+
+    }
+    catch(error){
+
+        console.warn(
+            "ConfigurationService could not load the PostgreSQL model configuration.",
+            error
+        );
+
+    }
+    finally {
+
+        serverConfigurationInitializationInProgress = false;
+
+    }
 
 }
 
@@ -279,8 +399,9 @@ string | null {
 /**
  * Save a complete configuration override.
  *
- * Invalid configuration is rejected and nothing is
- * written to localStorage.
+ * The existing synchronous UI contract is preserved.
+ * PostgreSQL persistence occurs through the authenticated
+ * model-configuration API.
  */
 export function saveConfiguration(
 
@@ -296,18 +417,14 @@ export function saveConfiguration(
     const normalized =
 
         normalizeConfiguration(
-
             configuration
-
         );
 
 
     const validation =
 
         validateConfiguration(
-
             normalized
-
         );
 
 
@@ -318,61 +435,22 @@ export function saveConfiguration(
     }
 
 
-    const stored:StoredConfigurationOverrides = {
-
-        version:
-            CONFIGURATION_VERSION,
-
-        savedAt:
-            new Date().toISOString(),
-
-        configuration:
+    serverConfiguration =
+        cloneConfiguration(
             normalized
-
-    };
-
-
-    try {
-
-        localStorage.setItem(
-
-            CONFIGURATION_STORAGE_KEY,
-
-            JSON.stringify(
-
-                stored
-
-            )
-
-        );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "ConfigurationService could not save configuration.",
-
-            error
-
         );
 
 
-        return {
+    serverConfigurationSavedAt =
+        new Date().toISOString();
 
-            valid:
-                false,
 
-            errors:[
+    serverConfigurationInitialized = true;
 
-                "The configuration could not be saved in browser storage."
 
-            ]
-
-        };
-
-    }
+    void persistConfigurationToServer(
+        normalized
+    );
 
 
     publishConfigurationChanged();
@@ -391,8 +469,8 @@ export function saveConfiguration(
 
 
 /**
- * Remove all saved overrides and return to the
- * built-in configuration.
+ * Remove the shared override and return to built-in
+ * configuration.
  */
 export function restoreDefaultConfiguration():void {
 
@@ -401,30 +479,94 @@ export function restoreDefaultConfiguration():void {
     );
 
 
-    try {
+    serverConfiguration = null;
 
-        localStorage.removeItem(
+    serverConfigurationSavedAt = null;
 
-            CONFIGURATION_STORAGE_KEY
+    serverConfigurationInitialized = true;
 
+
+    void clearServerModelConfiguration()
+        .catch(
+            error => {
+
+                console.error(
+                    "ConfigurationService could not remove the PostgreSQL model configuration.",
+                    error
+                );
+
+            }
         );
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "ConfigurationService could not remove saved configuration.",
-
-            error
-
-        );
-
-    }
 
 
     publishConfigurationChanged();
+
+}
+
+
+/**
+ * Persist one validated model override.
+ */
+async function persistConfigurationToServer(
+
+    configuration:ConfigurationOverrides
+
+):Promise<void> {
+
+    try {
+
+        const serverOverride =
+            await saveServerModelConfiguration(
+                cloneConfiguration(
+                    configuration
+                )
+            );
+
+
+        const normalized =
+            normalizeConfiguration(
+                serverOverride.configuration
+            );
+
+
+        const validation =
+            validateConfiguration(
+                normalized
+            );
+
+
+        if(!validation.valid){
+
+            throw new Error(
+                validation.errors.join(
+                    " "
+                )
+            );
+
+        }
+
+
+        serverConfiguration =
+            cloneConfiguration(
+                normalized
+            );
+
+
+        serverConfigurationSavedAt =
+            serverOverride.savedAt;
+
+
+        serverConfigurationInitialized = true;
+
+    }
+    catch(error){
+
+        console.error(
+            "ConfigurationService could not save the PostgreSQL model configuration.",
+            error
+        );
+
+    }
 
 }
 
@@ -1074,197 +1216,27 @@ function normalizeConfiguration(
 
 
 /**
- * Read and validate the stored configuration.
- *
- * Invalid/corrupt saved data is ignored so the
- * application safely falls back to built-in values.
+ * Remove obsolete workstation-local configuration.
  */
-function loadStoredConfiguration():
+function clearLegacyConfigurationStorage():
 
-StoredConfigurationOverrides | null {
-
-    let raw:string | null = null;
-
+void {
 
     try {
 
-        raw = localStorage.getItem(
-
-            CONFIGURATION_STORAGE_KEY
-
+        localStorage.removeItem(
+            LEGACY_CONFIGURATION_STORAGE_KEY
         );
 
     }
-
     catch(error){
 
-        console.error(
-
-            "ConfigurationService could not read browser storage.",
-
+        console.warn(
+            "ConfigurationService could not remove legacy browser configuration.",
             error
-
         );
 
-
-        return null;
-
     }
-
-
-    if(!raw){
-
-        return null;
-
-    }
-
-
-    try {
-
-        const parsed:unknown =
-
-            JSON.parse(
-
-                raw
-
-            );
-
-
-        if(
-
-            !isStoredConfigurationOverrides(
-
-                parsed
-
-            )
-
-        ){
-
-            console.warn(
-
-                "ConfigurationService ignored an invalid saved configuration wrapper."
-
-            );
-
-
-            return null;
-
-        }
-
-
-        const normalized =
-
-            normalizeConfiguration(
-
-                parsed.configuration
-
-            );
-
-
-        const validation =
-
-            validateConfiguration(
-
-                normalized
-
-            );
-
-
-        if(!validation.valid){
-
-            console.warn(
-
-                "ConfigurationService ignored invalid saved configuration.",
-
-                validation.errors
-
-            );
-
-
-            return null;
-
-        }
-
-
-        return {
-
-            version:
-                CONFIGURATION_VERSION,
-
-            savedAt:
-                parsed.savedAt,
-
-            configuration:
-                normalized
-
-        };
-
-    }
-
-    catch(error){
-
-        console.error(
-
-            "ConfigurationService could not parse saved configuration.",
-
-            error
-
-        );
-
-
-        return null;
-
-    }
-
-}
-
-
-/**
- * Runtime guard for stored configuration wrapper.
- */
-function isStoredConfigurationOverrides(
-
-    value:unknown
-
-):value is StoredConfigurationOverrides {
-
-    if(
-
-        typeof value !== "object"
-
-        ||
-
-        value === null
-
-    ){
-
-        return false;
-
-    }
-
-
-    const candidate =
-
-        value as Partial<StoredConfigurationOverrides>;
-
-
-    return (
-
-        candidate.version === CONFIGURATION_VERSION
-
-        &&
-
-        typeof candidate.savedAt === "string"
-
-        &&
-
-        typeof candidate.configuration === "object"
-
-        &&
-
-        candidate.configuration !== null
-
-    );
 
 }
 
@@ -1356,10 +1328,11 @@ function publishConfigurationChanged():void {
 
 
 /**
- * Export storage key for administrative diagnostics.
+ * Export the former browser-storage key for legacy
+ * administrative diagnostics.
  */
 export function getConfigurationStorageKey():string {
 
-    return CONFIGURATION_STORAGE_KEY;
+    return LEGACY_CONFIGURATION_STORAGE_KEY;
 
 }
