@@ -99,6 +99,25 @@ import {
 from "../types/RoleDefinitions";
 
 
+import {
+
+    getSynchronizationStatus,
+    subscribeToSynchronizationStatus
+
+}
+
+from "../services/SynchronizationStatusService";
+
+
+import type {
+
+    SynchronizationStatus
+
+}
+
+from "../services/SynchronizationStatusService";
+
+
 interface SidebarNavigationItem {
 
     id:ApplicationPage;
@@ -116,6 +135,8 @@ interface SidebarNavigationItem {
  * Prevent duplicate authenticated-user subscriptions.
  */
 let currentUserSubscribed = false;
+
+let synchronizationStatusSubscribed = false;
 
 
 /**
@@ -333,24 +354,33 @@ export function Sidebar():string {
                 ${createCurrentUserControl()}
 
 
-                <div class="sidebar-footer-status">
+                <div
+                    id="sidebarSynchronizationStatus"
+                    class="sidebar-footer-status sidebar-sync-status sidebar-sync-status-idle"
+                    role="status"
+                    aria-live="polite"
+                    aria-label="EDORI synchronization status"
+                >
 
                     <span
-                        class="sidebar-footer-status-dot"
+                        class="sidebar-footer-status-dot sidebar-sync-status-dot"
                         aria-hidden="true"
                     >
                     </span>
 
 
-                    <div>
+                    <div class="sidebar-sync-status-copy">
 
-                        <span class="sidebar-footer-label">
-                            Operational Tool
+                        <span
+                            id="sidebarSynchronizationLabel"
+                            class="sidebar-footer-label"
+                        >
+                            Connecting
                         </span>
 
 
-                        <strong>
-                            EDORI · Version 2.1
+                        <strong id="sidebarSynchronizationDetail">
+                            Preparing shared data
                         </strong>
 
                     </div>
@@ -377,6 +407,9 @@ export function initializeSidebar():void {
      * before navigation synchronization.
      */
     initializeCurrentUserControl();
+
+
+    initializeSynchronizationStatus();
 
 
     /*
@@ -421,6 +454,197 @@ export function initializeSidebar():void {
         getCurrentPage()
 
     );
+
+}
+
+
+/**
+ * Initialize persistent synchronization health in the
+ * sidebar footer.
+ */
+function initializeSynchronizationStatus():void {
+
+    renderSynchronizationStatus(
+        getSynchronizationStatus()
+    );
+
+
+    if(!synchronizationStatusSubscribed){
+
+        synchronizationStatusSubscribed = true;
+
+
+        subscribeToSynchronizationStatus(
+
+            renderSynchronizationStatus
+
+        );
+
+    }
+
+
+    /*
+     * Keep relative last-sync text fresh between sync
+     * cycles.
+     */
+    window.setInterval(
+
+        () => {
+
+            renderSynchronizationStatus(
+                getSynchronizationStatus()
+            );
+
+        },
+
+        30_000
+
+    );
+
+}
+
+
+/**
+ * Render synchronization health without changing HRI
+ * operational state.
+ */
+function renderSynchronizationStatus(
+
+    status:SynchronizationStatus
+
+):void {
+
+    const container =
+        document.getElementById(
+            "sidebarSynchronizationStatus"
+        );
+
+    const label =
+        document.getElementById(
+            "sidebarSynchronizationLabel"
+        );
+
+    const detail =
+        document.getElementById(
+            "sidebarSynchronizationDetail"
+        );
+
+
+    if(!container || !label || !detail){
+
+        return;
+
+    }
+
+
+    container.className =
+        `sidebar-footer-status sidebar-sync-status sidebar-sync-status-${status.health}`;
+
+
+    switch(status.health){
+
+        case "syncing":
+            label.textContent = "Syncing";
+            break;
+
+        case "synchronized":
+            label.textContent = "Synchronized";
+            break;
+
+        case "delayed":
+            label.textContent = "Sync delayed";
+            break;
+
+        case "offline":
+            label.textContent = "Offline";
+            break;
+
+        default:
+            label.textContent = "Connecting";
+
+    }
+
+
+    detail.textContent =
+        status.lastSuccessfulSyncAt
+            ? `Last sync ${formatSynchronizationTime(
+                status.lastSuccessfulSyncAt
+            )}`
+            : (
+                status.health === "offline"
+                    ? "Waiting for network"
+                    : status.health === "delayed"
+                        ? "Retrying automatically"
+                        : "Preparing shared data"
+            );
+
+
+    container.title =
+        status.message;
+
+}
+
+
+function formatSynchronizationTime(
+
+    timestamp:string
+
+):string {
+
+    const milliseconds =
+        new Date(
+            timestamp
+        ).getTime();
+
+
+    if(Number.isNaN(milliseconds)){
+
+        return "recently";
+
+    }
+
+
+    const seconds =
+        Math.floor(
+            Math.max(
+                0,
+                Date.now() - milliseconds
+            )
+            /
+            1000
+        );
+
+
+    if(seconds < 10){
+
+        return "just now";
+
+    }
+
+
+    if(seconds < 60){
+
+        return `${seconds}s ago`;
+
+    }
+
+
+    const minutes =
+        Math.floor(
+            seconds / 60
+        );
+
+
+    if(minutes < 60){
+
+        return `${minutes}m ago`;
+
+    }
+
+
+    return `${Math.floor(
+        minutes / 60
+    )}h ago`;
 
 }
 

@@ -24725,3 +24725,54 @@ small {
     }
 
 }
+
+/* =====================================================
+   Phase 19C - Sidebar synchronization status
+   Append to the END of src/style.css
+   ===================================================== */
+
+.sidebar-sync-status {
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        opacity 160ms ease;
+}
+
+.sidebar-sync-status-dot {
+    flex: 0 0 auto;
+}
+
+.sidebar-sync-status-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sidebar-sync-status-copy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-sync-status-syncing .sidebar-sync-status-dot {
+    animation: edori-sidebar-sync-pulse 1.1s ease-in-out infinite;
+}
+
+.sidebar-sync-status-delayed .sidebar-sync-status-dot,
+.sidebar-sync-status-offline .sidebar-sync-status-dot {
+    opacity: 0.8;
+}
+
+@keyframes edori-sidebar-sync-pulse {
+    0%,
+    100% {
+        transform: scale(0.82);
+        opacity: 0.55;
+    }
+
+    50% {
+        transform: scale(1.16);
+        opacity: 1;
+    }
+}

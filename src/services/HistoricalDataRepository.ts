@@ -63,6 +63,7 @@ from "./HistoricalExpectationApiService";
 
 import {
 
+    emit,
     subscribe
 
 }
@@ -106,6 +107,10 @@ let importedDataset:ImportedHistoricalDataset | null = null;
 let serverDatasetInitialized = false;
 
 let serverDatasetInitializationInProgress = false;
+
+let serverDatasetWriteInProgress = false;
+
+let lastServerDatasetImportedAtMilliseconds = 0;
 
 
 clearLegacyHistoricalStorage();
@@ -174,6 +179,11 @@ export function saveHistoricalDataset(
 
     void persistHistoricalDatasetToServer(
         normalizedDataset
+    );
+
+
+    emit(
+        APP_EVENTS.HISTORICAL_DATA_CHANGED
     );
 
 }
@@ -273,6 +283,11 @@ void {
 
             }
         );
+
+
+    emit(
+        APP_EVENTS.HISTORICAL_DATA_CHANGED
+    );
 
 }
 
@@ -469,6 +484,10 @@ Promise<void> {
         };
 
 
+        lastServerDatasetImportedAtMilliseconds =
+            importedAt.getTime();
+
+
         serverDatasetInitialized = true;
 
     }
@@ -490,6 +509,173 @@ Promise<void> {
 
 
 /**
+ * Refresh the optional imported historical dataset from
+ * PostgreSQL without writing anything back.
+ *
+ * Returns true only when the effective historical data
+ * source changed.
+ */
+export async function refreshServerHistoricalDataset():
+
+Promise<boolean> {
+
+    if(
+        serverDatasetWriteInProgress
+        ||
+        serverDatasetInitializationInProgress
+    ){
+
+        return false;
+
+    }
+
+
+    const serverDataset =
+        await loadServerHistoricalDataset();
+
+
+    if(!serverDataset){
+
+        if(importedDataset === null){
+
+            return false;
+
+        }
+
+
+        importedDataset = null;
+
+        lastServerDatasetImportedAtMilliseconds = 0;
+
+
+        emit(
+            APP_EVENTS.HISTORICAL_DATA_CHANGED
+        );
+
+
+        emit(
+            APP_EVENTS.RESULT_CHANGED
+        );
+
+
+        return true;
+
+    }
+
+
+    const importedAt =
+        normalizeTimestamp(
+            serverDataset.importedAt
+        );
+
+
+    if(!importedAt){
+
+        throw new Error(
+            "The synchronized PostgreSQL historical dataset contains an invalid import timestamp."
+        );
+
+    }
+
+
+    const serverImportedAtMilliseconds =
+        importedAt.getTime();
+
+
+    if(
+        lastServerDatasetImportedAtMilliseconds > 0
+        &&
+        serverImportedAtMilliseconds
+        <
+        lastServerDatasetImportedAtMilliseconds
+    ){
+
+        return false;
+
+    }
+
+
+    const normalizedDataset =
+        normalizeDataset(
+            serverDataset.records
+        );
+
+
+    const validation =
+        validateHistoricalDataset(
+            normalizedDataset
+        );
+
+
+    if(!validation.valid){
+
+        throw new Error(
+            createValidationErrorMessage(
+                validation
+            )
+        );
+
+    }
+
+
+    const changed =
+        importedDataset === null
+        ||
+        JSON.stringify(
+            importedDataset.records
+        )
+        !==
+        JSON.stringify(
+            normalizedDataset
+        );
+
+
+    lastServerDatasetImportedAtMilliseconds =
+        Math.max(
+            lastServerDatasetImportedAtMilliseconds,
+            serverImportedAtMilliseconds
+        );
+
+
+    if(!changed){
+
+        return false;
+
+    }
+
+
+    importedDataset = {
+
+        importedAt:
+            importedAt.toISOString(),
+
+        records:
+            cloneDataset(
+                normalizedDataset
+            )
+
+    };
+
+
+    serverDatasetInitialized = true;
+
+
+    emit(
+        APP_EVENTS.HISTORICAL_DATA_CHANGED
+    );
+
+
+    emit(
+        APP_EVENTS.RESULT_CHANGED
+    );
+
+
+    return true;
+
+}
+
+
+/**
  * Persist one validated imported dataset.
  */
 async function persistHistoricalDatasetToServer(
@@ -497,6 +683,9 @@ async function persistHistoricalDatasetToServer(
     dataset:HistoricalExpectation[]
 
 ):Promise<void> {
+
+    serverDatasetWriteInProgress = true;
+
 
     try {
 
@@ -531,10 +720,25 @@ async function persistHistoricalDatasetToServer(
         }
 
 
+        const importedAt =
+            normalizeTimestamp(
+                serverDataset.importedAt
+            );
+
+
+        if(!importedAt){
+
+            throw new Error(
+                "The server returned an invalid historical-dataset timestamp."
+            );
+
+        }
+
+
         importedDataset = {
 
             importedAt:
-                serverDataset.importedAt,
+                importedAt.toISOString(),
 
             records:
                 cloneDataset(
@@ -542,6 +746,10 @@ async function persistHistoricalDatasetToServer(
                 )
 
         };
+
+
+        lastServerDatasetImportedAtMilliseconds =
+            importedAt.getTime();
 
 
         serverDatasetInitialized = true;
@@ -553,6 +761,11 @@ async function persistHistoricalDatasetToServer(
             "Unable to save the historical expectation dataset to PostgreSQL:",
             error
         );
+
+    }
+    finally {
+
+        serverDatasetWriteInProgress = false;
 
     }
 

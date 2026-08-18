@@ -10,6 +10,15 @@
 export const APP_EVENTS = {
 
     /**
+     * The authoritative committed Hospital Readiness
+     * assessment changed locally or was synchronized
+     * from PostgreSQL.
+     */
+    STATE_CHANGED:
+        "stateChanged",
+
+
+    /**
      * A new authoritative EDORI result has been
      * calculated or the current result has been
      * invalidated.
@@ -63,19 +72,19 @@ export const APP_EVENTS = {
      * This changes derived triggers/recommendations,
      * not the HRI calculation itself.
      */
-TRIGGER_CONFIGURATION_CHANGED:
-    "triggerConfigurationChanged",
+    TRIGGER_CONFIGURATION_CHANGED:
+        "triggerConfigurationChanged",
 
 
-/**
- * Application users, role assignments, or the
- * active user/session changed.
- *
- * Components that display user identity or enforce
- * authorization can refresh from this event.
- */
-USERS_CHANGED:
-    "usersChanged"
+    /**
+     * Application users, role assignments, or the
+     * active user/session changed.
+     *
+     * Components that display user identity or enforce
+     * authorization can refresh from this event.
+     */
+    USERS_CHANGED:
+        "usersChanged"
 
 } as const;
 

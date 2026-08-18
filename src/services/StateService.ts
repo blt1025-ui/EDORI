@@ -44,6 +44,7 @@ from "./CurrentOperationalStateApiService";
 
 import {
 
+    emit,
     subscribe
 
 }
@@ -87,6 +88,10 @@ const LEGACY_STATE_STORAGE_KEY =
 let serverStateInitialized = false;
 
 let serverStateInitializationInProgress = false;
+
+let serverStateWriteInProgress = false;
+
+let lastServerStateUpdatedAtMilliseconds = 0;
 
 
 /*
@@ -328,6 +333,11 @@ export function updateState(
         state
     );
 
+
+    emit(
+        APP_EVENTS.STATE_CHANGED
+    );
+
 }
 
 
@@ -369,6 +379,11 @@ export function setState(
 
     void persistCurrentStateToServer(
         state
+    );
+
+
+    emit(
+        APP_EVENTS.STATE_CHANGED
     );
 
 }
@@ -440,6 +455,11 @@ void {
 
             }
         );
+
+
+    emit(
+        APP_EVENTS.STATE_CHANGED
+    );
 
 }
 
@@ -584,6 +604,12 @@ Promise<void> {
         );
 
 
+        lastServerStateUpdatedAtMilliseconds =
+            normalizeServerTimestampMilliseconds(
+                serverState.updatedAt
+            );
+
+
         serverStateInitialized = true;
 
     }
@@ -613,6 +639,148 @@ Promise<void> {
 
 
 /**
+ * Refresh the committed assessment from PostgreSQL.
+ *
+ * Returns true only when the effective in-memory
+ * assessment changed.
+ *
+ * This method never writes back to the server.
+ */
+export async function refreshServerCurrentState():
+
+Promise<boolean> {
+
+    if(
+        serverStateWriteInProgress
+        ||
+        serverStateInitializationInProgress
+    ){
+
+        return false;
+
+    }
+
+
+    const serverState =
+
+        await loadServerCurrentState();
+
+
+    /*
+     * A remote delete should clear this workstation once
+     * there is no local write in flight.
+     */
+    if(!serverState){
+
+        if(!hasCommittedAssessment()){
+
+            return false;
+
+        }
+
+
+        state = cloneAssessment(
+            DEFAULT_STATE
+        );
+
+
+        lastServerStateUpdatedAtMilliseconds = 0;
+
+
+        emit(
+            APP_EVENTS.STATE_CHANGED
+        );
+
+
+        return true;
+
+    }
+
+
+    const serverUpdatedAtMilliseconds =
+
+        normalizeServerTimestampMilliseconds(
+            serverState.updatedAt
+        );
+
+
+    /*
+     * Never apply a response known to be older than a
+     * server version already observed by this tab.
+     */
+    if(
+        serverUpdatedAtMilliseconds > 0
+        &&
+        lastServerStateUpdatedAtMilliseconds > 0
+        &&
+        serverUpdatedAtMilliseconds
+        <
+        lastServerStateUpdatedAtMilliseconds
+    ){
+
+        return false;
+
+    }
+
+
+    const normalizedState =
+
+        normalizeAssessment(
+            serverState.assessment
+        );
+
+
+    if(!normalizedState){
+
+        throw new Error(
+            "The synchronized PostgreSQL Hospital Readiness assessment contains invalid values."
+        );
+
+    }
+
+
+    if(
+        assessmentsEqual(
+            state,
+            normalizedState
+        )
+    ){
+
+        lastServerStateUpdatedAtMilliseconds =
+            Math.max(
+                lastServerStateUpdatedAtMilliseconds,
+                serverUpdatedAtMilliseconds
+            );
+
+
+        return false;
+
+    }
+
+
+    state = cloneAssessment(
+        normalizedState
+    );
+
+
+    lastServerStateUpdatedAtMilliseconds =
+        serverUpdatedAtMilliseconds;
+
+
+    serverStateInitialized = true;
+
+
+    emit(
+        APP_EVENTS.STATE_CHANGED
+    );
+
+
+    return true;
+
+}
+
+
+/**
  * Persist one validated committed assessment through the
  * authenticated current-state API.
  */
@@ -621,6 +789,9 @@ async function persistCurrentStateToServer(
     assessment:SituationAssessment
 
 ):Promise<void> {
+
+    serverStateWriteInProgress = true;
+
 
     try {
 
@@ -677,6 +848,12 @@ async function persistCurrentStateToServer(
         }
 
 
+        lastServerStateUpdatedAtMilliseconds =
+            normalizeServerTimestampMilliseconds(
+                serverState.updatedAt
+            );
+
+
         serverStateInitialized = true;
 
     }
@@ -691,6 +868,59 @@ async function persistCurrentStateToServer(
         );
 
     }
+    finally {
+
+        serverStateWriteInProgress = false;
+
+    }
+
+}
+
+
+/**
+ * Compare two normalized assessments.
+ */
+function assessmentsEqual(
+
+    first:SituationAssessment,
+
+    second:SituationAssessment
+
+):boolean {
+
+    return JSON.stringify(
+        first
+    )
+    ===
+    JSON.stringify(
+        second
+    );
+
+}
+
+
+/**
+ * Normalize one server updated-at timestamp.
+ */
+function normalizeServerTimestampMilliseconds(
+
+    value:string
+
+):number {
+
+    const milliseconds =
+        new Date(
+            value
+        ).getTime();
+
+
+    return Number.isNaN(
+        milliseconds
+    )
+
+        ? 0
+
+        : milliseconds;
 
 }
 

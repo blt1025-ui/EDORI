@@ -131,6 +131,10 @@ let serverSurgePlanInitialized = false;
 
 let serverSurgePlanInitializationInProgress = false;
 
+let serverSurgePlanWriteInProgress = false;
+
+let lastServerSurgePlanSavedAtMilliseconds = 0;
+
 
 clearLegacySurgePlanStorage();
 
@@ -1027,6 +1031,13 @@ Promise<void> {
             serverOverride.savedAt;
 
 
+        lastServerSurgePlanSavedAtMilliseconds =
+
+            normalizeServerSurgePlanTimestamp(
+                serverOverride.savedAt
+            );
+
+
         serverSurgePlanInitialized = true;
 
     }
@@ -1048,6 +1059,144 @@ Promise<void> {
 
 
 /**
+ * Refresh the optional Hospital Surge Plan override from
+ * PostgreSQL without writing anything back.
+ */
+export async function refreshServerSurgePlan():
+
+Promise<boolean> {
+
+    if(
+        serverSurgePlanWriteInProgress
+        ||
+        serverSurgePlanInitializationInProgress
+    ){
+
+        return false;
+
+    }
+
+
+    const serverOverride =
+        await loadServerSurgePlan();
+
+
+    if(!serverOverride){
+
+        if(serverSurgePlan === null){
+
+            return false;
+
+        }
+
+
+        serverSurgePlan = null;
+
+        serverSurgePlanSavedAt = null;
+
+        lastServerSurgePlanSavedAtMilliseconds = 0;
+
+
+        publishSurgePlanChanged();
+
+
+        return true;
+
+    }
+
+
+    const serverSavedAtMilliseconds =
+        normalizeServerSurgePlanTimestamp(
+            serverOverride.savedAt
+        );
+
+
+    if(
+        serverSavedAtMilliseconds > 0
+        &&
+        lastServerSurgePlanSavedAtMilliseconds > 0
+        &&
+        serverSavedAtMilliseconds
+        <
+        lastServerSurgePlanSavedAtMilliseconds
+    ){
+
+        return false;
+
+    }
+
+
+    const normalized =
+        normalizeConfiguration(
+            serverOverride.configuration
+        );
+
+
+    const validation =
+        validateSurgePlan(
+            normalized
+        );
+
+
+    if(!validation.valid){
+
+        throw new Error(
+            validation.errors.join(
+                " "
+            )
+        );
+
+    }
+
+
+    const changed =
+        serverSurgePlan === null
+        ||
+        JSON.stringify(
+            serverSurgePlan
+        )
+        !==
+        JSON.stringify(
+            normalized
+        );
+
+
+    serverSurgePlanSavedAt =
+        serverOverride.savedAt;
+
+
+    lastServerSurgePlanSavedAtMilliseconds =
+        Math.max(
+            lastServerSurgePlanSavedAtMilliseconds,
+            serverSavedAtMilliseconds
+        );
+
+
+    if(!changed){
+
+        return false;
+
+    }
+
+
+    serverSurgePlan =
+        cloneConfiguration(
+            normalized
+        );
+
+
+    serverSurgePlanInitialized = true;
+
+
+    publishSurgePlanChanged();
+
+
+    return true;
+
+}
+
+
+/**
  * Persist one validated Hospital Surge Plan override.
  */
 async function persistSurgePlanToServer(
@@ -1055,6 +1204,9 @@ async function persistSurgePlanToServer(
     configuration:SurgePlanConfiguration
 
 ):Promise<void> {
+
+    serverSurgePlanWriteInProgress = true;
+
 
     try {
 
@@ -1104,6 +1256,13 @@ async function persistSurgePlanToServer(
             serverOverride.savedAt;
 
 
+        lastServerSurgePlanSavedAtMilliseconds =
+
+            normalizeServerSurgePlanTimestamp(
+                serverOverride.savedAt
+            );
+
+
         serverSurgePlanInitialized = true;
 
     }
@@ -1115,6 +1274,34 @@ async function persistSurgePlanToServer(
         );
 
     }
+    finally {
+
+        serverSurgePlanWriteInProgress = false;
+
+    }
+
+}
+
+
+function normalizeServerSurgePlanTimestamp(
+
+    value:string
+
+):number {
+
+    const milliseconds =
+        new Date(
+            value
+        ).getTime();
+
+
+    return Number.isNaN(
+        milliseconds
+    )
+
+        ? 0
+
+        : milliseconds;
 
 }
 

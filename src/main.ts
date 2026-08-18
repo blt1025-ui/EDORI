@@ -123,6 +123,15 @@ import {
 
 from "./services/SecurityAuditService";
 
+
+import {
+
+    initializeSynchronizationService
+
+}
+
+from "./services/SynchronizationService";
+
 import {
 
     initializeServerConfiguration
@@ -130,6 +139,15 @@ import {
 }
 
 from "./services/ConfigurationService";
+
+
+import {
+
+    initializeServerHistoricalDataset
+
+}
+
+from "./services/HistoricalDataRepository";
 
 import {
 
@@ -289,6 +307,8 @@ async function initializeApplication():Promise<void> {
 
     await initializeServerConfiguration();
 
+    await initializeServerHistoricalDataset();
+
     await initializeServerTriggerConfiguration();
 
     await initializeServerSurgePlan();
@@ -301,6 +321,14 @@ async function initializeApplication():Promise<void> {
 
 
         initializeSessionSecurity();
+
+
+        /*
+         * Begin authenticated multi-workstation polling.
+         * The service starts/stops itself as authentication
+         * changes.
+         */
+        initializeSynchronizationService();
 
 
         synchronizeAuthenticationDisplay();

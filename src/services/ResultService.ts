@@ -70,6 +70,7 @@ from "./CurrentResultApiService";
 
 import {
 
+    emit,
     subscribe
 
 }
@@ -93,8 +94,6 @@ from "../config/appEvents";
  */
 
 
-
-
 /**
  * Previous workstation-local storage keys.
  *
@@ -114,6 +113,10 @@ const LEGACY_INVALIDATION_STORAGE_KEY =
 let serverResultInitialized = false;
 
 let serverResultInitializationInProgress = false;
+
+let serverResultWriteInProgress = false;
+
+let lastServerResultUpdatedAtMilliseconds = 0;
 
 
 /*
@@ -212,6 +215,11 @@ export function setLatestResult(
 
     void persistCurrentResultStateToServer();
 
+
+    emit(
+        APP_EVENTS.RESULT_CHANGED
+    );
+
 }
 
 
@@ -293,6 +301,11 @@ export function invalidateLatestResult(
 
     void persistCurrentResultStateToServer();
 
+
+    emit(
+        APP_EVENTS.RESULT_CHANGED
+    );
+
 }
 
 
@@ -351,6 +364,11 @@ void {
 
             }
         );
+
+
+    emit(
+        APP_EVENTS.RESULT_CHANGED
+    );
 
 }
 
@@ -431,6 +449,16 @@ Promise<void> {
         const serverState =
 
             await loadServerCurrentResultState();
+
+
+        if(serverState){
+
+            lastServerResultUpdatedAtMilliseconds =
+                normalizeServerTimestampMilliseconds(
+                    serverState.updatedAt
+                );
+
+        }
 
 
         if(!serverState){
@@ -526,11 +554,176 @@ Promise<void> {
 
 
 /**
+ * Refresh the authoritative result/invalidation state
+ * from PostgreSQL.
+ *
+ * Returns true only when effective local state changed.
+ */
+export async function refreshServerResultState():
+
+Promise<boolean> {
+
+    if(
+        serverResultWriteInProgress
+        ||
+        serverResultInitializationInProgress
+    ){
+
+        return false;
+
+    }
+
+
+    const serverState =
+
+        await loadServerCurrentResultState();
+
+
+    if(!serverState){
+
+        if(
+            latestResult === null
+            &&
+            invalidationReason === null
+        ){
+
+            return false;
+
+        }
+
+
+        latestResult = null;
+
+        invalidationReason = null;
+
+        lastServerResultUpdatedAtMilliseconds = 0;
+
+
+        emit(
+            APP_EVENTS.RESULT_CHANGED
+        );
+
+
+        return true;
+
+    }
+
+
+    const serverUpdatedAtMilliseconds =
+
+        normalizeServerTimestampMilliseconds(
+            serverState.updatedAt
+        );
+
+
+    if(
+        serverUpdatedAtMilliseconds > 0
+        &&
+        lastServerResultUpdatedAtMilliseconds > 0
+        &&
+        serverUpdatedAtMilliseconds
+        <
+        lastServerResultUpdatedAtMilliseconds
+    ){
+
+        return false;
+
+    }
+
+
+    const normalizedInvalidationReason =
+
+        normalizeInvalidationReason(
+            serverState.invalidationReason
+        );
+
+
+    let nextResult:EdoriResult | null = null;
+
+
+    if(
+        !normalizedInvalidationReason
+        &&
+        serverState.result
+    ){
+
+        nextResult =
+
+            normalizeResult(
+                serverState.result
+            );
+
+
+        if(!nextResult){
+
+            throw new Error(
+                "The synchronized PostgreSQL Hospital Readiness result contains invalid values."
+            );
+
+        }
+
+    }
+
+
+    const changed =
+
+        !resultStatesEqual(
+            latestResult,
+            invalidationReason,
+            nextResult,
+            normalizedInvalidationReason
+        );
+
+
+    lastServerResultUpdatedAtMilliseconds =
+        Math.max(
+            lastServerResultUpdatedAtMilliseconds,
+            serverUpdatedAtMilliseconds
+        );
+
+
+    if(!changed){
+
+        return false;
+
+    }
+
+
+    latestResult =
+
+        nextResult
+            ? cloneResult(
+                nextResult
+            )
+            : null;
+
+
+    invalidationReason =
+        normalizedInvalidationReason;
+
+
+    serverResultInitialized = true;
+
+
+    emit(
+        APP_EVENTS.RESULT_CHANGED
+    );
+
+
+    return true;
+
+}
+
+
+/**
  * Persist the current result/invalidation state.
  */
 async function persistCurrentResultStateToServer():
 
 Promise<void> {
+
+    serverResultWriteInProgress = true;
+
 
     try {
 
@@ -546,6 +739,12 @@ Promise<void> {
 
                 invalidationReason
 
+            );
+
+
+        lastServerResultUpdatedAtMilliseconds =
+            normalizeServerTimestampMilliseconds(
+                serverState.updatedAt
             );
 
 
@@ -619,6 +818,81 @@ Promise<void> {
         );
 
     }
+    finally {
+
+        serverResultWriteInProgress = false;
+
+    }
+
+}
+
+
+/**
+ * Compare two result/invalidation states.
+ */
+function resultStatesEqual(
+
+    firstResult:EdoriResult | null,
+
+    firstReason:string | null,
+
+    secondResult:EdoriResult | null,
+
+    secondReason:string | null
+
+):boolean {
+
+    if(firstReason !== secondReason){
+
+        return false;
+
+    }
+
+
+    if(
+        firstResult === null
+        ||
+        secondResult === null
+    ){
+
+        return firstResult === secondResult;
+
+    }
+
+
+    return JSON.stringify(
+        firstResult
+    )
+    ===
+    JSON.stringify(
+        secondResult
+    );
+
+}
+
+
+/**
+ * Normalize one server updated-at timestamp.
+ */
+function normalizeServerTimestampMilliseconds(
+
+    value:string
+
+):number {
+
+    const milliseconds =
+        new Date(
+            value
+        ).getTime();
+
+
+    return Number.isNaN(
+        milliseconds
+    )
+
+        ? 0
+
+        : milliseconds;
 
 }
 

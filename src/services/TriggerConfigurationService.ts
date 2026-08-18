@@ -154,6 +154,10 @@ let serverTriggerConfigurationInitialized = false;
 
 let serverTriggerConfigurationInitializationInProgress = false;
 
+let serverTriggerConfigurationWriteInProgress = false;
+
+let lastServerTriggerConfigurationSavedAtMilliseconds = 0;
+
 
 clearLegacyTriggerConfigurationStorage();
 
@@ -1130,6 +1134,13 @@ Promise<void> {
             serverOverride.savedAt;
 
 
+        lastServerTriggerConfigurationSavedAtMilliseconds =
+
+            normalizeServerTriggerConfigurationTimestamp(
+                serverOverride.savedAt
+            );
+
+
         serverTriggerConfigurationInitialized = true;
 
     }
@@ -1151,6 +1162,144 @@ Promise<void> {
 
 
 /**
+ * Refresh hospital-specific trigger configuration from
+ * PostgreSQL without writing anything back.
+ */
+export async function refreshServerTriggerConfiguration():
+
+Promise<boolean> {
+
+    if(
+        serverTriggerConfigurationWriteInProgress
+        ||
+        serverTriggerConfigurationInitializationInProgress
+    ){
+
+        return false;
+
+    }
+
+
+    const serverOverride =
+        await loadServerTriggerConfiguration();
+
+
+    if(!serverOverride){
+
+        if(serverTriggerConfiguration === null){
+
+            return false;
+
+        }
+
+
+        serverTriggerConfiguration = null;
+
+        serverTriggerConfigurationSavedAt = null;
+
+        lastServerTriggerConfigurationSavedAtMilliseconds = 0;
+
+
+        publishTriggerConfigurationChanged();
+
+
+        return true;
+
+    }
+
+
+    const serverSavedAtMilliseconds =
+        normalizeServerTriggerConfigurationTimestamp(
+            serverOverride.savedAt
+        );
+
+
+    if(
+        serverSavedAtMilliseconds > 0
+        &&
+        lastServerTriggerConfigurationSavedAtMilliseconds > 0
+        &&
+        serverSavedAtMilliseconds
+        <
+        lastServerTriggerConfigurationSavedAtMilliseconds
+    ){
+
+        return false;
+
+    }
+
+
+    const normalized =
+        normalizeConfiguration(
+            serverOverride.configuration as TriggerConfiguration
+        );
+
+
+    const validation =
+        validateTriggerConfiguration(
+            normalized
+        );
+
+
+    if(!validation.valid){
+
+        throw new Error(
+            validation.errors.join(
+                " "
+            )
+        );
+
+    }
+
+
+    const changed =
+        serverTriggerConfiguration === null
+        ||
+        JSON.stringify(
+            serverTriggerConfiguration
+        )
+        !==
+        JSON.stringify(
+            normalized
+        );
+
+
+    serverTriggerConfigurationSavedAt =
+        serverOverride.savedAt;
+
+
+    lastServerTriggerConfigurationSavedAtMilliseconds =
+        Math.max(
+            lastServerTriggerConfigurationSavedAtMilliseconds,
+            serverSavedAtMilliseconds
+        );
+
+
+    if(!changed){
+
+        return false;
+
+    }
+
+
+    serverTriggerConfiguration =
+        cloneConfiguration(
+            normalized
+        );
+
+
+    serverTriggerConfigurationInitialized = true;
+
+
+    publishTriggerConfigurationChanged();
+
+
+    return true;
+
+}
+
+
+/**
  * Persist one validated trigger override.
  */
 async function persistTriggerConfigurationToServer(
@@ -1158,6 +1307,9 @@ async function persistTriggerConfigurationToServer(
     configuration:TriggerConfiguration
 
 ):Promise<void> {
+
+    serverTriggerConfigurationWriteInProgress = true;
+
 
     try {
 
@@ -1207,6 +1359,13 @@ async function persistTriggerConfigurationToServer(
             serverOverride.savedAt;
 
 
+        lastServerTriggerConfigurationSavedAtMilliseconds =
+
+            normalizeServerTriggerConfigurationTimestamp(
+                serverOverride.savedAt
+            );
+
+
         serverTriggerConfigurationInitialized = true;
 
     }
@@ -1218,6 +1377,34 @@ async function persistTriggerConfigurationToServer(
         );
 
     }
+    finally {
+
+        serverTriggerConfigurationWriteInProgress = false;
+
+    }
+
+}
+
+
+function normalizeServerTriggerConfigurationTimestamp(
+
+    value:string
+
+):number {
+
+    const milliseconds =
+        new Date(
+            value
+        ).getTime();
+
+
+    return Number.isNaN(
+        milliseconds
+    )
+
+        ? 0
+
+        : milliseconds;
 
 }
 

@@ -134,27 +134,20 @@ let serverConfigurationInitialized = false;
 
 let serverConfigurationInitializationInProgress = false;
 
+let serverConfigurationWriteInProgress = false;
+
+let lastServerConfigurationSavedAtMilliseconds = 0;
+
 
 clearLegacyConfigurationStorage();
 
 
-/**
- * Reload the shared configuration when EDORI's
- * authenticated identity/session changes.
- *
- * This covers a successful login that occurs without
- * reloading the browser.
- */
 subscribe(
 
     APP_EVENTS.USERS_CHANGED,
 
     () => {
 
-        /*
-         * Allow a new authenticated session to refresh
-         * the authoritative configuration from PostgreSQL.
-         */
         serverConfigurationInitialized = false;
 
 
@@ -163,6 +156,7 @@ subscribe(
     }
 
 );
+
 
 /**
  * Floating-point tolerance used when validating
@@ -376,6 +370,12 @@ Promise<void> {
             serverOverride.savedAt;
 
 
+        lastServerConfigurationSavedAtMilliseconds =
+            normalizeServerConfigurationTimestamp(
+                serverOverride.savedAt
+            );
+
+
         serverConfigurationInitialized = true;
 
     }
@@ -392,6 +392,167 @@ Promise<void> {
         serverConfigurationInitializationInProgress = false;
 
     }
+
+}
+
+
+/**
+ * Refresh the optional model configuration override from
+ * PostgreSQL without writing anything back.
+ *
+ * Returns true only when the effective configuration
+ * changed on this workstation.
+ */
+export async function refreshServerConfiguration():
+
+Promise<boolean> {
+
+    if(
+        serverConfigurationWriteInProgress
+        ||
+        serverConfigurationInitializationInProgress
+    ){
+
+        return false;
+
+    }
+
+
+    const serverOverride =
+        await loadServerModelConfiguration();
+
+
+    if(!serverOverride){
+
+        if(serverConfiguration === null){
+
+            return false;
+
+        }
+
+
+        serverConfiguration = null;
+
+        serverConfigurationSavedAt = null;
+
+        lastServerConfigurationSavedAtMilliseconds = 0;
+
+
+        emit(
+            APP_EVENTS.CONFIGURATION_CHANGED
+        );
+
+
+        emit(
+            APP_EVENTS.RESULT_CHANGED
+        );
+
+
+        return true;
+
+    }
+
+
+    const serverSavedAtMilliseconds =
+        normalizeServerConfigurationTimestamp(
+            serverOverride.savedAt
+        );
+
+
+    if(
+        serverSavedAtMilliseconds > 0
+        &&
+        lastServerConfigurationSavedAtMilliseconds > 0
+        &&
+        serverSavedAtMilliseconds
+        <
+        lastServerConfigurationSavedAtMilliseconds
+    ){
+
+        return false;
+
+    }
+
+
+    const normalized =
+        normalizeConfiguration(
+            serverOverride.configuration
+        );
+
+
+    const validation =
+        validateConfiguration(
+            normalized
+        );
+
+
+    if(!validation.valid){
+
+        throw new Error(
+            validation.errors.join(
+                " "
+            )
+        );
+
+    }
+
+
+    const changed =
+        serverConfiguration === null
+        ||
+        JSON.stringify(
+            serverConfiguration
+        )
+        !==
+        JSON.stringify(
+            normalized
+        );
+
+
+    serverConfigurationSavedAt =
+        serverOverride.savedAt;
+
+
+    lastServerConfigurationSavedAtMilliseconds =
+        Math.max(
+            lastServerConfigurationSavedAtMilliseconds,
+            serverSavedAtMilliseconds
+        );
+
+
+    if(!changed){
+
+        return false;
+
+    }
+
+
+    serverConfiguration =
+        cloneConfiguration(
+            normalized
+        );
+
+
+    serverConfigurationInitialized = true;
+
+
+    /*
+     * The workstation that made this change already
+     * persisted the authoritative result invalidation.
+     * Do not call publishConfigurationChanged() here,
+     * because that would write the invalidation again.
+     */
+    emit(
+        APP_EVENTS.CONFIGURATION_CHANGED
+    );
+
+
+    emit(
+        APP_EVENTS.RESULT_CHANGED
+    );
+
+
+    return true;
 
 }
 
@@ -513,6 +674,9 @@ async function persistConfigurationToServer(
 
 ):Promise<void> {
 
+    serverConfigurationWriteInProgress = true;
+
+
     try {
 
         const serverOverride =
@@ -556,6 +720,12 @@ async function persistConfigurationToServer(
             serverOverride.savedAt;
 
 
+        lastServerConfigurationSavedAtMilliseconds =
+            normalizeServerConfigurationTimestamp(
+                serverOverride.savedAt
+            );
+
+
         serverConfigurationInitialized = true;
 
     }
@@ -565,6 +735,11 @@ async function persistConfigurationToServer(
             "ConfigurationService could not save the PostgreSQL model configuration.",
             error
         );
+
+    }
+    finally {
+
+        serverConfigurationWriteInProgress = false;
 
     }
 
@@ -1215,9 +1390,33 @@ function normalizeConfiguration(
 }
 
 
+function normalizeServerConfigurationTimestamp(
+
+    value:string
+
+):number {
+
+    const milliseconds =
+        new Date(
+            value
+        ).getTime();
+
+
+    return Number.isNaN(
+        milliseconds
+    )
+
+        ? 0
+
+        : milliseconds;
+
+}
+
+
 /**
  * Remove obsolete workstation-local configuration.
  */
+
 function clearLegacyConfigurationStorage():
 
 void {

@@ -10,7 +10,7 @@ from "vite";
 export default defineConfig({
 
     base:
-        "/EDORI/",
+        "/",
 
 
     server:{

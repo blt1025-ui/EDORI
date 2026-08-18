@@ -10,6 +10,8 @@
     "server:dev": "tsx watch server/src/server.ts",
     "server:build": "tsc -p server/tsconfig.json",
     "server:start": "node server/dist/server.js",
+    "production:build": "npm run build && npm run server:build",
+    "production:start": "npm run production:build && npm run server:start",
     "db:migrate": "tsx server/src/database/migrate.ts",
     "db:verify": "tsx server/src/database/verifySchema.ts",
     "auth:bootstrap": "tsx server/src/auth/bootstrapAdministrator.ts",

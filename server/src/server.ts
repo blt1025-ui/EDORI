@@ -1,10 +1,32 @@
 /**
  * server
  *
- * EDORI API process entry point.
+ * EDORI API + production frontend process entry point.
  */
 
 import "./config/environment.js";
+
+
+import {
+
+    existsSync
+
+}
+
+from "node:fs";
+
+
+import {
+
+    resolve
+
+}
+
+from "node:path";
+
+
+import express from "express";
+
 
 import {
 
@@ -40,10 +62,21 @@ const DEFAULT_PORT =
     3001;
 
 
+const DEFAULT_HOST =
+
+    "0.0.0.0";
+
+
 const configuredPort =
 
     Number(
+
+        process.env.PORT
+
+        ??
+
         process.env.EDORI_API_PORT
+
     );
 
 
@@ -62,6 +95,19 @@ const port =
         : DEFAULT_PORT;
 
 
+const host =
+
+    typeof process.env.EDORI_API_HOST === "string"
+
+    &&
+
+    process.env.EDORI_API_HOST.trim()
+
+        ? process.env.EDORI_API_HOST.trim()
+
+        : DEFAULT_HOST;
+
+
 const app =
 
     createApp();
@@ -78,8 +124,154 @@ console.info(
 
 );
 
+
 /**
- * Verify PostgreSQL before opening the API port.
+ * Production/static frontend.
+ *
+ * Vite writes the compiled frontend to repository-root
+ * /dist. If that directory exists, the same Express
+ * process serves both the browser application and /api.
+ *
+ * This keeps EDORI on one origin:
+ *
+ *   http(s)://host/
+ *   http(s)://host/api/...
+ *
+ * Development remains compatible because the backend can
+ * still start without /dist while Vite is running
+ * separately.
+ */
+const frontendDirectory =
+
+    resolve(
+        process.cwd(),
+        "dist"
+    );
+
+
+const frontendIndex =
+
+    resolve(
+        frontendDirectory,
+        "index.html"
+    );
+
+
+const frontendAvailable =
+
+    existsSync(
+        frontendIndex
+    );
+
+
+if(frontendAvailable){
+
+    app.use(
+
+        express.static(
+
+            frontendDirectory,
+
+            {
+                index:
+                    false,
+
+                fallthrough:
+                    true
+            }
+
+        )
+
+    );
+
+
+    /**
+     * SPA fallback for browser routes.
+     *
+     * API requests are deliberately excluded. Existing API
+     * 404/error behavior remains authoritative.
+     */
+    app.use(
+
+        (
+            request,
+            response,
+            next
+        ) => {
+
+            if(
+
+                request.method !== "GET"
+
+                ||
+
+                request.path.startsWith(
+                    "/api/"
+                )
+
+                ||
+
+                request.path === "/api"
+
+            ){
+
+                next();
+
+                return;
+
+            }
+
+
+            response.sendFile(
+
+                frontendIndex,
+
+                error => {
+
+                    if(error){
+
+                        next(
+                            error
+                        );
+
+                    }
+
+                }
+
+            );
+
+        }
+
+    );
+
+
+    console.info(
+
+        `EDORI compiled frontend enabled: ${frontendDirectory}`
+
+    );
+
+}
+else {
+
+    console.warn(
+
+        [
+            "EDORI compiled frontend was not found.",
+            `Expected: ${frontendIndex}`,
+            "API-only mode will continue.",
+            "Run npm run build before server:start to serve the browser application from this process."
+        ].join(
+            "\n"
+        )
+
+    );
+
+}
+
+
+/**
+ * Verify PostgreSQL before opening the HTTP port.
  *
  * This gives us a clear startup failure during setup
  * rather than allowing EDORI to appear healthy while
@@ -95,7 +287,7 @@ if(!databaseStatus.connected){
     console.error(
 
         [
-            "EDORI API could not connect to PostgreSQL.",
+            "EDORI server could not connect to PostgreSQL.",
             "Check PGHOST, PGPORT, PGDATABASE, PGUSER, and PGPASSWORD.",
             databaseStatus.error
                 ? `Database error: ${databaseStatus.error}`
@@ -121,15 +313,22 @@ const server =
 
         port,
 
+        host,
+
         () => {
 
             console.info(
 
                 [
-                    "EDORI API started successfully.",
+                    "EDORI server started successfully.",
+                    `Host: ${host}`,
                     `Port: ${port}`,
                     "PostgreSQL: connected",
-                    `Health: http://localhost:${port}/api/health`
+                    `Local application: http://localhost:${port}`,
+                    `Local health: http://localhost:${port}/api/health`,
+                    frontendAvailable
+                        ? "Frontend: compiled Vite application served by Express"
+                        : "Frontend: API-only mode"
                 ].join(
                     "\n"
                 )
@@ -166,7 +365,7 @@ function shutdown(
 
     console.info(
 
-        `EDORI API received ${signal}. Shutting down.`
+        `EDORI server received ${signal}. Shutting down.`
 
     );
 
