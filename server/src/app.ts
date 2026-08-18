@@ -108,14 +108,30 @@ from "./routes/AdminUserRoutes.js";
  */
 export function createApp() {
 
-    const app =
+   const app =
 
-        express();
+    express();
 
 
-    app.disable(
-        "x-powered-by"
-    );
+/**
+ * Railway terminates public HTTPS before forwarding
+ * requests to the EDORI Express application.
+ *
+ * Trust one proxy hop so Express can correctly resolve
+ * the original client protocol and IP address.
+ */
+app.set(
+
+    "trust proxy",
+
+    1
+
+);
+
+
+app.disable(
+    "x-powered-by"
+);
 
 
     app.use(
