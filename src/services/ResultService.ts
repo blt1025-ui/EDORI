@@ -112,7 +112,17 @@ const LEGACY_INVALIDATION_STORAGE_KEY =
 
 let serverResultInitialized = false;
 
-let serverResultInitializationInProgress = false;
+
+/**
+ * Shared PostgreSQL initialization Promise.
+ *
+ * Authentication events and the application startup
+ * sequence can request result hydration at nearly the
+ * same time. Every caller must await the same operation.
+ */
+let serverResultInitializationPromise:
+Promise<void> | null = null;
+
 
 let serverResultWriteInProgress = false;
 
@@ -423,132 +433,184 @@ export function getResultServiceStatus():{
 
 
 /**
- * Load the authoritative shared current-result state from
- * PostgreSQL after authentication has been established.
+ * Load the authoritative shared current-result state
+ * from PostgreSQL after authentication has been
+ * established.
+ *
+ * Concurrent startup callers share one Promise so the
+ * application cannot render before an already-running
+ * result hydration has completed.
  */
-export async function initializeServerResultState():
+export function initializeServerResultState():
 
 Promise<void> {
 
-    if(
-        serverResultInitialized
-        ||
-        serverResultInitializationInProgress
-    ){
+    if(serverResultInitialized){
 
-        return;
+        return Promise.resolve();
 
     }
 
 
-    serverResultInitializationInProgress = true;
+    if(serverResultInitializationPromise){
+
+        return serverResultInitializationPromise;
+
+    }
 
 
-    try {
+    serverResultInitializationPromise =
 
-        const serverState =
+        (async () => {
 
-            await loadServerCurrentResultState();
+            try {
 
+                const serverState =
 
-        if(serverState){
-
-            lastServerResultUpdatedAtMilliseconds =
-                normalizeServerTimestampMilliseconds(
-                    serverState.updatedAt
-                );
-
-        }
+                    await loadServerCurrentResultState();
 
 
-        if(!serverState){
+                if(serverState){
 
-            latestResult = null;
+                    lastServerResultUpdatedAtMilliseconds =
 
-            invalidationReason = null;
+                        normalizeServerTimestampMilliseconds(
+                            serverState.updatedAt
+                        );
 
-            serverResultInitialized = true;
+                }
+                else {
 
-            return;
+                    lastServerResultUpdatedAtMilliseconds =
+                        0;
 
-        }
-
-
-        const normalizedInvalidationReason =
-
-            normalizeInvalidationReason(
-                serverState.invalidationReason
-            );
+                }
 
 
-        if(normalizedInvalidationReason){
+                if(!serverState){
 
-            latestResult = null;
-
-            invalidationReason =
-                normalizedInvalidationReason;
-
-            serverResultInitialized = true;
-
-            return;
-
-        }
+                    latestResult =
+                        null;
 
 
-        if(serverState.result){
-
-            const normalizedResult =
-
-                normalizeResult(
-                    serverState.result
-                );
+                    invalidationReason =
+                        null;
 
 
-            if(!normalizedResult){
+                    serverResultInitialized =
+                        true;
 
-                throw new Error(
-                    "The PostgreSQL Hospital Readiness result contains invalid values."
+
+                    return;
+
+                }
+
+
+                const normalizedInvalidationReason =
+
+                    normalizeInvalidationReason(
+                        serverState.invalidationReason
+                    );
+
+
+                if(normalizedInvalidationReason){
+
+                    latestResult =
+                        null;
+
+
+                    invalidationReason =
+                        normalizedInvalidationReason;
+
+
+                    serverResultInitialized =
+                        true;
+
+
+                    return;
+
+                }
+
+
+                if(serverState.result){
+
+                    const normalizedResult =
+
+                        normalizeResult(
+                            serverState.result
+                        );
+
+
+                    if(!normalizedResult){
+
+                        throw new Error(
+
+                            "The PostgreSQL Hospital Readiness result contains invalid values."
+
+                        );
+
+                    }
+
+
+                    latestResult =
+
+                        cloneResult(
+                            normalizedResult
+                        );
+
+
+                    invalidationReason =
+                        null;
+
+
+                    serverResultInitialized =
+                        true;
+
+
+                    return;
+
+                }
+
+
+                latestResult =
+                    null;
+
+
+                invalidationReason =
+                    null;
+
+
+                serverResultInitialized =
+                    true;
+
+            }
+            catch(error){
+
+                /*
+                 * Leave initialization incomplete after a
+                 * failed server request so a later
+                 * authenticated request can retry.
+                 */
+                console.warn(
+
+                    "Unable to load the PostgreSQL Hospital Readiness result state:",
+
+                    error
+
                 );
 
             }
+            finally {
+
+                serverResultInitializationPromise =
+                    null;
+
+            }
+
+        })();
 
 
-            latestResult =
-
-                cloneResult(
-                    normalizedResult
-                );
-
-
-            invalidationReason = null;
-
-            serverResultInitialized = true;
-
-            return;
-
-        }
-
-
-        latestResult = null;
-
-        invalidationReason = null;
-
-        serverResultInitialized = true;
-
-    }
-    catch(error){
-
-        console.warn(
-            "Unable to load the PostgreSQL Hospital Readiness result state:",
-            error
-        );
-
-    }
-    finally {
-
-        serverResultInitializationInProgress = false;
-
-    }
+    return serverResultInitializationPromise;
 
 }
 
@@ -563,13 +625,21 @@ export async function refreshServerResultState():
 
 Promise<boolean> {
 
-    if(
-        serverResultWriteInProgress
-        ||
-        serverResultInitializationInProgress
-    ){
+    if(serverResultWriteInProgress){
 
         return false;
+
+    }
+
+
+    /*
+     * Startup hydration is authoritative. If it is already
+     * underway, allow it to finish before performing a
+     * synchronization refresh.
+     */
+    if(serverResultInitializationPromise){
+
+        await serverResultInitializationPromise;
 
     }
 

@@ -87,7 +87,18 @@ const LEGACY_STATE_STORAGE_KEY =
 
 let serverStateInitialized = false;
 
-let serverStateInitializationInProgress = false;
+
+/**
+ * Shared initialization promise.
+ *
+ * Multiple callers can request initialization during
+ * application startup. All callers must await the same
+ * PostgreSQL load rather than treating an in-progress
+ * request as if initialization were complete.
+ */
+let serverStateInitializationPromise:
+Promise<void> | null = null;
+
 
 let serverStateWriteInProgress = false;
 
@@ -538,102 +549,128 @@ export function getStateServiceStatus():{
 /**
  * Load the authoritative current assessment from
  * PostgreSQL after authentication is established.
+ *
+ * Initialization may be requested by both the
+ * USERS_CHANGED subscription and the application startup
+ * sequence. If one load is already running, every caller
+ * receives and awaits that same Promise.
  */
-export async function initializeServerCurrentState():
+export function initializeServerCurrentState():
 
 Promise<void> {
 
-    if(
+    if(serverStateInitialized){
 
-        serverStateInitialized
-
-        ||
-
-        serverStateInitializationInProgress
-
-    ){
-
-        return;
+        return Promise.resolve();
 
     }
 
 
-    serverStateInitializationInProgress = true;
+    if(serverStateInitializationPromise){
 
-
-    try {
-
-        const serverState =
-
-            await loadServerCurrentState();
-
-
-        if(!serverState){
-
-            state = cloneAssessment(
-                DEFAULT_STATE
-            );
-
-            serverStateInitialized = true;
-
-            return;
-
-        }
-
-
-        const normalizedState =
-
-            normalizeAssessment(
-                serverState.assessment
-            );
-
-
-        if(!normalizedState){
-
-            throw new Error(
-
-                "The PostgreSQL current Hospital Readiness assessment contains invalid values."
-
-            );
-
-        }
-
-
-        state = cloneAssessment(
-            normalizedState
-        );
-
-
-        lastServerStateUpdatedAtMilliseconds =
-            normalizeServerTimestampMilliseconds(
-                serverState.updatedAt
-            );
-
-
-        serverStateInitialized = true;
+        return serverStateInitializationPromise;
 
     }
-    catch(error){
 
-        /*
-         * A temporary 401 before authentication completes,
-         * or a transient API failure, must not crash EDORI.
-         * A later USERS_CHANGED event can retry.
-         */
-        console.warn(
 
-            "Unable to load the PostgreSQL Hospital Readiness current state:",
+    serverStateInitializationPromise =
 
-            error
+        (async () => {
 
-        );
+            try {
 
-    }
-    finally {
+                const serverState =
 
-        serverStateInitializationInProgress = false;
+                    await loadServerCurrentState();
 
-    }
+
+                if(!serverState){
+
+                    state = cloneAssessment(
+                        DEFAULT_STATE
+                    );
+
+
+                    lastServerStateUpdatedAtMilliseconds =
+                        0;
+
+
+                    serverStateInitialized =
+                        true;
+
+
+                    return;
+
+                }
+
+
+                const normalizedState =
+
+                    normalizeAssessment(
+                        serverState.assessment
+                    );
+
+
+                if(!normalizedState){
+
+                    throw new Error(
+
+                        "The PostgreSQL current Hospital Readiness assessment contains invalid values."
+
+                    );
+
+                }
+
+
+                state = cloneAssessment(
+                    normalizedState
+                );
+
+
+                lastServerStateUpdatedAtMilliseconds =
+
+                    normalizeServerTimestampMilliseconds(
+                        serverState.updatedAt
+                    );
+
+
+                serverStateInitialized =
+                    true;
+
+            }
+            catch(error){
+
+                /*
+                 * Do not mark initialization complete when
+                 * PostgreSQL could not be loaded.
+                 *
+                 * This permits a later authenticated retry.
+                 */
+                console.warn(
+
+                    "Unable to load the PostgreSQL Hospital Readiness current state:",
+
+                    error
+
+                );
+
+            }
+            finally {
+
+                /*
+                 * Release the shared Promise only after every
+                 * caller awaiting this initialization has been
+                 * allowed to complete.
+                 */
+                serverStateInitializationPromise =
+                    null;
+
+            }
+
+        })();
+
+
+    return serverStateInitializationPromise;
 
 }
 
@@ -650,13 +687,21 @@ export async function refreshServerCurrentState():
 
 Promise<boolean> {
 
-    if(
-        serverStateWriteInProgress
-        ||
-        serverStateInitializationInProgress
-    ){
+    if(serverStateWriteInProgress){
 
         return false;
+
+    }
+
+
+    /*
+     * If initial hydration is still running, wait for it
+     * rather than racing a second PostgreSQL read against
+     * application startup.
+     */
+    if(serverStateInitializationPromise){
+
+        await serverStateInitializationPromise;
 
     }
 
