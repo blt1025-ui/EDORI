@@ -7,6 +7,8 @@
  *
  * - Load global styles
  * - Initialize authentication
+ * - Restore authoritative PostgreSQL-backed application state
+ * - Prevent authenticated pages from rendering before hydration completes
  * - Render the login experience when signed out
  * - Render and initialize EDORI once authenticated
  * - Keep login/application visibility synchronized
@@ -15,708 +17,248 @@
 
 import "./style.css";
 
+import { APP_EVENTS } from "./config/appEvents";
+import { App } from "./components/App";
+import { initializeServerCurrentState } from "./services/StateService";
+import { initializeDashboard } from "./components/Dashboard";
+import { initializeLoginPage, LoginPage } from "./components/LoginPage";
+import { initializePasswordChangePage, PasswordChangePage } from "./components/PasswordChangePage";
+import { initializeAuthentication, isAuthenticated, isPasswordChangeRequired } from "./services/AuthenticationService";
+import { subscribe } from "./services/EventService";
+import { initializeSessionSecurity } from "./services/SessionSecurityService";
+import { initializeServerTriggerConfiguration } from "./services/TriggerConfigurationService";
+import { initializeServerSurgePlan } from "./services/SurgePlanService";
+import { initializeServerResultState } from "./services/ResultService";
+import { initializeServerSecurityAuditLog } from "./services/SecurityAuditService";
+import { initializeSynchronizationService } from "./services/SynchronizationService";
+import { initializeServerConfiguration } from "./services/ConfigurationService";
+import { initializeServerHistoricalDataset } from "./services/HistoricalDataRepository";
+import { copyEdoriScenarioResults, printEdoriCalibrationTable, printEdoriScenarioReport } from "./scenarios/runEdoriScenarios";
+import { printOperationalTriggerReport } from "./scenarios/runOperationalTriggers";
+import { printOperationalAssessmentReport } from "./scenarios/runOperationalAssessment";
+import { runEdoriValidationSuite } from "./scenarios/runEdoriValidationSuite";
+
+const appElement = document.querySelector<HTMLDivElement>("#app");
 
-import {
-
-    APP_EVENTS
-
-}
-
-from "./config/appEvents";
-
-
-import {
-
-    App
-
-}
-
-from "./components/App";
-
-import {
-
-    initializeServerCurrentState
-
-}
-
-from "./services/StateService";
-
-import {
-
-    initializeDashboard
-
-}
-
-from "./components/Dashboard";
-
-
-import {
-
-    initializeLoginPage,
-    LoginPage
-
-}
-
-from "./components/LoginPage";
-
-
-import {
-
-    initializePasswordChangePage,
-    PasswordChangePage
-
-}
-
-from "./components/PasswordChangePage";
-
-
-import {
-
-    initializeAuthentication,
-    isAuthenticated,
-    isPasswordChangeRequired
-
-}
-
-from "./services/AuthenticationService";
-
-
-import {
-
-    subscribe
-
-}
-
-from "./services/EventService";
-
-
-import {
-
-    initializeSessionSecurity
-
-}
-
-from "./services/SessionSecurityService";
-
-import {
-
-    initializeServerTriggerConfiguration
-
-}
-
-from "./services/TriggerConfigurationService";
-
-import {
-
-    initializeServerSurgePlan
-
-}
-
-from "./services/SurgePlanService";
-
-import {
-
-    initializeServerResultState
-
-}
-
-from "./services/ResultService";
-
-import {
-
-    initializeServerSecurityAuditLog
-
-}
-
-from "./services/SecurityAuditService";
-
-
-import {
-
-    initializeSynchronizationService
-
-}
-
-from "./services/SynchronizationService";
-
-import {
-
-    initializeServerConfiguration
-
-}
-
-from "./services/ConfigurationService";
-
-
-import {
-
-    initializeServerHistoricalDataset
-
-}
-
-from "./services/HistoricalDataRepository";
-
-import {
-
-    copyEdoriScenarioResults,
-
-    printEdoriCalibrationTable,
-
-    printEdoriScenarioReport
-
-}
-
-from "./scenarios/runEdoriScenarios";
-
-
-import {
-
-    printOperationalTriggerReport
-
-}
-
-from "./scenarios/runOperationalTriggers";
-
-
-import {
-
-    printOperationalAssessmentReport
-
-}
-
-from "./scenarios/runOperationalAssessment";
-
-
-import {
-
-    runEdoriValidationSuite
-
-}
-
-from "./scenarios/runEdoriValidationSuite";
-
-
-/**
- * Locate the application root created by index.html.
- */
-const appElement = document.querySelector<
-
-    HTMLDivElement
-
->(
-
-    "#app"
-
-);
-
-
-/**
- * Stop initialization if the root element cannot
- * be found.
- */
 if(!appElement){
-
-    throw new Error(
-
-        "EDORI could not find the #app root element."
-
-    );
-
+    throw new Error("EDORI could not find the #app root element.");
 }
 
-
-/**
- * Track whether the authenticated application has
- * already been rendered and initialized.
- *
- * The application remains mounted while signed out so
- * repeated login/logout cycles do not create duplicate
- * component event subscriptions.
- */
 let authenticatedApplicationInitialized = false;
+let applicationStartupComplete = false;
+let authenticatedHydrationPromise:Promise<void> | null = null;
 
-
-/**
- * Create persistent authentication/application hosts.
- */
 appElement.innerHTML = `
-
-    <div
-        id="edoriAuthenticationHost"
-        class="edori-authentication-host"
-    >
-    </div>
-
-
-    <div
-        id="edoriPasswordChangeHost"
-        class="edori-password-change-host"
-        hidden
-    >
-    </div>
-
-
-    <div
-        id="edoriAuthenticatedApplicationHost"
-        class="edori-authenticated-application-host"
-        hidden
-    >
-    </div>
-
+    <div id="edoriAuthenticationHost" class="edori-authentication-host"></div>
+    <div id="edoriPasswordChangeHost" class="edori-password-change-host" hidden></div>
+    <div id="edoriAuthenticatedApplicationHost" class="edori-authenticated-application-host" hidden></div>
 `;
 
-
-/**
- * Keep the visible experience synchronized whenever
- * UserService reports an identity/session change.
- */
 subscribe(
-
     APP_EVENTS.USERS_CHANGED,
-
-    synchronizeAuthenticationDisplay
-
-);
-
-
-window.addEventListener(
-
-    "edori-authentication-state-changed",
-
-    synchronizeAuthenticationDisplay
-
-);
-
-
-/**
- * Initialize the authentication layer and then display
- * the correct experience.
- */
-void initializeApplication();
-
-
-async function initializeApplication():Promise<void> {
-
-    try {
-
-        await initializeAuthentication();
-
-
-        /*
-         * Load the shared PostgreSQL-backed EDORI model
-         * configuration before rendering the authenticated
-         * application.
-         *
-         * If no saved override exists, ConfigurationService
-         * continues using the built-in TypeScript defaults.
-         */
-       if(isAuthenticated()){
-
-    /*
-     * Restore the authoritative committed assessment
-     * before any dashboard components render.
-     */
-    await initializeServerCurrentState();
-
-
-    await initializeServerConfiguration();
-
-    await initializeServerHistoricalDataset();
-
-    await initializeServerTriggerConfiguration();
-
-    await initializeServerSurgePlan();
-
-    await initializeServerResultState();
-
-    await initializeServerSecurityAuditLog();
-
-}
-
-
-        initializeSessionSecurity();
-
-
-        /*
-         * Begin authenticated multi-workstation polling.
-         * The service starts/stops itself as authentication
-         * changes.
-         */
-        initializeSynchronizationService();
-
-
-        synchronizeAuthenticationDisplay();
-
-    }
-    catch(error){
-
-        console.error(
-
-            "EDORI authentication initialization failed:",
-
-            error
-
-        );
-
-
-        renderAuthenticationInitializationError();
-
-    }
-
-}
-
-
-/**
- * Show either LoginPage or the authenticated EDORI app.
- */
-function synchronizeAuthenticationDisplay():void {
-
-    const authenticationHost =
-
-        document.getElementById(
-
-            "edoriAuthenticationHost"
-
-        );
-
-
-    const passwordChangeHost =
-
-        document.getElementById(
-
-            "edoriPasswordChangeHost"
-
-        );
-
-
-    const applicationHost =
-
-        document.getElementById(
-
-            "edoriAuthenticatedApplicationHost"
-
-        );
-
-
-    if(
-
-        !authenticationHost
-
-        ||
-
-        !passwordChangeHost
-
-        ||
-
-        !applicationHost
-
-    ){
-
-        return;
-
-    }
-
-
-    if(
-
-        isAuthenticated()
-
-        &&
-
-        isPasswordChangeRequired()
-
-    ){
-
-        authenticationHost.hidden =
-            true;
-
-
-        authenticationHost.innerHTML =
-            "";
-
-
-        applicationHost.hidden =
-            true;
-
-
-        passwordChangeHost.hidden =
-            false;
-
-
-        passwordChangeHost.innerHTML =
-
-            PasswordChangePage();
-
-
-        initializePasswordChangePage(
-
-            synchronizeAuthenticationDisplay
-
-        );
-
-
-        return;
-
-    }
-
-
-    passwordChangeHost.hidden =
-        true;
-
-
-    passwordChangeHost.innerHTML =
-        "";
-
-
-    if(isAuthenticated()){
-
-        authenticationHost.hidden =
-            true;
-
-
-        authenticationHost.innerHTML =
-            "";
-
-
-        applicationHost.hidden =
-            false;
-
-
-        if(!authenticatedApplicationInitialized){
-
-            applicationHost.innerHTML =
-
-                App();
-
-
-            initializeDashboard();
-
-
-            authenticatedApplicationInitialized =
-                true;
-
+    () => {
+        if(isAuthenticated()){
+            applicationStartupComplete = false;
+            void hydrateAuthenticatedApplication().then(() => {
+                synchronizeAuthenticationDisplay();
+            });
+            return;
         }
 
-
-        return;
-
+        applicationStartupComplete = false;
+        synchronizeAuthenticationDisplay();
     }
+);
 
+window.addEventListener(
+    "edori-authentication-state-changed",
+    synchronizeAuthenticationDisplay
+);
 
-    applicationHost.hidden =
-        true;
+void initializeApplication();
 
+async function initializeApplication():Promise<void> {
+    try {
+        await initializeAuthentication();
 
-    authenticationHost.hidden =
-        false;
+        if(isAuthenticated()){
+            await hydrateAuthenticatedApplication();
+        }
 
+        initializeSessionSecurity();
+        initializeSynchronizationService();
+        synchronizeAuthenticationDisplay();
+    }
+    catch(error){
+        console.error(
+            "EDORI authentication initialization failed:",
+            error
+        );
 
-    authenticationHost.innerHTML =
-
-        LoginPage();
-
-
-    initializeLoginPage();
-
+        renderAuthenticationInitializationError();
+    }
 }
 
+function hydrateAuthenticatedApplication():Promise<void> {
+    if(!isAuthenticated()){
+        applicationStartupComplete = false;
+        return Promise.resolve();
+    }
 
-/**
- * Render an unrecoverable authentication-startup error.
- */
+    if(applicationStartupComplete){
+        return Promise.resolve();
+    }
+
+    if(authenticatedHydrationPromise){
+        return authenticatedHydrationPromise;
+    }
+
+    authenticatedHydrationPromise = (async () => {
+        try {
+            await initializeServerCurrentState();
+            await initializeServerConfiguration();
+            await initializeServerHistoricalDataset();
+            await initializeServerTriggerConfiguration();
+            await initializeServerSurgePlan();
+            await initializeServerResultState();
+            await initializeServerSecurityAuditLog();
+
+            applicationStartupComplete = true;
+        }
+        catch(error){
+            applicationStartupComplete = false;
+            console.error(
+                "EDORI authenticated state hydration failed:",
+                error
+            );
+            throw error;
+        }
+        finally {
+            authenticatedHydrationPromise = null;
+        }
+    })();
+
+    return authenticatedHydrationPromise;
+}
+
+function synchronizeAuthenticationDisplay():void {
+    const authenticationHost = document.getElementById("edoriAuthenticationHost");
+    const passwordChangeHost = document.getElementById("edoriPasswordChangeHost");
+    const applicationHost = document.getElementById("edoriAuthenticatedApplicationHost");
+
+    if(!authenticationHost || !passwordChangeHost || !applicationHost){
+        return;
+    }
+
+    if(!isAuthenticated()){
+        applicationHost.hidden = true;
+        passwordChangeHost.hidden = true;
+        passwordChangeHost.innerHTML = "";
+        authenticationHost.hidden = false;
+        authenticationHost.innerHTML = LoginPage();
+        initializeLoginPage();
+        return;
+    }
+
+    if(!applicationStartupComplete){
+        authenticationHost.hidden = true;
+        passwordChangeHost.hidden = true;
+        applicationHost.hidden = false;
+
+        if(!authenticatedApplicationInitialized){
+            applicationHost.innerHTML = `
+                <main class="edori-startup-loading">
+                    <section class="edori-startup-loading-card">
+                        <h1>Loading Hospital Readiness</h1>
+                        <p>Restoring the current assessment and operational state...</p>
+                    </section>
+                </main>
+            `;
+        }
+
+        return;
+    }
+
+    if(isPasswordChangeRequired()){
+        authenticationHost.hidden = true;
+        authenticationHost.innerHTML = "";
+        applicationHost.hidden = true;
+        passwordChangeHost.hidden = false;
+        passwordChangeHost.innerHTML = PasswordChangePage();
+        initializePasswordChangePage(synchronizeAuthenticationDisplay);
+        return;
+    }
+
+    passwordChangeHost.hidden = true;
+    passwordChangeHost.innerHTML = "";
+    authenticationHost.hidden = true;
+    authenticationHost.innerHTML = "";
+    applicationHost.hidden = false;
+
+    if(!authenticatedApplicationInitialized){
+        applicationHost.innerHTML = App();
+        initializeDashboard();
+        authenticatedApplicationInitialized = true;
+    }
+}
+
 function renderAuthenticationInitializationError():void {
-
-    const authenticationHost =
-
-        document.getElementById(
-
-            "edoriAuthenticationHost"
-
-        );
-
-
-    const passwordChangeHost =
-
-        document.getElementById(
-
-            "edoriPasswordChangeHost"
-
-        );
-
-
-    const applicationHost =
-
-        document.getElementById(
-
-            "edoriAuthenticatedApplicationHost"
-
-        );
-
+    const authenticationHost = document.getElementById("edoriAuthenticationHost");
+    const passwordChangeHost = document.getElementById("edoriPasswordChangeHost");
+    const applicationHost = document.getElementById("edoriAuthenticatedApplicationHost");
 
     if(passwordChangeHost){
-
-        passwordChangeHost.hidden =
-            true;
-
+        passwordChangeHost.hidden = true;
     }
-
 
     if(applicationHost){
-
-        applicationHost.hidden =
-            true;
-
+        applicationHost.hidden = true;
     }
-
 
     if(!authenticationHost){
-
         return;
-
     }
 
-
-    authenticationHost.hidden =
-        false;
-
-
+    authenticationHost.hidden = false;
     authenticationHost.innerHTML = `
-
         <main class="edori-login-page">
-
             <section class="edori-login-card edori-login-fatal-error">
-
-                <h1>
-                    EDORI could not start
-                </h1>
-
+                <h1>EDORI could not start</h1>
                 <p>
-                    The authentication system could not be initialized.
+                    The authentication system or shared application state could not be initialized.
                     Review the browser console for details.
                 </p>
-
             </section>
-
         </main>
-
     `;
-
 }
 
-
-/**
- * Development-only browser-console tools.
- *
- * These functions are exposed while running:
- *
- * npm run dev
- *
- * They are not attached to window in a production
- * build.
- */
 if(import.meta.env.DEV){
-
-    const developmentWindow = window as Window
-
-    &
-
-    {
-
-        /**
-         * Print the complete scenario report.
-         */
+    const developmentWindow = window as Window & {
         runEdoriScenarios?:() => void;
-
-
-        /**
-         * Print the compact calibration table.
-         */
         showEdoriCalibration?:() => void;
-
-
-        /**
-         * Copy scenario results as formatted JSON.
-         */
         copyEdoriScenarioResults?:() => Promise<void>;
-
-
-        /**
-         * Evaluate all configured operational
-         * triggers against the current assessment.
-         */
         runOperationalTriggers?:() => void;
-
-
-        /**
-         * Build and print the complete EDORI
-         * OperationalAssessment object.
-         */
         runOperationalAssessment?:() => void;
-
-
-        /**
-         * Run the consolidated EDORI development
-         * validation suite.
-         */
         runEdoriValidationSuite?:() => unknown;
-
     };
 
-
-    developmentWindow.runEdoriScenarios =
-
-        printEdoriScenarioReport;
-
-
-    developmentWindow.showEdoriCalibration =
-
-        printEdoriCalibrationTable;
-
-
-    developmentWindow.copyEdoriScenarioResults =
-
-        copyEdoriScenarioResults;
-
-
-    developmentWindow.runOperationalTriggers =
-
-        printOperationalTriggerReport;
-
-
-    developmentWindow.runOperationalAssessment =
-
-        printOperationalAssessmentReport;
-
-
-    developmentWindow.runEdoriValidationSuite =
-
-        runEdoriValidationSuite;
-
+    developmentWindow.runEdoriScenarios = printEdoriScenarioReport;
+    developmentWindow.showEdoriCalibration = printEdoriCalibrationTable;
+    developmentWindow.copyEdoriScenarioResults = copyEdoriScenarioResults;
+    developmentWindow.runOperationalTriggers = printOperationalTriggerReport;
+    developmentWindow.runOperationalAssessment = printOperationalAssessmentReport;
+    developmentWindow.runEdoriValidationSuite = runEdoriValidationSuite;
 
     console.info(
-
         [
-
             "EDORI development tools are available:",
-
             "runEdoriScenarios()",
-
             "showEdoriCalibration()",
-
             "copyEdoriScenarioResults()",
-
             "runOperationalTriggers()",
-
             "runOperationalAssessment()",
-
             "runEdoriValidationSuite()"
-
-        ].join(
-
-            "\n"
-
-        )
-
+        ].join("\n")
     );
-
 }
