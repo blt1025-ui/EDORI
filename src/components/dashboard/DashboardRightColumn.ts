@@ -196,8 +196,8 @@ export function DashboardRightColumn():string {
                 title:
                     "EDORI Gauge",
 
-                description:
-                    "Current numerical score and final operational level",
+              description:
+    "Current numerical HRI score and score-derived operational level",
 
                 content:
                     Gauge(),
@@ -216,8 +216,8 @@ export function DashboardRightColumn():string {
                 title:
                     "Operational Assessment",
 
-                description:
-                    "Trigger-adjusted readiness, pillars, and active conditions",
+            description:
+    "HRI readiness domains, operational context, and active advisory triggers",
 
                 content:
                     OperationalOverview(),

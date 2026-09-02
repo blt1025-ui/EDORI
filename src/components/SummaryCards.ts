@@ -1,16 +1,14 @@
 /**
  * SummaryCards
  *
- * Displays five Hospital Readiness domain cards
+ * Displays the three authoritative Hospital Readiness domain cards
  * using the authoritative OperationalAssessment.
  *
  * Cards:
  *
  * - ED Operational Pressure
- * - Acute-Care Capacity
+ * - Projected Hospital Capacity
  * - Critical-Care Capacity
- * - Hospital Inflow
- * - Projected Capacity
  *
  * This component does not calculate Hospital Readiness,
  * evaluate triggers, or modify application state.
@@ -299,7 +297,7 @@ function updateSummaryCards():void {
 
 
 /**
- * Create all five completed domain cards.
+ * Create the three authoritative Version 2.2 HRI domain cards.
  */
 function createCommandCenterCards(
 
@@ -381,14 +379,6 @@ function createCommandCenterCards(
      * =================================================
      */
 
-    const acuteOccupancyPercent = calculatePercentage(
-
-        assessment.occupiedAcuteCareBeds,
-
-        assessment.staffedAcuteCareBeds
-
-    );
-
 
     const criticalOccupancyPercent = calculatePercentage(
 
@@ -399,24 +389,11 @@ function createCommandCenterCards(
     );
 
 
-    const currentAvailableAcuteCareBeds =
-
-        result.currentAvailableAcuteCareBeds;
-
-
     /*
      * =================================================
      * Hospital Flow
      * =================================================
      */
-
-    const inflowDifference =
-
-        result.currentHospitalInflow
-
-        -
-
-        result.expectedHospitalInflow;
 
 
     const projectedAvailableAcuteCareBeds =
@@ -481,49 +458,6 @@ return `
         ${createCommandCenterCard({
 
             title:
-                "Acute-Care Capacity",
-
-            icon:
-                "🛏️",
-
-            primaryLabel:
-                "Occupied / Staffed Beds",
-
-            primaryValue:
-                `${formatNumber(
-                    assessment.occupiedAcuteCareBeds
-                )} / ${formatNumber(
-                    assessment.staffedAcuteCareBeds
-                )}`,
-
-            secondaryValue:
-                `${formatNumber(
-                    acuteOccupancyPercent
-                )}% occupied`,
-
-            comparison:
-                `${formatSignedAvailability(
-                    currentAvailableAcuteCareBeds
-                )} currently available`,
-
-            detail:
-                `Four-hour projected availability: ${formatSignedAvailability(
-                    projectedAvailableAcuteCareBeds
-                )}.`,
-
-            severity:
-                getDomainCardSeverity(
-
-                    result.acuteCapacityScore
-
-                )
-
-        })}
-
-
-        ${createCommandCenterCard({
-
-            title:
                 "Critical-Care Capacity",
 
             icon:
@@ -567,56 +501,7 @@ return `
         ${createCommandCenterCard({
 
             title:
-                "Hospital Inflow",
-
-            icon:
-                "↘️",
-
-            primaryLabel:
-    "Known Non-ED Inflow",
-
-            primaryValue:
-                formatNumber(
-
-                    result.currentHospitalInflow
-
-                ),
-
-            secondaryValue:
-                `${formatNumber(
-                    result.expectedHospitalInflow
-                )} historical expected`,
-
-            comparison:
-                createDifferenceText(
-
-                    inflowDifference,
-
-                    "vs historical expected inflow"
-
-                ),
-
-            detail:
-    `Known non-ED inflow: direct admissions ${formatNumber(
-        assessment.currentDirectAdmissions
-    )} · surgical/procedural admissions ${formatNumber(
-        assessment.currentSurgicalAdmissions
-    )}.`,
-
-            severity:
-                getDomainCardSeverity(
-
-                    result.inflowScore
-
-                )
-
-        })}
-
-
-        ${createCommandCenterCard({
-
-            title:
-                "Projected Capacity",
+                "Projected Hospital Capacity",
 
             icon:
                 "↔️",
@@ -644,11 +529,11 @@ return `
                 ),
 
             detail:
-                `Forecast uses ${formatNumber(
-                    result.projectedHospitalInflow
-                )} projected admissions over the ${formatNumber(
-                    assessment.forecastHours
-                )}-hour horizon. Negative bed availability means projected demand exceeds staffed acute-care capacity.`,
+                `Four-hour projection applies current ED boarders, known direct admissions, known surgical/procedural admissions, ${formatNumber(
+                    assessment.expectedEDAdmissions4h
+                )} expected additional ED admissions, and ${formatNumber(
+                    result.expectedInpatientDepartures
+                )} expected inpatient departures to current staffed acute-care capacity. Negative bed availability means projected demand exceeds staffed capacity.`,
 
             severity:
                 getDomainCardSeverity(
@@ -1053,23 +938,13 @@ function createAwaitingAssessmentCards():string {
         },
 
         {
-            title:"Acute-Care Capacity",
-            icon:"🛏️"
+            title:"Projected Hospital Capacity",
+            icon:"↔️"
         },
 
         {
             title:"Critical-Care Capacity",
             icon:"⚕️"
-        },
-
-        {
-            title:"Hospital Inflow",
-            icon:"↘️"
-        },
-
-        {
-            title:"Projected Capacity",
-            icon:"↔️"
         }
 
     ];

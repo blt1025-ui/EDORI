@@ -13,7 +13,7 @@
  * - Risk direction
  * - Confidence
  * - Score-derived operational state
- * - Hospital surge-plan recommendations
+ * - Configured operational recommendations
  *
  * This service does not:
  *
@@ -26,13 +26,11 @@
 
 import {
 
-    getSurgePlanIntervention
+    getOperationalIntervention
 
 }
 
-from "./SurgePlanService";
-
-
+from "../config/interventions";
 
 
 import {
@@ -201,15 +199,6 @@ export function createOperationalAssessment(
         );
 
 
-    /*
-     * Keep every trigger evaluation in triggerResults for
-     * diagnostics, auditing, scenario testing, and future
-     * administrative review.
-     *
-     * activeTriggers represents the operationally relevant
-     * active trigger set after lower-severity overlapping
-     * triggers have been suppressed.
-     */
     const activeTriggers =
 
         applyTriggerSupersession(
@@ -253,9 +242,20 @@ export function createOperationalAssessment(
     );
 
 
+    /*
+     * Version 2.2 state-authority rule:
+     *
+     * The HRI score is the sole authority for the Alpha-Echo
+     * operational state. Operational triggers remain advisory
+     * and may generate alerts, priorities, recommendations,
+     * reassessment intervals, and leadership actions, but they
+     * must never elevate or otherwise change the HRI state.
+     */
     const finalOperationalState = {
 
-        ...normalizedContext.result.operationalState
+        ...normalizedContext
+            .result
+            .operationalState
 
     };
 
@@ -521,25 +521,18 @@ export function createOperationalAssessment(
 
 
 /**
- * Create Version 2 Hospital Readiness explanatory
+ * Create Version 2.2 Hospital Readiness explanatory
  * pillar scores.
  *
- * These pillars do not replace or recalculate HRI.
- * They group authoritative Hospital Readiness
- * domains into leadership-friendly categories.
+ * The three authoritative HRI domains map directly to
+ * EdoriResult. Legacy acute-care and hospital-inflow keys are
+ * returned as zero-valued compatibility properties only.
  */
 function createInitialPillarScores(
 
     context:OperationalTriggerContext
 
 ):OperationalPillarScores {
-
-    /*
-     * The five displayed domain scores map directly to
-     * the authoritative Hospital Readiness result.
-     *
-     * No secondary weighting or averaging occurs here.
-     */
 
     const edOperationalPressure =
 
@@ -550,29 +543,11 @@ function createInitialPillarScores(
         );
 
 
-    const acuteCareCapacity =
-
-        clampScore(
-
-            context.result.acuteCapacityScore
-
-        );
-
-
     const criticalCareCapacity =
 
         clampScore(
 
             context.result.criticalCapacityScore
-
-        );
-
-
-    const hospitalInflow =
-
-        clampScore(
-
-            context.result.inflowScore
 
         );
 
@@ -599,11 +574,12 @@ function createInitialPillarScores(
 
         edOperationalPressure,
 
-        acuteCareCapacity,
+        /* Version 2.2 compatibility properties. */
+        acuteCareCapacity:0,
 
         criticalCareCapacity,
 
-        hospitalInflow,
+        hospitalInflow:0,
 
         projectedCapacity,
 
@@ -615,7 +591,7 @@ function createInitialPillarScores(
 
 
 /**
- * Create explainable Version 2 Hospital Readiness
+ * Create explainable Version 2.2 Hospital Readiness
  * pillar details.
  */
 function createInitialPillarDetails(
@@ -651,17 +627,6 @@ function createInitialPillarDetails(
         );
 
 
-    const acuteOccupancyPercent =
-
-        calculatePercentage(
-
-            context.assessment.occupiedAcuteCareBeds,
-
-            context.assessment.staffedAcuteCareBeds
-
-        );
-
-
     const criticalOccupancyPercent =
 
         calculatePercentage(
@@ -691,15 +656,6 @@ function createInitialPillarDetails(
         context.assessment.occupiedCriticalCareBeds;
 
 
-    const inflowVariance =
-
-        context.result.currentHospitalInflow
-
-        -
-
-        context.result.expectedHospitalInflow;
-
-
     const projectedCapacityChange =
 
         context.result.projectedAvailableAcuteCareBeds
@@ -713,7 +669,7 @@ function createInitialPillarDetails(
 
         /*
          * =================================================
-         * ED Operational Pressure — 35%
+         * ED Operational Pressure — 45%
          * =================================================
          */
 
@@ -800,7 +756,7 @@ function createInitialPillarDetails(
                         ),
 
                     explanation:
-                        "Current ED boarding population compared with the historical expectation for the current weekday and hour."
+                        "Current ED boarding population. Boarding contributes to present ED operational pressure and is also counted once as known inpatient bed demand in the four-hour projection."
 
                 },
 
@@ -845,101 +801,7 @@ function createInitialPillarDetails(
 
         /*
          * =================================================
-         * Acute-Care Capacity — 20%
-         * =================================================
-         */
-
-        {
-
-            id:
-                "acuteCareCapacity",
-
-            title:
-                "Acute-Care Capacity",
-
-            score:
-                scores.acuteCareCapacity,
-
-            summary:
-                createAcuteCareCapacitySummary(
-
-                    context,
-
-                    acuteOccupancyPercent,
-
-                    currentAvailableAcuteCareBeds
-
-                ),
-
-            factors:[
-
-                {
-
-                    id:
-                        "acute-care-occupancy",
-
-                    label:
-                        "Acute-Care Occupancy",
-
-                    currentValue:
-                        acuteOccupancyPercent,
-
-                    comparisonValue:
-                        null,
-
-                    difference:
-                        null,
-
-                    severity:
-                        clampScore(
-
-                            context.result.acuteCapacityScore
-
-                        ),
-
-                    explanation:
-                        `Current staffed acute-care occupancy: ${formatNumber(context.assessment.occupiedAcuteCareBeds)} of ${formatNumber(context.assessment.staffedAcuteCareBeds)} staffed beds.`
-
-                },
-
-
-                {
-
-                    id:
-                        "available-acute-care-beds",
-
-                    label:
-                        "Available Acute-Care Beds",
-
-                    currentValue:
-                        currentAvailableAcuteCareBeds,
-
-                    comparisonValue:
-                        null,
-
-                    difference:
-                        null,
-
-                    severity:
-                        clampScore(
-
-                            context.result.acuteCapacityScore
-
-                        ),
-
-                    explanation:
-                        "Current staffed acute-care beds not occupied."
-
-                }
-
-            ]
-
-        },
-
-
-        /*
-         * =================================================
-         * Critical-Care Capacity — 15%
+         * Critical-Care Capacity — 20%
          * =================================================
          */
 
@@ -1033,101 +895,7 @@ function createInitialPillarDetails(
 
         /*
          * =================================================
-         * Hospital Inflow — 15%
-         * =================================================
-         */
-
-        {
-
-            id:
-                "hospitalInflow",
-
-            title:
-                "Hospital Inflow",
-
-            score:
-                scores.hospitalInflow,
-
-            summary:
-                createHospitalInflowSummary(
-
-                    context
-
-                ),
-
-            factors:[
-
-                {
-
-                    id:
-                        "known-hospital-inflow",
-
-                    label:
-                        "Known Hospital Inflow",
-
-                    currentValue:
-                        context.result.currentHospitalInflow,
-
-                    comparisonValue:
-                        context.result.expectedHospitalInflow,
-
-                    difference:
-                        inflowVariance,
-
-                    severity:
-                        clampScore(
-
-                            context.result.inflowScore
-
-                        ),
-
-                    explanation:
-                        "Current known ED, direct, and surgical/procedural admissions compared with the historical four-hour hospital inflow expectation."
-
-                },
-
-
-                {
-
-                    id:
-                        "projected-hospital-inflow",
-
-                    label:
-                        "Projected Hospital Inflow",
-
-                    currentValue:
-                        context.result.projectedHospitalInflow,
-
-                    comparisonValue:
-                        context.result.expectedHospitalInflow,
-
-                    difference:
-                        context.result.projectedHospitalInflow
-
-                        -
-
-                        context.result.expectedHospitalInflow,
-
-                    severity:
-                        clampScore(
-
-                            context.result.inflowScore
-
-                        ),
-
-                    explanation:
-                        "Hospital inflow used by the four-hour forecast. The model uses the greater of currently known inflow and historical expected inflow."
-
-                }
-
-            ]
-
-        },
-
-
-        /*
-         * =================================================
-         * Projected Capacity — 15%
+         * Projected Acute-Care Capacity — 35%
          * =================================================
          */
 
@@ -1137,7 +905,7 @@ function createInitialPillarDetails(
                 "projectedCapacity",
 
             title:
-                "Projected Capacity",
+                "Projected Acute-Care Capacity",
 
             score:
                 scores.projectedCapacity,
@@ -1154,10 +922,160 @@ function createInitialPillarDetails(
                 {
 
                     id:
+                        "current-available-acute-care-beds",
+
+                    label:
+                        "Current Available Acute-Care Beds",
+
+                    currentValue:
+                        currentAvailableAcuteCareBeds,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Current staffed acute-care capacity before known and expected four-hour demand is applied."
+
+                },
+
+
+                {
+
+                    id:
+                        "current-ed-boarders",
+
+                    label:
+                        "ED Admissions Awaiting Beds",
+
+                    currentValue:
+                        context.assessment.boardedPatients,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Admitted ED patients already awaiting inpatient beds. These patients are known demand and are counted once in the projection."
+
+                },
+
+
+                {
+
+                    id:
+                        "known-direct-admissions",
+
+                    label:
+                        "Known Direct Admissions - Next 4 Hours",
+
+                    currentValue:
+                        context.assessment.currentDirectAdmissions,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Direct admissions already known and expected to require acute-care placement during the four-hour projection window."
+
+                },
+
+
+                {
+
+                    id:
+                        "known-surgical-admissions",
+
+                    label:
+                        "Known Surgical/Procedural Admissions - Next 4 Hours",
+
+                    currentValue:
+                        context.assessment.currentSurgicalAdmissions,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Surgical or procedural admissions already known and expected to require acute-care placement during the four-hour projection window."
+
+                },
+
+
+                {
+
+                    id:
+                        "expected-additional-ed-admissions",
+
+                    label:
+                        "Expected Additional ED Admissions - Next 4 Hours",
+
+                    currentValue:
+                        context.assessment.expectedEDAdmissions4h,
+
+                    comparisonValue:
+                        null,
+
+                    difference:
+                        null,
+
+                    severity:
+                        clampScore(
+
+                            context.result.projectedCapacityScore
+
+                        ),
+
+                    explanation:
+                        "Historical forecast of new ED-origin inpatient admissions expected after the assessment time. Existing ED boarders are excluded from this forecast."
+
+                },
+
+
+                {
+
+                    id:
                         "expected-inpatient-departures",
 
                     label:
-                        "Expected Inpatient Departures",
+                        "Expected Inpatient Departures - Next 4 Hours",
 
                     currentValue:
                         context.result.expectedInpatientDepartures,
@@ -1176,7 +1094,7 @@ function createInitialPillarDetails(
                         ),
 
                     explanation:
-                        "Historical expected inpatient departures during the four-hour forecast period. This value is not entered or estimated by the user."
+                        "Historical forecast of acute-care beds expected to be released through inpatient departures during the next four hours."
 
                 },
 
@@ -1325,45 +1243,6 @@ function createEdOperationalPressureSummary(
 
 
 /**
- * Explain the Acute-Care Capacity domain.
- */
-function createAcuteCareCapacitySummary(
-
-    context:OperationalTriggerContext,
-
-    occupancyPercent:number,
-
-    availableBeds:number
-
-):string {
-
-    if(availableBeds <= 0){
-
-        return `Acute-care capacity is fully utilized with ${formatNumber(context.assessment.occupiedAcuteCareBeds)} of ${formatNumber(context.assessment.staffedAcuteCareBeds)} staffed beds occupied.`;
-
-    }
-
-
-    if(context.result.acuteCapacityScore >= 60){
-
-        return `Acute-care capacity is significantly constrained at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds currently available.`;
-
-    }
-
-
-    if(context.result.acuteCapacityScore >= 30){
-
-        return `Acute-care capacity is under pressure at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds currently available.`;
-
-    }
-
-
-    return `Acute-care capacity is currently in a lower-pressure range at ${formatNumber(occupancyPercent)}% occupancy with ${formatNumber(availableBeds)} staffed beds available.`;
-
-}
-
-
-/**
  * Explain the Critical-Care Capacity domain.
  */
 function createCriticalCareCapacitySummary(
@@ -1403,54 +1282,7 @@ function createCriticalCareCapacitySummary(
 
 
 /**
- * Explain the Hospital Inflow domain.
- */
-function createHospitalInflowSummary(
-
-    context:OperationalTriggerContext
-
-):string {
-
-    const current =
-
-        context.result.currentHospitalInflow;
-
-
-    const expected =
-
-        context.result.expectedHospitalInflow;
-
-
-    const variance =
-
-        current
-
-        -
-
-        expected;
-
-
-    if(variance > 0){
-
-        return `Known four-hour hospital inflow is ${formatNumber(variance)} patients above the historical expectation (${formatNumber(current)} known versus ${formatNumber(expected)} expected).`;
-
-    }
-
-
-    if(variance < 0){
-
-        return `Known four-hour hospital inflow is ${formatNumber(Math.abs(variance))} patients below the historical expectation; the forecast continues to use at least the historical expected inflow.`;
-
-    }
-
-
-    return `Known four-hour hospital inflow matches the historical expectation at ${formatNumber(expected)} patients.`;
-
-}
-
-
-/**
- * Explain the Projected Capacity domain.
+ * Explain the Projected Acute-Care Capacity domain.
  */
 function createProjectedCapacitySummary(
 
@@ -1470,39 +1302,39 @@ function createProjectedCapacitySummary(
 
     if(projectedAvailable < 0){
 
-        return `The four-hour forecast projects demand exceeding staffed acute-care capacity by approximately ${formatNumber(Math.abs(projectedAvailable))} beds.`;
+        return `The four-hour forecast projects acute-care demand exceeding staffed capacity by approximately ${formatNumber(Math.abs(projectedAvailable))} beds.`;
 
     }
 
 
     if(projectedAvailable === 0){
 
-        return "The four-hour forecast projects complete utilization of currently staffed acute-care capacity.";
+        return "The four-hour forecast projects complete utilization of staffed acute-care capacity.";
 
     }
 
 
     if(projectedAvailable < currentAvailable){
 
-        return `Acute-care availability is projected to tighten from ${formatNumber(currentAvailable)} beds currently available to approximately ${formatNumber(projectedAvailable)} beds over the next four hours.`;
+        return `Acute-care reserve is projected to tighten from ${formatNumber(currentAvailable)} beds currently available to approximately ${formatNumber(projectedAvailable)} beds over the next four hours.`;
 
     }
 
 
     if(projectedAvailable > currentAvailable){
 
-        return `Acute-care availability is projected to improve from ${formatNumber(currentAvailable)} beds currently available to approximately ${formatNumber(projectedAvailable)} beds over the next four hours.`;
+        return `Acute-care reserve is projected to improve from ${formatNumber(currentAvailable)} beds currently available to approximately ${formatNumber(projectedAvailable)} beds over the next four hours.`;
 
     }
 
 
-    return `Acute-care availability is projected to remain approximately stable at ${formatNumber(projectedAvailable)} beds over the next four hours.`;
+    return `Acute-care reserve is projected to remain approximately stable at ${formatNumber(projectedAvailable)} beds over the next four hours.`;
 
 }
 
 
 /**
- * Explain the projected-capacity calculation.
+ * Explain the Version 2.2 projected-capacity calculation.
  */
 function createProjectedCapacityExplanation(
 
@@ -1515,21 +1347,26 @@ function createProjectedCapacityExplanation(
         context.result.projectedAvailableAcuteCareBeds;
 
 
+    const demandDescription =
+
+        "after current ED boarders, known direct admissions, known surgical/procedural admissions, expected additional ED admissions, and expected inpatient departures are applied to current staffed acute-care capacity";
+
+
     if(projectedAvailable < 0){
 
-        return `The four-hour forecast projects a capacity deficit of approximately ${formatNumber(Math.abs(projectedAvailable))} acute-care beds after expected inpatient departures and projected hospital inflow are applied.`;
+        return `The four-hour forecast projects a capacity deficit of approximately ${formatNumber(Math.abs(projectedAvailable))} acute-care beds ${demandDescription}.`;
 
     }
 
 
     if(projectedAvailable === 0){
 
-        return "The four-hour forecast projects no remaining staffed acute-care bed availability after expected departures and projected inflow are applied.";
+        return `The four-hour forecast projects no remaining staffed acute-care bed availability ${demandDescription}.`;
 
     }
 
 
-    return `The four-hour forecast projects approximately ${formatNumber(projectedAvailable)} staffed acute-care beds remaining available after expected departures and projected inflow are applied.`;
+    return `The four-hour forecast projects approximately ${formatNumber(projectedAvailable)} staffed acute-care beds remaining available ${demandDescription}.`;
 
 }
 
@@ -1723,177 +1560,64 @@ function determineConfidence(
 
 
 /**
- * Remove lower-severity active triggers when a more
- * severe trigger represents the same operational
- * condition.
- *
- * Important:
- *
- * - Raw triggerResults remain unchanged.
- * - Only the operational active-trigger collection is
- *   filtered.
- * - HRI score is not changed.
- * - Alpha through Echo state is not changed.
- * - Trigger conditions and thresholds are not changed.
- *
- * This prevents leadership-facing displays and
- * recommendations from showing several nested alerts
- * for the same underlying operational problem.
+ * Suppress lower-severity leadership-facing alerts when
+ * multiple nested triggers describe the same condition.
+ * Raw triggerResults remain unchanged for auditability.
  */
 function applyTriggerSupersession(
 
-    activeTriggers:
-        OperationalAssessment["activeTriggers"]
+    activeTriggers:OperationalAssessment["activeTriggers"]
 
 ):OperationalAssessment["activeTriggers"] {
 
-    /*
-     * Each group is ordered from lowest severity
-     * to highest severity.
-     *
-     * When multiple triggers in one group are active,
-     * only the highest active trigger is retained.
-     */
     const supersessionGroups:string[][] = [
-
-        /*
-         * =============================================
-         * Projected Acute-Care Capacity
-         * =============================================
-         */
         [
-
             "projected-acute-capacity-low",
-
             "projected-acute-capacity-exhausted",
-
             "projected-acute-capacity-deficit",
-
-            "severe-projected-acute-capacity-deficit"
-
+            "severe-projected-acute-capacity-deficit",
+            "extreme-projected-acute-capacity-deficit"
         ],
-
-
-        /*
-         * =============================================
-         * ED Boarding
-         * =============================================
-         */
         [
-
             "significant-boarding",
-
             "boarding-crisis"
-
         ]
-
     ];
 
-
-    /*
-     * IDs that should be removed because a higher
-     * trigger in the same hierarchy is active.
-     */
     const suppressedIds = new Set<string>();
 
-
     supersessionGroups.forEach(
-
         group => {
-
-            const activeIdsInGroup =
-
-                group.filter(
-
-                    triggerId =>
-
-                        activeTriggers.some(
-
-                            triggerResult =>
-
-                                triggerResult
-                                    .trigger
-                                    .id
-
-                                ===
-
-                                triggerId
-
-                        )
-
-                );
-
-
-            /*
-             * Zero or one active trigger means there
-             * is nothing to supersede.
-             */
-            if(activeIdsInGroup.length <= 1){
-
-                return;
-
-            }
-
-
-            /*
-             * Because the group is ordered from lowest
-             * to highest severity, the final active ID
-             * is the trigger we retain.
-             */
-            const highestActiveId =
-
-                activeIdsInGroup[
-
-                    activeIdsInGroup.length - 1
-
-                ];
-
-
-            activeIdsInGroup.forEach(
-
-                triggerId => {
-
-                    if(triggerId !== highestActiveId){
-
-                        suppressedIds.add(
-
-                            triggerId
-
-                        );
-
-                    }
-
-                }
-
+            const activeIdsInGroup = group.filter(
+                triggerId =>
+                    activeTriggers.some(
+                        triggerResult =>
+                            triggerResult.trigger.id === triggerId
+                    )
             );
 
+            if(activeIdsInGroup.length <= 1){
+                return;
+            }
+
+            const highestActiveId =
+                activeIdsInGroup[activeIdsInGroup.length - 1];
+
+            activeIdsInGroup.forEach(
+                triggerId => {
+                    if(triggerId !== highestActiveId){
+                        suppressedIds.add(triggerId);
+                    }
+                }
+            );
         }
-
     );
-
 
     return activeTriggers.filter(
-
         triggerResult =>
-
-            !suppressedIds.has(
-
-                triggerResult
-                    .trigger
-                    .id
-
-            )
-
+            !suppressedIds.has(triggerResult.trigger.id)
     );
-
 }
-
-
-/**
- * Operational triggers do not alter Alpha–Echo in
- * Version 2.1. They remain available for warnings,
- * recommendations, and reassessment guidance.
- */
 
 
 /**
@@ -1927,7 +1651,7 @@ function createOperationalRecommendations(
 
                         const intervention =
 
-                            getSurgePlanIntervention(
+                            getOperationalIntervention(
 
                                 interventionId
 
@@ -2153,21 +1877,12 @@ function createOperationalRecommendations(
 
 
 /**
- * Calculate operational momentum pressure.
+ * Calculate a transitional momentum score.
  *
- * Operational Momentum is not part of the
- * authoritative HRI score.
+ * A stable score begins at 50.
  *
- * This value is displayed as a pressure scale:
- *
- * Stable or improving        -> 0
- * +1 HRI point               -> 10
- * +5 HRI points              -> 50
- * +10 or more HRI points     -> 100
- *
- * Improvement is communicated through the readable
- * momentum summary and risk-direction fields rather
- * than by assigning a negative pressure score.
+ * Improving conditions move below 50.
+ * Worsening conditions move above 50.
  */
 function calculateMomentumScore(
 
@@ -2198,20 +1913,13 @@ function calculateMomentumScore(
         scores[scores.length - 2];
 
 
-    if(latestChange <= 0){
-
-        return 0;
-
-    }
-
-
     return clampScore(
 
-        latestChange
+        50
 
-        *
+        +
 
-        10
+        latestChange * 5
 
     );
 

@@ -1064,7 +1064,7 @@ function createEditableDomainWeights(
 
                 "HRI Domain Weights",
 
-                "The five domain weights must total exactly 100%."
+                "The three authoritative HRI domain weights must total exactly 100%. Acute-care capacity and hospital inflow remain operational context, not weighted HRI domains."
 
             )}
 
@@ -1078,26 +1078,14 @@ function createEditableDomainWeights(
                 )}
 
                 ${createPercentageInput(
-                    "configWeightAcute",
-                    "Acute-Care Capacity",
-                    configuration.domainWeights.acuteCapacity
-                )}
-
-                ${createPercentageInput(
                     "configWeightCritical",
                     "Critical-Care Capacity",
                     configuration.domainWeights.criticalCapacity
                 )}
 
                 ${createPercentageInput(
-                    "configWeightInflow",
-                    "Hospital Inflow",
-                    configuration.domainWeights.inflow
-                )}
-
-                ${createPercentageInput(
                     "configWeightProjected",
-                    "Projected Capacity",
+                    "Projected Hospital Capacity",
                     configuration.domainWeights.projectedCapacity
                 )}
 
@@ -1112,13 +1100,9 @@ function createEditableDomainWeights(
                 ${formatPercentageTotal(
                     configuration.domainWeights.edPressure
                     +
-                    configuration.domainWeights.acuteCapacity
+                    configuration.domainWeights.projectedCapacity
                     +
                     configuration.domainWeights.criticalCapacity
-                    +
-                    configuration.domainWeights.inflow
-                    +
-                    configuration.domainWeights.projectedCapacity
                 )}
             </div>
 
@@ -1418,22 +1402,12 @@ function createReadOnlyWeights(
                 )}
 
                 ${createWeightCard(
-                    "Acute-Care Capacity",
-                    configuration.domainWeights.acuteCapacity
-                )}
-
-                ${createWeightCard(
                     "Critical-Care Capacity",
                     configuration.domainWeights.criticalCapacity
                 )}
 
                 ${createWeightCard(
-                    "Hospital Inflow",
-                    configuration.domainWeights.inflow
-                )}
-
-                ${createWeightCard(
-                    "Projected Capacity",
+                    "Projected Hospital Capacity",
                     configuration.domainWeights.projectedCapacity
                 )}
 
@@ -1841,9 +1815,7 @@ ConfigurationOverrides | null {
             ),
 
         acuteCapacity:
-            readPercentage(
-                "configWeightAcute"
-            ),
+            0,
 
         criticalCapacity:
             readPercentage(
@@ -1851,9 +1823,7 @@ ConfigurationOverrides | null {
             ),
 
         inflow:
-            readPercentage(
-                "configWeightInflow"
-            ),
+            0,
 
         projectedCapacity:
             readPercentage(
@@ -2044,17 +2014,9 @@ function updateLiveTotals():void {
         "domainWeightTotal",
 
         [
-
             "configWeightEdPressure",
-
-            "configWeightAcute",
-
-            "configWeightCritical",
-
-            "configWeightInflow",
-
-            "configWeightProjected"
-
+            "configWeightProjected",
+            "configWeightCritical"
         ]
 
     );

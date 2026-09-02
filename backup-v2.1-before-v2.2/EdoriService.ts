@@ -1,7 +1,7 @@
 /**
  * EdoriService
  *
- * Version 2.2 Hospital Readiness Model
+ * Version 2.1 Hospital Readiness Model
  *
  * Pure calculation engine for one completed
  * hospital operational assessment.
@@ -10,44 +10,39 @@
  *
  * HRI =
  *
- * 0.45 × ED Operational Pressure
+ * 0.35 × ED Operational Pressure
  * +
- * 0.20 × Critical-Care Capacity Pressure
+ * 0.20 × Acute-Care Capacity Pressure
  * +
- * 0.35 × Projected Acute-Care Capacity Pressure
- *
- * Acute-Care Capacity and Hospital Inflow are retained
- * as compatibility/context values but do not
- * independently contribute to HRI.
- *
- * Historical data forecasts uncertain future ED
- * admissions and inpatient departures. Projected
- * capacity is scored against actual staffed
- * operational capacity, not historical bed balance.
+ * 0.15 × Critical-Care Capacity Pressure
+ * +
+ * 0.15 × Hospital Inflow Pressure
+ * +
+ * 0.15 × Projected Capacity Pressure
  *
  * No application state is read or modified here.
  */
 
 import {
 
-    ED_PRESSURE_WEIGHTS,
+    getConfiguration,
 
-    WEIGHTS,
-
-    areWeightsValid
+    validateConfiguration
 
 }
 
-from "../config/weights";
+from "./ConfigurationService";
 
 
 import {
 
-    getOperationalState
+    getConfiguredOperationalState
 
 }
 
-from "../config/operationalStates";
+from "./OperationalStateService";
+
+
 
 
 import type {
@@ -103,6 +98,16 @@ const HIGH_ACUITY_SHARE_AT_MAXIMUM_SCORE =
     0.30;
 
 
+/**
+ * Known non-ED inflow eight patients above its
+ * historical four-hour expectation produces maximum
+ * inflow pressure.
+ */
+const INFLOW_EXCESS_AT_MAXIMUM_SCORE =
+
+    8;
+
+
 /*
  * =====================================================
  * Public calculation
@@ -119,15 +124,63 @@ export function calculateEdori(
 
 ):EdoriResult {
 
-    if(!areWeightsValid()){
+    /*
+     * =================================================
+     * Effective runtime configuration
+     * =================================================
+     *
+     * ConfigurationService returns validated saved
+     * administrative overrides when they exist.
+     *
+     * Otherwise it returns the built-in configuration.
+     *
+     * Capture configuration exactly once so one HRI
+     * calculation cannot mix configuration versions.
+     */
+
+    const configuration =
+
+        getConfiguration();
+
+
+    const configurationValidation =
+
+        validateConfiguration(
+
+            configuration
+
+        );
+
+
+    if(!configurationValidation.valid){
 
         throw new Error(
 
-            "Hospital Readiness scoring weights are invalid."
+            [
+
+                "Hospital Readiness configuration is invalid.",
+
+                ...configurationValidation.errors
+
+            ].join(
+
+                " "
+
+            )
 
         );
 
     }
+
+
+    const domainWeights =
+
+        configuration.domainWeights;
+
+
+    const edPressureWeights =
+
+        configuration.edPressureWeights;
 
 
     /*
@@ -167,7 +220,7 @@ export function calculateEdori(
         );
 
 
-    const edPressureScore =
+        const edPressureScore =
 
         roundScore(
 
@@ -177,7 +230,7 @@ export function calculateEdori(
 
                 *
 
-                ED_PRESSURE_WEIGHTS.volume
+                edPressureWeights.volume
 
             )
 
@@ -189,7 +242,7 @@ export function calculateEdori(
 
                 *
 
-                ED_PRESSURE_WEIGHTS.boarding
+                edPressureWeights.boarding
 
             )
 
@@ -201,7 +254,7 @@ export function calculateEdori(
 
                 *
 
-                ED_PRESSURE_WEIGHTS.acuity
+                edPressureWeights.acuity
 
             )
 
@@ -223,15 +276,13 @@ export function calculateEdori(
         );
 
 
-    /*
-     * Version 2.2:
-     *
-     * Current acute-care occupancy remains available
-     * for operational context and trigger evaluation,
-     * but it is no longer an independently weighted
-     * Hospital Readiness domain.
-     */
-    const acuteCapacityScore = 0;
+    const acuteCapacityScore =
+
+        calculateAcuteCapacityScore(
+
+            acuteOccupancy
+
+        );
 
 
     /*
@@ -304,17 +355,15 @@ export function calculateEdori(
         );
 
 
-    /*
-     * Version 2.2:
-     *
-     * Hospital inflow no longer receives an independent
-     * HRI score. Known direct and surgical/procedural
-     * admissions contribute through projected capacity.
-     *
-     * Historical expected non-ED inflow is retained as
-     * compatibility data for existing records.
-     */
-    const inflowScore = 0;
+    const inflowScore =
+
+        calculateInflowScore(
+
+            knownNonEDInflow,
+
+            expectedNonEDInflow
+
+        );
 
 
     /*
@@ -346,30 +395,46 @@ export function calculateEdori(
 
 
     /*
-     * Direct and surgical/procedural admissions are
-     * treated as known four-hour demand.
-     *
-     * Version 2.2 deliberately does not forecast these
-     * streams from historical expectations because the
-     * operational assessment already contains the
-     * admissions known to be arriving during the
-     * four-hour horizon.
+     * Direct and surgical/procedural admissions use
+     * the greater of currently known demand and the
+     * historical four-hour expectation.
      */
+
     const projectedDirectAdmissions =
 
         roundValue(
-            normalizeNonNegative(
-                assessment.currentDirectAdmissions
+
+            Math.max(
+
+                normalizeNonNegative(
+                    assessment.currentDirectAdmissions
+                ),
+
+                normalizeNonNegative(
+                    assessment.expectedDirectAdmissions4h
+                )
+
             )
+
         );
 
 
     const projectedSurgicalAdmissions =
 
         roundValue(
-            normalizeNonNegative(
-                assessment.currentSurgicalAdmissions
+
+            Math.max(
+
+                normalizeNonNegative(
+                    assessment.currentSurgicalAdmissions
+                ),
+
+                normalizeNonNegative(
+                    assessment.expectedSurgicalAdmissions4h
+                )
+
             )
+
         );
 
 
@@ -485,18 +550,12 @@ export function calculateEdori(
         );
 
 
-    /*
-     * Version 2.2 scores the projected absolute
-     * operational bed balance directly.
-     *
-     * Historical bed balance remains available as
-     * compatibility/reporting data but does not define
-     * what level of projected capacity is acceptable.
-     */
     const projectedCapacityScore =
 
         calculateProjectedCapacityScore(
-            projectedAvailableAcuteCareBeds
+
+            projectedCapacityVariance
+
         );
 
 
@@ -529,15 +588,67 @@ export function calculateEdori(
      * =================================================
      */
 
-    const baseScore =
+        const baseScore =
 
         roundScore(
 
-            (edPressureScore * WEIGHTS.edPressure)
+            (
+
+                edPressureScore
+
+                *
+
+                domainWeights.edPressure
+
+            )
+
             +
-            (criticalCapacityScore * WEIGHTS.criticalCapacity)
+
+            (
+
+                acuteCapacityScore
+
+                *
+
+                domainWeights.acuteCapacity
+
+            )
+
             +
-            (projectedCapacityScore * WEIGHTS.projectedCapacity)
+
+            (
+
+                criticalCapacityScore
+
+                *
+
+                domainWeights.criticalCapacity
+
+            )
+
+            +
+
+            (
+
+                inflowScore
+
+                *
+
+                domainWeights.inflow
+
+            )
+
+            +
+
+            (
+
+                projectedCapacityScore
+
+                *
+
+                domainWeights.projectedCapacity
+
+            )
 
         );
 
@@ -556,7 +667,13 @@ export function calculateEdori(
             [
 
                 edPressureScore,
+
+                acuteCapacityScore,
+
                 criticalCapacityScore,
+
+                inflowScore,
+
                 projectedCapacityScore
 
             ]
@@ -577,13 +694,13 @@ export function calculateEdori(
         );
 
 
-    const operationalState =
+ const operationalState =
 
-        getOperationalState(
+    getConfiguredOperationalState(
 
-            score
+        score
 
-        );
+    );
 
 
     const drivers =
@@ -827,11 +944,12 @@ function calculateRelativeExcessScore(
  * Absolute burden anchors:
  *
  * 0 boarders   ->   0
- * 10 boarders  ->  15
- * 20 boarders  ->  30
- * 30 boarders  ->  50
- * 40 boarders  ->  75
- * 50+ boarders -> 100
+ * 10 boarders  ->  10
+ * 20 boarders  ->  25
+ * 30 boarders  ->  40
+ * 40 boarders  ->  60
+ * 50 boarders  ->  80
+ * 60+ boarders -> 100
  *
  * Historical-deviation modifier:
  *
@@ -878,15 +996,17 @@ function calculateEDBoardingScore(
 
                 { x:0, y:0 },
 
-                { x:10, y:15 },
+                { x:10, y:10 },
 
-                { x:20, y:30 },
+                { x:20, y:25 },
 
-                { x:30, y:50 },
+                { x:30, y:40 },
 
-                { x:40, y:75 },
+                { x:40, y:60 },
 
-                { x:50, y:100 }
+                { x:50, y:80 },
+
+                { x:60, y:100 }
 
             ]
 
@@ -1055,6 +1175,64 @@ function calculateEDAcuityScore(
 
 /*
  * =====================================================
+ * Acute-Care Capacity
+ * =====================================================
+ */
+
+
+/**
+ * Convert acute-care occupancy into operational
+ * pressure.
+ *
+ * Acute-care capacity is an absolute constraint.
+ * Historical occupancy never reduces this score.
+ *
+ * <= 80% ->   0
+ * 85%    ->  10
+ * 90%    ->  25
+ * 95%    ->  50
+ * 97%    ->  65
+ * 98%    ->  75
+ * 99%    ->  88
+ * 100%   -> 100
+ */
+function calculateAcuteCapacityScore(
+
+    occupancy:number
+
+):number {
+
+    return interpolatePressureCurve(
+
+        occupancy,
+
+        [
+
+            { x:0.80, y:0 },
+
+            { x:0.85, y:10 },
+
+            { x:0.90, y:25 },
+
+            { x:0.95, y:50 },
+
+            { x:0.97, y:65 },
+
+            { x:0.98, y:75 },
+
+            { x:0.99, y:88 },
+
+            { x:1.00, y:100 }
+
+        ]
+
+    );
+
+}
+
+
+/*
+ * =====================================================
  * Critical-Care Capacity
  * =====================================================
  */
@@ -1123,57 +1301,143 @@ function calculateCriticalCapacityScore(
 
 /*
  * =====================================================
+ * Hospital Inflow
+ * =====================================================
+ */
+
+
+/**
+ * Compare currently known hospital inflow with the
+ * historical four-hour norm.
+ *
+ * At or below historical expectation = 0.
+ *
+ * Eight admissions above historical expectation
+ * produces the maximum score.
+ */
+function calculateInflowScore(
+
+    currentHospitalInflow:number,
+
+    expectedHospitalInflow:number
+
+):number {
+
+    const excessInflow =
+
+        currentHospitalInflow
+
+        -
+
+        expectedHospitalInflow;
+
+
+    if(excessInflow <= 0){
+
+        return 0;
+
+    }
+
+
+    return roundScore(
+
+        clampScore(
+
+            excessInflow
+
+            /
+
+            INFLOW_EXCESS_AT_MAXIMUM_SCORE
+
+            *
+
+            100
+
+        )
+
+    );
+
+}
+
+
+/*
+ * =====================================================
  * Projected Capacity
  * =====================================================
  */
 
 
 /**
- * Convert projected staffed acute-care bed availability
- * into Version 2.2 projected-capacity pressure.
+ * Convert projected-capacity variance into pressure.
  *
- * Historical data informs expected additional ED
- * admissions and expected inpatient departures, but the
- * resulting projection is scored against actual staffed
- * operational capacity.
+ * The score is based on how much WORSE today's
+ * projected bed balance is than the historical
+ * projected balance for the same weekday/hour.
  *
- * Projected available beds -> pressure score
+ * At or better than historical expectation -> 0
+ * 5 beds worse                          -> 25
+ * 10 beds worse                         -> 50
+ * 20 beds worse                         -> 80
+ * 30 beds worse                         -> 100
  *
- * +5 or more ->   0
- *  0          -> 10
- * -5          -> 20
- * -10         -> 30
- * -15         -> 40
- * -20         -> 50
- * -25         -> 65
- * -30         -> 80
- * -35         -> 90
- * -40 or less -> 100
- *
- * Values between anchors are linearly interpolated.
+ * A negative absolute bed balance does NOT
+ * automatically create a high score.
  */
 function calculateProjectedCapacityScore(
-    projectedAvailableAcuteCareBeds:number
+
+    projectedCapacityVariance:number
+
 ):number {
 
-    if(!Number.isFinite(projectedAvailableAcuteCareBeds)){
+    if(!Number.isFinite(projectedCapacityVariance)){
+
         return 100;
+
     }
 
+
+    const bedsWorseThanHistorical = Math.max(
+
+        0,
+
+        -projectedCapacityVariance
+
+    );
+
+
     return interpolatePressureCurve(
-        projectedAvailableAcuteCareBeds,
+
+        bedsWorseThanHistorical,
+
         [
-            { x:-40, y:100 },
-            { x:-35, y:90 },
-            { x:-30, y:80 },
-            { x:-25, y:65 },
-            { x:-20, y:50 },
-            { x:-15, y:40 },
-            { x:-10, y:30 },
-            { x:-5, y:20 },
-            { x:0, y:10 },
-            { x:5, y:0 }
+
+            {
+                x:0,
+                y:0
+            },
+
+            {
+                x:5,
+                y:25
+            },
+
+            {
+                x:10,
+                y:50
+            },
+
+            {
+                x:20,
+                y:80
+            },
+
+            {
+                x:30,
+                y:100
+            }
+
         ]
+
     );
 
 }
@@ -1186,14 +1450,26 @@ function calculateProjectedCapacityScore(
  */
 
 /**
- * Individual domain adjustment:
- * 80 through <90  -> +3
- * 90 through <100 -> +5
- * 100             -> +7
+ * Add a controlled numerical adjustment when one or
+ * more major Hospital Readiness domains become severe.
  *
- * Multiple severe domains:
- * 2 domains >=80  -> additional +5
- * 3+ domains >=80 -> additional +10
+ * A domain is considered severe at a score of 80 or
+ * greater.
+ *
+ * Adjustment:
+ *
+ * 0 severe domains  -> +0
+ * 1 severe domain   -> +5
+ * 2 severe domains  -> +10
+ * 3+ severe domains -> +15
+ *
+ * This adjustment is intentionally non-cumulative.
+ * It prevents multiple extreme domains from being
+ * excessively diluted by lower scores elsewhere while
+ * avoiding very large additive bonuses.
+ *
+ * The operational state is still selected solely from
+ * the final numerical Hospital Readiness score.
  */
 function calculateSevereDomainAdjustment(
 
@@ -1201,66 +1477,59 @@ function calculateSevereDomainAdjustment(
 
 ):number {
 
-    const normalizedScores = domainScores.map(
+    const severeDomainCount =
 
-        domainScore => clampScore(domainScore)
+        domainScores
 
-    );
+            .map(
 
-    let individualAdjustment = 0;
+                domainScore =>
 
-    normalizedScores.forEach(
+                    clampScore(
 
-        domainScore => {
+                        Number.isFinite(domainScore)
 
-            if(domainScore >= 100){
+                            ? domainScore
 
-                individualAdjustment += 7;
-                return;
+                            : 0
 
-            }
+                    )
 
-            if(domainScore >= 90){
+            )
 
-                individualAdjustment += 5;
-                return;
+            .filter(
 
-            }
+                domainScore =>
 
-            if(domainScore >= 80){
+                    domainScore >= 80
 
-                individualAdjustment += 3;
+            )
 
-            }
+            .length;
 
-        }
-
-    );
-
-    const severeDomainCount = normalizedScores.filter(
-
-        domainScore => domainScore >= 80
-
-    ).length;
-
-    let multiDomainAdjustment = 0;
 
     if(severeDomainCount >= 3){
 
-        multiDomainAdjustment = 10;
-
-    }
-    else if(severeDomainCount >= 2){
-
-        multiDomainAdjustment = 5;
+        return 15;
 
     }
 
-    return roundScore(
 
-        individualAdjustment + multiDomainAdjustment
+    if(severeDomainCount === 2){
 
-    );
+        return 10;
+
+    }
+
+
+    if(severeDomainCount === 1){
+
+        return 5;
+
+    }
+
+
+    return 0;
 
 }
 
@@ -1463,9 +1732,11 @@ function buildDrivers(
                 "Projected Acute-Care Capacity",
 
             description:
-                domains.projectedAvailableAcuteCareBeds < 0
-                    ? `The four-hour forecast projects a deficit of ${formatAbsoluteBedCount(domains.projectedAvailableAcuteCareBeds)} staffed acute-care beds.`
-                    : `The four-hour forecast projects ${formatAbsoluteBedCount(domains.projectedAvailableAcuteCareBeds)} staffed acute-care beds remaining available.`,
+                domains.projectedCapacityVariance < 0
+
+                    ? `Projected acute-care bed balance is ${formatAbsoluteBedCount(domains.projectedCapacityVariance)} beds worse than the historical expectation for this weekday/hour.`
+
+                    : "Projected acute-care bed balance is at or better than the historical expectation.",
 
             severity:
                 domains.projectedCapacityScore,
@@ -1474,7 +1745,7 @@ function buildDrivers(
                 domains.projectedAvailableAcuteCareBeds,
 
             expectedValue:
-                5
+                domains.historicalProjectedBedBalance
 
         });
 
@@ -2007,3 +2278,4 @@ function formatAbsoluteBedCount(
         );
 
 }
+

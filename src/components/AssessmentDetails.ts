@@ -304,42 +304,18 @@ function createAssessmentMarkup(
 
 
     /*
- * Known current hospital inflow contains only
- * non-ED admissions.
- *
- * Existing ED inpatient demand is already represented
- * by boardedPatients and must not be counted again.
- *
- * Future NEW ED-origin admissions are supplied by the
- * historical four-hour forecast.
- */
-const currentHospitalInflow =
-
-    assessment.currentDirectAdmissions
-
-    +
-
-    assessment.currentSurgicalAdmissions;
-
-
-    const inflowDifference =
-
-        currentHospitalInflow
-
-        -
-
-        assessment.expectedHospitalInflow4h;
-
-
-    const projectedHospitalInflow = Math.max(
-
-        currentHospitalInflow,
-
-        assessment.expectedHospitalInflow4h
-
-    );
-
-
+     * Version 2.2 projected acute-care capacity:
+     *
+     * Historical data predicts only uncertain future flow:
+     * - additional ED-origin inpatient admissions
+     * - inpatient departures
+     *
+     * Direct and surgical/procedural admissions are treated
+     * as known four-hour demand.
+     *
+     * Existing ED boarders are added exactly once as unresolved
+     * inpatient bed demand.
+     */
     const projectedAvailableAcuteCareBeds =
 
         currentAvailableAcuteCareBeds
@@ -350,7 +326,19 @@ const currentHospitalInflow =
 
         -
 
-        projectedHospitalInflow;
+        assessment.boardedPatients
+
+        -
+
+        assessment.currentDirectAdmissions
+
+        -
+
+        assessment.currentSurgicalAdmissions
+
+        -
+
+        assessment.expectedEDAdmissions4h;
 
 
     return `
@@ -621,13 +609,26 @@ const currentHospitalInflow =
         <div class="assessment-details-section">
 
             <h4>
-                Hospital Inflow and Forecast
+                Known Four-Hour Inpatient Demand
             </h4>
 
 
             <div class="assessment-details-grid">
 
-               
+                ${createMetricCard({
+
+                    label:
+                        "ED Admissions Awaiting Beds",
+
+                    value:
+                        formatNumber(
+                            assessment.boardedPatients
+                        ),
+
+                    description:
+                        "Current admitted ED patients awaiting inpatient beds. These patients are counted once as known acute-care bed demand."
+
+                })}
 
 
                 ${createMetricCard({
@@ -641,7 +642,7 @@ const currentHospitalInflow =
                         ),
 
                     description:
-                        "Known direct inpatient admissions during the current four-hour assessment horizon."
+                        "Known direct inpatient admissions expected during the current four-hour forecast horizon."
 
                 })}
 
@@ -657,27 +658,7 @@ const currentHospitalInflow =
                         ),
 
                     description:
-                        "Known inpatient admissions expected from surgical or procedural areas."
-
-                })}
-
-
-                ${createComparisonCard({
-
-                    label:
-                        "Total Known Hospital Inflow",
-
-                    currentValue:
-                        currentHospitalInflow,
-
-                    expectedValue:
-                        assessment.expectedHospitalInflow4h,
-
-                    difference:
-                        inflowDifference,
-
-                    unit:
-                        "patients"
+                        "Known inpatient admissions expected from surgical or procedural areas during the current four-hour forecast horizon."
 
                 })}
 
@@ -689,7 +670,7 @@ const currentHospitalInflow =
         <div class="assessment-details-section">
 
             <h4>
-                Four-Hour Historical Flow and Projected Capacity
+                Four-Hour Historical Forecast and Projected Capacity
             </h4>
 
 
@@ -698,7 +679,7 @@ const currentHospitalInflow =
                 ${createMetricCard({
 
                     label:
-                        "Expected ED Admissions",
+                        "Expected Additional ED Admissions",
 
                     value:
                         formatNumber(
@@ -706,55 +687,7 @@ const currentHospitalInflow =
                         ),
 
                     description:
-                        "Historical expected ED-origin inpatient admissions during the four-hour forecast period."
-
-                })}
-
-
-                ${createMetricCard({
-
-                    label:
-                        "Expected Direct Admissions",
-
-                    value:
-                        formatNumber(
-                            assessment.expectedDirectAdmissions4h
-                        ),
-
-                    description:
-                        "Historical expected direct inpatient admissions during the four-hour forecast period."
-
-                })}
-
-
-                ${createMetricCard({
-
-                    label:
-                        "Expected Surgical / Procedural Admissions",
-
-                    value:
-                        formatNumber(
-                            assessment.expectedSurgicalAdmissions4h
-                        ),
-
-                    description:
-                        "Historical expected surgical/procedural inpatient admissions during the four-hour forecast period."
-
-                })}
-
-
-                ${createMetricCard({
-
-                    label:
-                        "Expected Total Hospital Inflow",
-
-                    value:
-                        formatNumber(
-                            assessment.expectedHospitalInflow4h
-                        ),
-
-                    description:
-                        "Historical total expected inpatient inflow during the four-hour forecast period."
+                        "Historical forecast of new ED-origin inpatient admissions expected during the next four hours. Current ED boarders are excluded."
 
                 })}
 
@@ -770,23 +703,7 @@ const currentHospitalInflow =
                         ),
 
                     description:
-                        "Historical expected inpatient hospital departures during the four-hour forecast period. This value is never entered by the user."
-
-                })}
-
-
-                ${createMetricCard({
-
-                    label:
-                        "Projected Hospital Inflow Used",
-
-                    value:
-                        formatNumber(
-                            projectedHospitalInflow
-                        ),
-
-                    description:
-                        "The capacity forecast uses the greater of currently known hospital inflow and historical expected four-hour inflow."
+                        "Historical forecast of inpatient departures during the next four hours. This value is not entered by the user."
 
                 })}
 
@@ -1320,14 +1237,14 @@ function createProjectedCapacityDescription(
 
     if(projectedAvailableBeds === 0){
 
-        return "Projected inflow and historical inpatient departures result in complete utilization of staffed acute-care capacity.";
+        return "Known inpatient demand, forecast additional ED admissions, and expected inpatient departures result in complete utilization of staffed acute-care capacity.";
 
     }
 
 
     return `Approximately ${formatNumber(
         projectedAvailableBeds
-    )} staffed acute-care beds are projected to remain available after expected departures and projected inflow.`;
+    )} staffed acute-care beds are projected to remain available after known inpatient demand, forecast additional ED admissions, and expected inpatient departures.`;
 
 }
 

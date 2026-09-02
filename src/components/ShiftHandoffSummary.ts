@@ -415,8 +415,6 @@ function createHandoffMarkup(
 
     const finalState = operationalAssessment.finalOperationalState;
 
-    const baseState = operationalAssessment.baseOperationalState;
-
     const score = Math.round(result.score);
 
 
@@ -478,9 +476,6 @@ function createHandoffMarkup(
     const activeTriggers =
         operationalAssessment.activeTriggers
             .slice(0, MAXIMUM_HANDOFF_TRIGGERS);
-
-    const levelWasEscalated =
-        finalState.title !== baseState.title;
 
     const handoffText = createPlainTextHandoff(
         operationalAssessment,
@@ -559,27 +554,6 @@ function createHandoffMarkup(
         </div>
 
 
-        ${levelWasEscalated
-            ? `
-                <div class="shift-handoff-escalation">
-
-                    <strong>
-                        Trigger-adjusted escalation
-                    </strong>
-
-                    <span>
-                        The score-derived level was
-                        ${escapeHtml(baseState.title)}.
-                        Active triggers elevated the final level to
-                        ${escapeHtml(finalState.title)}.
-                    </span>
-
-                </div>
-            `
-            : ""
-        }
-
-
         <div class="shift-handoff-metrics">
 
             ${createMetricCard(
@@ -607,9 +581,9 @@ function createHandoffMarkup(
             )}
 
             ${createMetricCard(
-                "Four-Hour Hospital Flow",
-                `${formatNumber(result.projectedHospitalInflow)} projected inflow`,
-                `${formatNumber(result.expectedInpatientDepartures)} expected departures`
+                "Known Four-Hour Bed Demand",
+                `${formatNumber(assessment.currentDirectAdmissions + assessment.currentSurgicalAdmissions)} known admissions`,
+                `${formatNumber(assessment.expectedEDAdmissions4h)} expected additional ED admissions · ${formatNumber(result.expectedInpatientDepartures)} expected departures`
             )}
 
             ${createMetricCard(
@@ -1204,19 +1178,23 @@ function createPlainTextHandoff(
             )
         )}%)`,
 
-        `Known hospital inflow: ${formatNumber(
-            result.currentHospitalInflow
+        `ED admissions awaiting beds: ${formatNumber(
+            assessment.boardedPatients
         )}`,
 
-        `Historical expected four-hour inflow: ${formatNumber(
-            result.expectedHospitalInflow
+        `Known direct admissions, next four hours: ${formatNumber(
+            assessment.currentDirectAdmissions
         )}`,
 
-        `Hospital inflow used for forecast: ${formatNumber(
-            result.projectedHospitalInflow
+        `Known surgical/procedural admissions, next four hours: ${formatNumber(
+            assessment.currentSurgicalAdmissions
         )}`,
 
-        `Historical expected four-hour inpatient departures: ${formatNumber(
+        `Expected additional ED admissions, next four hours: ${formatNumber(
+            assessment.expectedEDAdmissions4h
+        )}`,
+
+        `Expected inpatient departures, next four hours: ${formatNumber(
             result.expectedInpatientDepartures
         )}`,
 

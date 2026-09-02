@@ -1,35 +1,33 @@
 /**
  * Hospital Readiness scoring-domain weights.
  *
- * Version 2.2 — Operational Capacity Projection
+ * Version 2.1 calibration
  *
  * Overall Hospital Readiness:
  *
- * 45% Emergency Department Operational Pressure
- * 20% Critical-Care Capacity
- * 35% Projected Acute-Care Capacity
- *
- * Acute-Care Capacity and Hospital Inflow remain
- * available elsewhere in the application as
- * operational context / compatibility data, but they
- * no longer contribute independently to HRI.
+ * 35% Emergency Department Operational Pressure
+ * 20% Acute-Care Capacity
+ * 15% Critical-Care Capacity
+ * 15% Hospital Inflow
+ * 15% Projected Capacity
  */
+
 export const WEIGHTS = {
 
     edPressure:
-        0.45,
+        0.35,
 
     acuteCapacity:
-        0.00,
-
-    criticalCapacity:
         0.20,
 
+    criticalCapacity:
+        0.15,
+
     inflow:
-        0.00,
+        0.15,
 
     projectedCapacity:
-        0.35
+        0.15
 
 } as const;
 
@@ -40,6 +38,10 @@ export const WEIGHTS = {
  * 25% ED census pressure
  * 45% ED boarding pressure
  * 30% high-acuity pressure
+ *
+ * Boarding remains the largest ED component while
+ * acuity receives greater influence than in the
+ * earlier 30 / 50 / 20 calibration.
  */
 export const ED_PRESSURE_WEIGHTS = {
 
@@ -80,7 +82,8 @@ export const TOTAL_WEIGHT =
 
 
 /**
- * Sum of all ED Operational Pressure subdomain weights.
+ * Sum of all ED Operational Pressure
+ * subdomain weights.
  */
 export const TOTAL_ED_PRESSURE_WEIGHT =
 
@@ -96,21 +99,26 @@ export const TOTAL_ED_PRESSURE_WEIGHT =
 
 
 /**
- * Determine whether all configured weights total
- * exactly 1.00 within floating-point tolerance.
+ * Determine whether all configured weights
+ * total exactly 1.00 within floating-point
+ * tolerance.
  */
 export function areWeightsValid():boolean {
 
     return (
 
         Math.abs(
+
             TOTAL_WEIGHT - 1
+
         ) < 0.000001
 
         &&
 
         Math.abs(
+
             TOTAL_ED_PRESSURE_WEIGHT - 1
+
         ) < 0.000001
 
     );

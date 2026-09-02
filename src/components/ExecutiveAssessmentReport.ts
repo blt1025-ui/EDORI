@@ -421,20 +421,9 @@ function createExecutiveReportMarkup(
 
     const finalState =
         operationalAssessment.finalOperationalState;
-
-    const baseState =
-        operationalAssessment.baseOperationalState;
-
     const score = Math.round(
         result.score
     );
-
-
-    const attribution =
-        getAssessmentAttribution(
-            snapshots,
-            assessment.assessmentTime
-        );
 
     const scoreChange = determineScoreChange(
         snapshots,
@@ -503,10 +492,6 @@ function createExecutiveReportMarkup(
                 0,
                 MAXIMUM_REPORT_ACTIONS
             );
-
-    const levelWasEscalated =
-        finalState.title !== baseState.title;
-
     return `
 
         <article
@@ -533,17 +518,6 @@ function createExecutiveReportMarkup(
                                 assessment.assessmentTime
                             )
                         )}
-                    </p>
-
-
-                    <p>
-                        Entered by
-                        ${escapeHtml(
-                            attribution.displayName
-                        )}
-                        (${escapeHtml(
-                            attribution.username
-                        )})
                     </p>
 
                 </div>
@@ -591,7 +565,7 @@ function createExecutiveReportMarkup(
                     <div>
 
                         <span class="executive-report-label">
-                            Final Operational Level
+                            Operational Level
                         </span>
 
                         <strong>
@@ -653,10 +627,10 @@ function createExecutiveReportMarkup(
             <div class="executive-report-context-row">
 
                 <div>
-                    <span>Score-Derived Level</span>
+                    <span>HRI Score-Derived Level</span>
                     <strong>
                         ${escapeHtml(
-                            baseState.title
+                            finalState.title
                         )}
                     </strong>
                 </div>
@@ -688,30 +662,6 @@ function createExecutiveReportMarkup(
                 </div>
 
             </div>
-
-
-            ${levelWasEscalated
-                ? `
-                    <div class="executive-report-alert">
-
-                        <strong>
-                            Trigger-adjusted escalation
-                        </strong>
-
-                        <p>
-                            The numerical score corresponded to
-                            ${escapeHtml(baseState.title)},
-                            but active operational triggers elevated
-                            the final level to
-                            ${escapeHtml(finalState.title)}.
-                        </p>
-
-                    </div>
-                `
-                : ""
-            }
-
-
             <section class="executive-report-section">
 
                 <div class="executive-report-section-heading">
@@ -736,18 +686,18 @@ function createExecutiveReportMarkup(
                                 result.edPressureScore
                             )} / 100`,
                         detail:
-                            "35% of the Hospital Readiness score"
+                            "45% of the Hospital Readiness score"
                     })}
 
                     ${createReportMetric({
                         label:
-                            "Acute-Care Capacity",
+                            "Projected Acute-Care Capacity",
                         value:
                             `${formatNumber(
-                                result.acuteCapacityScore
+                                result.projectedCapacityScore
                             )} / 100`,
                         detail:
-                            "20% of the Hospital Readiness score"
+                            "35% of the Hospital Readiness score"
                     })}
 
                     ${createReportMetric({
@@ -758,29 +708,7 @@ function createExecutiveReportMarkup(
                                 result.criticalCapacityScore
                             )} / 100`,
                         detail:
-                            "15% of the Hospital Readiness score"
-                    })}
-
-                    ${createReportMetric({
-                        label:
-                            "Hospital Inflow",
-                        value:
-                            `${formatNumber(
-                                result.inflowScore
-                            )} / 100`,
-                        detail:
-                            "15% of the Hospital Readiness score"
-                    })}
-
-                    ${createReportMetric({
-                        label:
-                            "Projected Capacity",
-                        value:
-                            `${formatNumber(
-                                result.projectedCapacityScore
-                            )} / 100`,
-                        detail:
-                            "15% of the Hospital Readiness score"
+                            "20% of the Hospital Readiness score"
                     })}
 
                 </div>
@@ -862,35 +790,46 @@ function createExecutiveReportMarkup(
 
                     ${createReportMetric({
                         label:
-                            "Current Hospital Inflow",
+                            "Known Direct Admissions - Next 4 Hours",
                         value:
                             formatNumber(
-                                result.currentHospitalInflow
+                                assessment.currentDirectAdmissions
                             ),
                         detail:
-                            "Known ED, direct, and surgical/procedural admissions"
+                            "Known acute-care demand; no historical forward projection applied"
                     })}
 
                     ${createReportMetric({
                         label:
-                            "Expected Hospital Inflow",
+                            "Known Surgical/Procedural Admissions - Next 4 Hours",
                         value:
                             formatNumber(
-                                result.expectedHospitalInflow
+                                assessment.currentSurgicalAdmissions
                             ),
                         detail:
-                            "Historical four-hour inpatient inflow"
+                            "Known acute-care demand; no historical forward projection applied"
                     })}
 
                     ${createReportMetric({
                         label:
-                            "Expected Inpatient Departures",
+                            "Expected Additional ED Admissions - Next 4 Hours",
+                        value:
+                            formatNumber(
+                                assessment.expectedEDAdmissions4h
+                            ),
+                        detail:
+                            "Historical forecast of new ED-origin admissions; current boarders excluded"
+                    })}
+
+                    ${createReportMetric({
+                        label:
+                            "Expected Inpatient Departures - Next 4 Hours",
                         value:
                             formatNumber(
                                 result.expectedInpatientDepartures
                             ),
                         detail:
-                            "Historical four-hour inpatient departures"
+                            "Historical forecast of beds expected to be released"
                     })}
 
                     ${createReportMetric({
@@ -972,6 +911,47 @@ function createExecutiveReportMarkup(
                 )}
 
             </div>
+
+
+            <section class="executive-report-section">
+
+                <div class="executive-report-section-heading">
+
+                    <span>
+                        Operational Interpretation
+                    </span>
+
+                    <h3>
+                        Four-Hour Capacity Outlook
+                    </h3>
+
+                </div>
+
+                <div class="executive-report-outlook">
+
+                    <strong>
+                        ${escapeHtml(
+                            createOutlookHeading(
+                                result.projectedAvailableAcuteCareBeds,
+                                operationalAssessment.riskDirection
+                            )
+                        )}
+                    </strong>
+
+                    <p>
+                        ${escapeHtml(
+                            createOutlookDescription(
+                                result.projectedAvailableAcuteCareBeds,
+                                assessment.boardedPatients,
+                                assessment.expectedEDBoarders,
+                                operationalAssessment.riskDirection
+                            )
+                        )}
+                    </p>
+
+                </div>
+
+            </section>
 
 
             <footer class="executive-report-footer">
@@ -1842,97 +1822,117 @@ function createProjectedCapacityDescription(
 
 
 /**
- * Format an assessment timestamp.
+ * Create the four-hour outlook heading.
  */
+function createOutlookHeading(
 
-/**
- * Resolve audit attribution for the committed assessment.
- *
- * Assessment snapshots are the authoritative audit record.
- * The snapshot nearest to the assessment timestamp is used.
- */
-function getAssessmentAttribution(
+    projectedAvailableBeds:number,
 
-    snapshots:EdoriSnapshot[],
+    riskDirection:OperationalAssessment["riskDirection"]
 
-    assessmentTime:Date | string
+):string {
 
-):{
+    if(
+        projectedAvailableBeds < 0
+        ||
+        riskDirection === "Rapidly Worsening"
+    ){
 
-    displayName:string;
-
-    username:string;
-
-    userId:string;
-
-} {
-
-    const assessmentTimestamp =
-        new Date(
-            assessmentTime
-        ).getTime();
-
-
-    const matchingSnapshot = snapshots
-        .slice()
-        .sort(
-            (first, second) => {
-
-                const firstDistance = Math.abs(
-                    new Date(first.timestamp).getTime()
-                    -
-                    assessmentTimestamp
-                );
-
-                const secondDistance = Math.abs(
-                    new Date(second.timestamp).getTime()
-                    -
-                    assessmentTimestamp
-                );
-
-                return firstDistance - secondDistance;
-
-            }
-        )[0];
-
-
-    if(!matchingSnapshot){
-
-        return {
-
-            displayName:
-                "Legacy / Unknown",
-
-            username:
-                "unknown",
-
-            userId:
-                "legacy-unknown"
-
-        };
+        return "Significant hospital capacity pressure expected";
 
     }
 
+    if(
+        projectedAvailableBeds === 0
+        ||
+        riskDirection === "Increasing"
+    ){
 
-    return {
+        return "Continued hospital capacity pressure expected";
 
-        displayName:
-            matchingSnapshot.enteredByDisplayName
-            || "Legacy / Unknown",
+    }
 
-        username:
-            matchingSnapshot.enteredByUsername
-            || "unknown",
+    if(riskDirection === "Improving"){
 
-        userId:
-            matchingSnapshot.enteredByUserId
-            || "legacy-unknown"
+        return "Conditions may improve";
 
-    };
+    }
+
+    return "Near-term capacity remains available";
 
 }
 
 
+/**
+ * Create a transparent four-hour outlook explanation.
+ */
+function createOutlookDescription(
+
+    projectedAvailableBeds:number,
+
+    boardedPatients:number,
+
+    expectedBoarders:number,
+
+    riskDirection:OperationalAssessment["riskDirection"]
+
+):string {
+
+    const boardingDifference =
+        boardedPatients - expectedBoarders;
+
+    if(projectedAvailableBeds < 0){
+
+        return `The four-hour forecast projects an acute-care capacity deficit of approximately ${formatNumber(
+            Math.abs(projectedAvailableBeds)
+        )} beds. Known bed demand plus expected additional ED admissions is projected to exceed currently available capacity after expected inpatient departures.`;
+
+    }
+
+    if(
+        projectedAvailableBeds === 0
+        &&
+        boardingDifference > 0
+    ){
+
+        return `The four-hour forecast projects complete utilization of staffed acute-care capacity while ED boarding remains ${formatNumber(
+            boardingDifference
+        )} patients above baseline. Inpatient throughput remains an important operational constraint.`;
+
+    }
+
+    if(
+        projectedAvailableBeds > 0
+        &&
+        riskDirection === "Improving"
+    ){
+
+        return `Approximately ${formatNumber(
+            projectedAvailableBeds
+        )} staffed acute-care beds are projected to remain available at the end of the four-hour horizon, and the recent operational trend is improving.`;
+
+    }
+
+    if(boardingDifference > 0){
+
+        return `Approximately ${formatNumber(
+            projectedAvailableBeds
+        )} staffed acute-care beds are projected to remain available, but ED boarding remains ${formatNumber(
+            boardingDifference
+        )} patients above baseline. Continue monitoring inpatient throughput and active triggers.`;
+
+    }
+
+    return `Approximately ${formatNumber(
+        projectedAvailableBeds
+    )} staffed acute-care beds are projected to remain available after projected inflow and historical expected inpatient departures.`;
+
+}
+
+
+/**
+ * Format an assessment timestamp.
+ */
 function formatAssessmentTime(
 
     value:Date | string

@@ -2,7 +2,7 @@
  * Gauge
  *
  * Displays the current EDORI score and the
- * trigger-adjusted Alpha–Echo operational level.
+ * HRI score-derived Alpha–Echo operational level.
  *
  * This component does not:
  *
@@ -338,11 +338,6 @@ function createCompletedGauge(
         operationalAssessment.finalOperationalState;
 
 
-    const baseState =
-
-        operationalAssessment.baseOperationalState;
-
-
     const needleRotation =
 
         -90
@@ -355,15 +350,6 @@ function createCompletedGauge(
     const activeTriggerCount =
 
         operationalAssessment.activeTriggers.length;
-
-
-    const levelWasEscalated =
-
-        finalState.title
-
-        !==
-
-        baseState.title;
 
 
     return `
@@ -384,7 +370,7 @@ function createCompletedGauge(
             <div class="command-gauge-level">
 
                 <span>
-                    Final Operational Level
+                    Operational Level
                 </span>
 
                 <strong>
@@ -500,13 +486,13 @@ function createCompletedGauge(
                 <div>
 
                     <span>
-                        Score-Derived Level
+                        HRI Score-Derived Level
                     </span>
 
                     <strong>
 
                         ${escapeHtml(
-                            baseState.title
+                            finalState.title
                         )}
 
                     </strong>
@@ -546,41 +532,6 @@ function createCompletedGauge(
                 </div>
 
             </div>
-
-
-            ${levelWasEscalated
-
-                ? `
-
-                    <div class="command-gauge-escalation">
-
-                        <strong>
-                            Trigger escalation
-                        </strong>
-
-                        <span>
-
-                            Active operational triggers elevated the final level from
-
-                            ${escapeHtml(
-                                baseState.title
-                            )}
-
-                            to
-
-                            ${escapeHtml(
-                                finalState.title
-                            )}.
-
-                        </span>
-
-                    </div>
-
-                `
-
-                : ""
-
-            }
 
         </div>
 

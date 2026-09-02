@@ -1,7 +1,7 @@
 /**
  * Operational Trigger Configuration
  *
- * Version 2.2 Hospital Readiness Model
+ * Version 2 Hospital Readiness Model
  *
  * Initial hospital-wide operational trigger
  * library.
@@ -770,7 +770,7 @@ description:
             "Known hospital inflow is at least five patients above the historical four-hour expectation.",
 
         enabled:
-            false,
+            true,
 
         category:
             "Hospital Flow",
@@ -827,7 +827,7 @@ description:
             "Known hospital inflow is at least 150% of the historical four-hour expectation.",
 
         enabled:
-            false,
+            true,
 
         category:
             "Hospital Flow",
@@ -876,21 +876,17 @@ description:
 
     /*
      * =====================================================
-     * PROJECTED CAPACITY — VERSION 2.2
+     * PROJECTED CAPACITY
      * =====================================================
-     *
-     * These triggers use projected staffed acute-care bed
-     * availability directly. The projected-capacity score is
-     * derived from the same value, so it is intentionally not
-     * repeated as a second trigger condition.
      */
 
     {
+
         id:
             "projected-acute-capacity-low",
 
         title:
-            "Projected Acute-Care Capacity Tight",
+            "Projected Acute-Care Capacity Low",
 
         description:
             "The four-hour forecast projects five or fewer staffed acute-care beds remaining available.",
@@ -902,10 +898,12 @@ description:
             "Projected Capacity",
 
         priority:
-            "Moderate",
+            "High",
 
         conditions:[
+
             {
+
                 metric:
                     "projectedAvailableAcuteCareBeds",
 
@@ -914,26 +912,35 @@ description:
 
                 threshold:
                     5
+
             }
+
         ],
 
         minimumOperationalState:
-            null,
+            "Bravo",
 
         reassessmentMinutes:
-            60,
+            30,
 
         interventionIds:[
+
             "review-pending-discharges",
+
             "notify-bed-management",
+
             "prepare-for-demand-growth"
+
         ],
 
         rationale:
-            "Five or fewer projected staffed acute-care beds represents minimal near-term reserve and warrants early throughput attention."
+            "Very limited projected acute-care reserve indicates that expected hospital flow may soon create a capacity constraint."
+
     },
 
+
     {
+
         id:
             "projected-acute-capacity-exhausted",
 
@@ -953,36 +960,48 @@ description:
             "High",
 
         conditions:[
+
             {
+
                 metric:
                     "projectedAvailableAcuteCareBeds",
 
                 operator:
-                    "lessThanOrEqual",
+                    "equal",
 
                 threshold:
                     0
+
             }
+
         ],
 
         minimumOperationalState:
-            null,
+            "Charlie",
 
         reassessmentMinutes:
             30,
 
         interventionIds:[
+
             "review-pending-discharges",
+
             "notify-bed-management",
+
             "escalate-inpatient-throughput",
+
             "prepare-for-demand-growth"
+
         ],
 
         rationale:
-            "The four-hour projection has consumed all staffed acute-care reserve and warrants coordinated capacity intervention."
+            "The four-hour forecast indicates that expected demand will consume all projected staffed acute-care reserve and warrants focused throughput intervention, but zero projected reserve alone does not establish severe deterioration relative to the historical baseline."
+
     },
 
+
     {
+
         id:
             "projected-acute-capacity-deficit",
 
@@ -990,7 +1009,7 @@ description:
             "Projected Acute-Care Capacity Deficit",
 
         description:
-            "The four-hour forecast projects a deficit of at least 10 staffed acute-care beds.",
+            "The four-hour forecast projects hospital demand exceeding staffed acute-care capacity.",
 
         enabled:
             true,
@@ -1002,7 +1021,70 @@ description:
             "High",
 
         conditions:[
+
             {
+
+                metric:
+                    "projectedAvailableAcuteCareBeds",
+
+                operator:
+                    "lessThan",
+
+                threshold:
+                    0
+
+            }
+
+        ],
+
+        minimumOperationalState:
+            "Charlie",
+
+        reassessmentMinutes:
+            30,
+
+        interventionIds:[
+
+            "review-pending-discharges",
+
+            "notify-bed-management",
+
+            "escalate-inpatient-throughput",
+
+            "prepare-for-demand-growth"
+
+        ],
+
+        rationale:
+            "Negative projected bed availability is an important near-term capacity warning, but absolute deficit alone does not establish severe deterioration relative to the historical baseline."
+
+    },
+
+
+    {
+
+        id:
+            "severe-projected-acute-capacity-deficit",
+
+        title:
+            "Severe Projected Acute-Care Capacity Deficit",
+
+        description:
+            "The four-hour forecast projects a deficit of at least 10 staffed acute-care beds and projected capacity pressure is severe relative to the historical baseline.",
+
+        enabled:
+            true,
+
+        category:
+            "Projected Capacity",
+
+        priority:
+            "Critical",
+
+        conditions:[
+
+            {
+
                 metric:
                     "projectedAvailableAcuteCareBeds",
 
@@ -1011,123 +1093,45 @@ description:
 
                 threshold:
                     -10
-            }
-        ],
 
-        minimumOperationalState:
-            null,
+            },
 
-        reassessmentMinutes:
-            30,
-
-        interventionIds:[
-            "review-pending-discharges",
-            "notify-bed-management",
-            "escalate-inpatient-throughput",
-            "prepare-for-demand-growth",
-            "notify-hospital-operations"
-        ],
-
-        rationale:
-            "A projected 10-bed deficit represents meaningful near-term demand beyond staffed acute-care capacity."
-    },
-
-    {
-        id:
-            "severe-projected-acute-capacity-deficit",
-
-        title:
-            "Severe Projected Acute-Care Capacity Deficit",
-
-        description:
-            "The four-hour forecast projects a deficit of at least 25 staffed acute-care beds.",
-
-        enabled:
-            true,
-
-        category:
-            "Projected Capacity",
-
-        priority:
-            "Critical",
-
-        conditions:[
             {
+
                 metric:
-                    "projectedAvailableAcuteCareBeds",
+                    "projectedCapacityScore",
 
                 operator:
-                    "lessThanOrEqual",
+                    "greaterThanOrEqual",
 
                 threshold:
-                    -25
+                    80
+
             }
+
         ],
 
         minimumOperationalState:
-            null,
+            "Echo",
 
         reassessmentMinutes:
             30,
 
         interventionIds:[
+
             "activate-hospital-surge",
+
             "notify-bed-management",
+
             "escalate-inpatient-throughput",
+
             "notify-hospital-operations"
+
         ],
 
         rationale:
-            "A projected 25-bed deficit represents major near-term demand beyond staffed acute-care capacity and warrants hospital-level surge response."
-    },
+            "A large projected deficit combined with severe deterioration relative to the historical projected-capacity baseline represents an unusually high near-term capacity risk."
 
-    {
-        id:
-            "extreme-projected-acute-capacity-deficit",
-
-        title:
-            "Extreme Projected Acute-Care Capacity Deficit",
-
-        description:
-            "The four-hour forecast projects a deficit of at least 40 staffed acute-care beds.",
-
-        enabled:
-            true,
-
-        category:
-            "Projected Capacity",
-
-        priority:
-            "Critical",
-
-        conditions:[
-            {
-                metric:
-                    "projectedAvailableAcuteCareBeds",
-
-                operator:
-                    "lessThanOrEqual",
-
-                threshold:
-                    -40
-            }
-        ],
-
-        minimumOperationalState:
-            null,
-
-        reassessmentMinutes:
-            30,
-
-        interventionIds:[
-            "activate-hospital-surge",
-            "notify-bed-management",
-            "escalate-inpatient-throughput",
-            "notify-hospital-operations"
-        ],
-
-        rationale:
-            "A projected deficit of 40 or more staffed acute-care beds corresponds to maximum projected-capacity pressure and represents an extreme operational constraint."
     },
 
 

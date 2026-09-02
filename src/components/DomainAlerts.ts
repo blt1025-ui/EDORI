@@ -1,7 +1,7 @@
 /**
  * DomainAlerts
  *
- * Version 2.1 Hospital Readiness Model
+ * Version 2.2 Hospital Readiness Model
  *
  * Displays a compact strip when one or more major
  * Hospital Readiness domains reach Elevated, High, or
@@ -9,8 +9,8 @@
  *
  * Domain Alerts do not modify the overall HRI or
  * operational state. Their purpose is to prevent a
- * significant individual domain from being obscured
- * by a lower composite score.
+ * significant individual weighted domain from being
+ * obscured by a lower composite score.
  */
 
 import {
@@ -79,11 +79,17 @@ export function DomainAlerts():string {
     return `
 
         <section
+
             id="domainAlerts"
+
             class="domain-alerts"
+
             aria-live="polite"
+
             hidden
+
         >
+
         </section>
 
     `;
@@ -191,14 +197,27 @@ function updateDomainAlerts():void {
     }
 
 
+    /*
+     * Version 2.2 authoritative HRI domains only.
+     *
+     * Acute-care occupancy remains important operational
+     * context and can activate advisory triggers, but it
+     * is not an independently weighted HRI domain.
+     *
+     * Hospital inflow is likewise retained for backward
+     * compatibility and analytics, but does not independently
+     * contribute to the Version 2.2 HRI.
+     */
     const alerts:DomainAlertItem[] = [
 
         {
 
             title:
+
                 "ED Operational Pressure",
 
             score:
+
                 result.edPressureScore
 
         },
@@ -206,40 +225,24 @@ function updateDomainAlerts():void {
         {
 
             title:
-                "Acute-Care Capacity",
+
+                "Projected Hospital Capacity",
 
             score:
-                result.acuteCapacityScore
+
+                result.projectedCapacityScore
 
         },
 
         {
 
             title:
+
                 "Critical-Care Capacity",
 
             score:
+
                 result.criticalCapacityScore
-
-        },
-
-        {
-
-            title:
-                "Hospital Inflow",
-
-            score:
-                result.inflowScore
-
-        },
-
-        {
-
-            title:
-                "Projected Capacity",
-
-            score:
-                result.projectedCapacityScore
 
         }
 
@@ -300,22 +303,29 @@ function updateDomainAlerts():void {
             <div>
 
                 <span class="domain-alerts-kicker">
+
                     Domain Alerts
+
                 </span>
 
                 <strong>
+
                     ${alerts.length === 1
 
-                        ? "1 elevated operational domain"
+                        ? "1 elevated HRI domain"
 
-                        : `${alerts.length} elevated operational domains`
+                        : `${alerts.length} elevated HRI domains`
+
                     }
+
                 </strong>
 
             </div>
 
             <span class="domain-alerts-explanation">
-                Significant domain pressure may be present even when the overall HRI is lower.
+
+                Significant pressure in an individual weighted HRI domain may be present even when the overall HRI is lower.
+
             </span>
 
         </div>
@@ -361,26 +371,40 @@ function createDomainAlertItem(
     return `
 
         <div
+
             class="
+
                 domain-alert-item
+
                 domain-alert-item-${escapeAttribute(
+
                     severity.level
+
                 )}
+
             "
+
         >
 
             <span
+
                 class="domain-alert-indicator"
+
                 aria-hidden="true"
+
             >
+
                 ⚠
+
             </span>
 
 
             <span class="domain-alert-name">
 
                 ${escapeHtml(
+
                     alert.title
+
                 )}
 
             </span>
@@ -389,7 +413,9 @@ function createDomainAlertItem(
             <strong class="domain-alert-score">
 
                 ${formatScore(
+
                     alert.score
+
                 )}
 
             </strong>
@@ -398,7 +424,9 @@ function createDomainAlertItem(
             <span class="domain-alert-level">
 
                 ${escapeHtml(
+
                     severity.label
+
                 )}
 
             </span>

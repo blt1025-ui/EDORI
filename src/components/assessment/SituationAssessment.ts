@@ -843,39 +843,10 @@ function createHistoricalSection():string {
 
                     "expectedEDAdmissions4hDisplay",
 
-                    "Expected ED Admissions — Next 4 Hours"
+                    "Expected Additional ED Admissions — Next 4 Hours"
 
                 )}
-
-
-                ${createExpectationDisplay(
-
-                    "expectedDirectAdmissions4hDisplay",
-
-                    "Expected Direct Admissions — Next 4 Hours"
-
-                )}
-
-
-                ${createExpectationDisplay(
-
-                    "expectedSurgicalAdmissions4hDisplay",
-
-                    "Expected Surgical / Procedural Admissions — Next 4 Hours"
-
-                )}
-
-
-                ${createExpectationDisplay(
-
-                    "expectedHospitalInflow4hDisplay",
-
-                    "Expected Total Hospital Inflow — Next 4 Hours"
-
-                )}
-
-
-                ${createExpectationDisplay(
+${createExpectationDisplay(
 
                     "expectedInpatientDepartures4hDisplay",
 
@@ -1376,7 +1347,7 @@ function submitAssessmentToEngine():void {
              * Compatibility-only field.
              *
              * Current ED admissions are not separately
-             * entered in Version 2.1 because existing
+             * entered in Version 2.2 because existing
              * ED admission demand is represented by
              * boardedPatients.
              */
@@ -1554,48 +1525,7 @@ function previewHistoricalExpectation(
         )
 
     );
-
-
-    setElementText(
-
-        "expectedDirectAdmissions4hDisplay",
-
-        formatHistoricalValue(
-
-            expectedValues.expectedDirectAdmissions4h
-
-        )
-
-    );
-
-
-    setElementText(
-
-        "expectedSurgicalAdmissions4hDisplay",
-
-        formatHistoricalValue(
-
-            expectedValues.expectedSurgicalAdmissions4h
-
-        )
-
-    );
-
-
-    setElementText(
-
-        "expectedHospitalInflow4hDisplay",
-
-        formatHistoricalValue(
-
-            expectedValues.expectedHospitalInflow4h
-
-        )
-
-    );
-
-
-    setElementText(
+setElementText(
 
         "expectedInpatientDepartures4hDisplay",
 
@@ -1686,48 +1616,7 @@ function restoreHistoricalDisplay():void {
         )
 
     );
-
-
-    setElementText(
-
-        "expectedDirectAdmissions4hDisplay",
-
-        formatHistoricalValue(
-
-            state.expectedDirectAdmissions4h
-
-        )
-
-    );
-
-
-    setElementText(
-
-        "expectedSurgicalAdmissions4hDisplay",
-
-        formatHistoricalValue(
-
-            state.expectedSurgicalAdmissions4h
-
-        )
-
-    );
-
-
-    setElementText(
-
-        "expectedHospitalInflow4hDisplay",
-
-        formatHistoricalValue(
-
-            state.expectedHospitalInflow4h
-
-        )
-
-    );
-
-
-    setElementText(
+setElementText(
 
         "expectedInpatientDepartures4hDisplay",
 
@@ -1918,14 +1807,7 @@ function clearExpectedValueDisplays():void {
         "expectedEDBoardersDisplay",
 
         "expectedEDAdmissions4hDisplay",
-
-        "expectedDirectAdmissions4hDisplay",
-
-        "expectedSurgicalAdmissions4hDisplay",
-
-        "expectedHospitalInflow4hDisplay",
-
-        "expectedInpatientDepartures4hDisplay"
+"expectedInpatientDepartures4hDisplay"
 
     ].forEach(
 

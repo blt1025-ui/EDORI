@@ -1,7 +1,7 @@
 /**
  * OperationalOverview
  *
- * Displays the Version 2 Hospital Readiness operational assessment.
+ * Displays the Version 2.2 Hospital Readiness operational assessment.
  *
  * This component does not calculate Hospital Readiness or
  * modify application state.
@@ -90,7 +90,7 @@ export function OperationalOverview():string {
                     </h3>
 
                     <p class="panel-description">
-                        Trigger-adjusted Hospital Readiness overview
+                        Hospital Readiness overview with operational triggers
                     </p>
 
                 </div>
@@ -316,7 +316,7 @@ function createOperationalAssessmentMarkup(
                 <div>
 
                     <span class="operational-state-label">
-                        Final Operational State
+                        Operational State
                     </span>
 
                     <strong class="operational-state-title">
@@ -337,7 +337,7 @@ function createOperationalAssessmentMarkup(
             <div class="operational-base-state">
 
                 <span>
-                    Score-Derived State
+                    HRI Score-Derived State
                 </span>
 
                 <strong>
@@ -413,20 +413,20 @@ function createOperationalAssessmentMarkup(
                     .pillarScores
                     .edOperationalPressure,
 
-                "35%"
+                "45%"
 
             )}
 
 
             ${createPillarCard(
 
-                "Acute-Care Capacity",
+                "Projected Hospital Capacity",
 
                 operationalAssessment
                     .pillarScores
-                    .acuteCareCapacity,
+                    .projectedCapacity,
 
-                "20%"
+                "35%"
 
             )}
 
@@ -439,33 +439,7 @@ function createOperationalAssessmentMarkup(
                     .pillarScores
                     .criticalCareCapacity,
 
-                "15%"
-
-            )}
-
-
-            ${createPillarCard(
-
-                "Hospital Inflow",
-
-                operationalAssessment
-                    .pillarScores
-                    .hospitalInflow,
-
-                "15%"
-
-            )}
-
-
-            ${createPillarCard(
-
-                "Projected Capacity",
-
-                operationalAssessment
-                    .pillarScores
-                    .projectedCapacity,
-
-                "15%"
+                "20%"
 
             )}
 

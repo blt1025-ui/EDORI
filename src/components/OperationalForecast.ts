@@ -14,8 +14,9 @@
  * - Future historical ED census and boarding baselines
  *   at +2 hours and +4 hours
  * - Current boarding burden relative to expectation
- * - Expected four-hour hospital inflow and inpatient
- *   departures for hospital-capacity context
+ * - Version 2.2 projected acute-bed availability using
+ *   known demand, expected additional ED admissions, and
+ *   expected inpatient departures
  * - Recent Hospital Readiness score movement
  *
  * This component does not modify Hospital Readiness results,
@@ -317,7 +318,7 @@ function updateOperationalForecast():void {
          * Boarding uses the same approach and is clamped
          * between 0 and the projected ED census.
          *
-         * Hospital inflow and inpatient departures remain
+         * Version 2.2 projected acute-bed availability remains
          * available as separate hospital-capacity context.
          */
 
@@ -454,15 +455,6 @@ function updateOperationalForecast():void {
             });
 
 
-        const expectedHospitalNetFlow4h =
-
-            assessment.expectedHospitalInflow4h
-
-            -
-
-            assessment.expectedInpatientDepartures4h;
-
-
         container.innerHTML =
 
             createForecastMarkup({
@@ -486,13 +478,20 @@ function updateOperationalForecast():void {
 
                 currentBoardingDeviation,
 
-                expectedHospitalInflow4h:
-                    assessment.expectedHospitalInflow4h,
+                currentDirectAdmissions:
+                    assessment.currentDirectAdmissions,
+
+                currentSurgicalAdmissions:
+                    assessment.currentSurgicalAdmissions,
+
+                expectedEDAdmissions4h:
+                    assessment.expectedEDAdmissions4h,
 
                 expectedInpatientDepartures4h:
                     assessment.expectedInpatientDepartures4h,
 
-                expectedHospitalNetFlow4h,
+                projectedAvailableAcuteCareBeds:
+                    result.projectedAvailableAcuteCareBeds,
 
                 recentHourlyScoreChange,
 
@@ -1095,11 +1094,15 @@ function createForecastMarkup(
 
         currentBoardingDeviation:number;
 
-        expectedHospitalInflow4h:number;
+        currentDirectAdmissions:number;
+
+        currentSurgicalAdmissions:number;
+
+        expectedEDAdmissions4h:number;
 
         expectedInpatientDepartures4h:number;
 
-        expectedHospitalNetFlow4h:number;
+        projectedAvailableAcuteCareBeds:number;
 
         recentHourlyScoreChange:number;
 
@@ -1246,17 +1249,23 @@ function createForecastMarkup(
 
                 ${createAssumptionCard(
 
-                    "Hospital Bed Flow",
+                    "Projected Acute-Bed Position",
 
                     formatSignedNumber(
-                        options.expectedHospitalNetFlow4h
+                        options.projectedAvailableAcuteCareBeds
                     ),
 
-                    `Over four hours, expected hospital inflow is ${formatNumber(
-                        options.expectedHospitalInflow4h
-                    )} and expected inpatient departures are ${formatNumber(
+                    `Projected availability reflects ${formatNumber(
+                        options.currentBoarders
+                    )} current ED boarders, ${formatNumber(
+                        options.currentDirectAdmissions
+                    )} known direct admissions, ${formatNumber(
+                        options.currentSurgicalAdmissions
+                    )} known surgical/procedural admissions, ${formatNumber(
+                        options.expectedEDAdmissions4h
+                    )} expected additional ED admissions, and ${formatNumber(
                         options.expectedInpatientDepartures4h
-                    )}. This is shown as hospital-capacity context and is not used as a proxy for ED census movement.`
+                    )} expected inpatient departures.`
 
                 )}
 

@@ -830,7 +830,7 @@ function validateHospitalConfiguration(
 
 
 /**
- * Validate overall HRI domain weights.
+ * Validate the three authoritative Version 2.2 HRI domain weights.
  */
 function validateDomainWeights(
 
@@ -844,13 +844,9 @@ function validateDomainWeights(
 
         weights.edPressure,
 
-        weights.acuteCapacity,
+        weights.projectedCapacity,
 
-        weights.criticalCapacity,
-
-        weights.inflow,
-
-        weights.projectedCapacity
+        weights.criticalCapacity
 
     ];
 
@@ -903,7 +899,32 @@ function validateDomainWeights(
 
         errors.push(
 
-            "HRI domain weights must total 100%."
+            "The three Version 2.2 HRI domain weights must total 100%."
+
+        );
+
+    }
+
+
+    /*
+     * Compatibility fields are retained in the schema so
+     * historical snapshots and persisted configurations remain
+     * readable, but Version 2.2 does not permit them to carry
+     * HRI weight.
+     */
+    if(
+
+        Math.abs(weights.acuteCapacity) > WEIGHT_TOLERANCE
+
+        ||
+
+        Math.abs(weights.inflow) > WEIGHT_TOLERANCE
+
+    ){
+
+        errors.push(
+
+            "Acute-care capacity and hospital inflow must remain 0% HRI weight in Version 2.2."
 
         );
 
@@ -1319,20 +1340,26 @@ function normalizeConfiguration(
                     configuration.domainWeights.edPressure
                 ),
 
+            /*
+             * Version 2.2 compatibility field.
+             * Acute-care capacity remains operational context
+             * but is not an HRI weighted domain.
+             */
             acuteCapacity:
-                Number(
-                    configuration.domainWeights.acuteCapacity
-                ),
+                0,
 
             criticalCapacity:
                 Number(
                     configuration.domainWeights.criticalCapacity
                 ),
 
+            /*
+             * Version 2.2 compatibility field.
+             * Hospital inflow remains available for legacy
+             * records/analytics but is not an HRI weighted domain.
+             */
             inflow:
-                Number(
-                    configuration.domainWeights.inflow
-                ),
+                0,
 
             projectedCapacity:
                 Number(

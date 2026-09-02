@@ -9,7 +9,7 @@
  * - Enabled / disabled status
  * - Associated Hospital Surge Plan response actions
  *
- * Trigger thresholds and escalation logic remain
+ * Trigger thresholds and advisory logic remain
  * protected and read-only.
  */
 
@@ -368,7 +368,7 @@ function createMarkup():string {
                 </strong>
 
                 <p>
-                    This phase allows the hospital to enable or disable a trigger and select its response actions. Metrics, thresholds, operators, priority, minimum operational state, and multi-condition logic are not editable here.
+                    This phase allows the hospital to enable or disable a trigger and select its response actions. Metrics, thresholds, operators, priority, and multi-condition logic are not editable here. Alpha–Echo operational state is determined only by the HRI score; triggers are advisory.
                 </p>
 
             </div>
@@ -753,21 +753,6 @@ function createTriggerCard(
                             }
                         </span>
 
-                        <span aria-hidden="true">
-                            •
-                        </span>
-
-                        <span>
-                            Minimum state:
-                            ${
-                                trigger.minimumOperationalState
-                                    ? escapeHtml(
-                                        trigger.minimumOperationalState
-                                    )
-                                    : "None"
-                            }
-                        </span>
-
                     </div>
 
                 </div>
@@ -910,21 +895,6 @@ function createTriggerCard(
                             </span>
                             <strong>
                                 ${escapeHtml(trigger.priority)}
-                            </strong>
-                        </div>
-
-                        <div>
-                            <span>
-                                Minimum Operational State
-                            </span>
-                            <strong>
-                                ${
-                                    trigger.minimumOperationalState
-                                        ? escapeHtml(
-                                            trigger.minimumOperationalState
-                                        )
-                                        : "None"
-                                }
                             </strong>
                         </div>
 
@@ -1246,7 +1216,7 @@ function createPlainLanguageCondition(
 
         case "inflowScore":
 
-            return `Hospital Inflow pressure score is ${formatOperatorWords(condition.operator)} ${value}`;
+            return `Legacy hospital inflow context score is ${formatOperatorWords(condition.operator)} ${value}`;
 
 
         case "expectedInpatientDepartures":
@@ -1271,7 +1241,7 @@ function createPlainLanguageCondition(
 
         case "projectedCapacityScore":
 
-            return `Projected Capacity pressure score is ${formatOperatorWords(condition.operator)} ${value}`;
+            return `Projected hospital capacity pressure score is ${formatOperatorWords(condition.operator)} ${value}`;
 
 
         case "hospitalReadinessScore":
