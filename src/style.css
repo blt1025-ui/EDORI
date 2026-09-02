@@ -9387,9 +9387,7 @@ body {
         grid-template-columns:1fr;
     }
 
-    .dashboard-page .command-center-cards {
-        grid-template-columns:repeat(2, minmax(0, 1fr));
-    }
+    
 
 }
 
@@ -11212,9 +11210,7 @@ body {
         margin-bottom:-28px;
     }
 
-    .dashboard-page .command-center-cards {
-        grid-template-columns:repeat(2, minmax(0, 1fr));
-    }
+    
 
 }
 
@@ -24775,4 +24771,1628 @@ small {
         transform: scale(1.16);
         opacity: 1;
     }
+}
+
+/* =========================================================
+   VERSION 2.2 — AUTHORITATIVE DASHBOARD + OPERATIONAL DETAIL
+   CARD LAYOUT
+
+   IMPORTANT:
+   These selectors match the actual current component markup:
+   - Dashboard SummaryCards uses .command-center-cards
+   - Operational Assessment uses .operational-pillar-grid
+
+   Keep this block LAST in style.css so it overrides older
+   five/six-domain layout rules retained elsewhere.
+========================================================= */
+
+
+/* ---------------------------------------------------------
+   DASHBOARD — THREE HRI DOMAIN CARDS ACROSS FULL WIDTH
+--------------------------------------------------------- */
+
+.dashboard-page .command-center-cards {
+    display:grid !important;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(0, 1fr)
+        ) !important;
+
+    width:100% !important;
+    max-width:none !important;
+
+    gap:12px !important;
+    margin:0 !important;
+}
+
+.dashboard-page
+.command-center-cards
+> .command-center-card {
+    grid-column:auto !important;
+    grid-row:auto !important;
+
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/* ---------------------------------------------------------
+   OPERATIONAL DETAIL — FOUR OPERATIONAL ASSESSMENT BOXES
+   ACROSS FULL WIDTH
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-pillar-grid {
+    display:grid !important;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(0, 1fr)
+        ) !important;
+
+    width:100% !important;
+    max-width:none !important;
+
+    gap:12px !important;
+}
+
+.operational-detail-page
+.operational-pillar-grid
+> .operational-pillar-card {
+    grid-column:auto !important;
+    grid-row:auto !important;
+
+    width:auto !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/* ---------------------------------------------------------
+   RESPONSIVE
+--------------------------------------------------------- */
+
+@media(max-width:1050px) {
+
+    .operational-detail-page
+    .operational-pillar-grid {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            ) !important;
+    }
+
+}
+
+
+@media(max-width:650px) {
+
+    .dashboard-page .command-center-cards,
+    .operational-detail-page .operational-pillar-grid {
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+/* =========================================================
+   DASHBOARD — THREE EQUAL HRI DOMAIN CARDS
+   Keep these three cards across the full dashboard width.
+========================================================= */
+
+.dashboard-page-domains {
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+.dashboard-page-domains > .command-center-cards,
+.dashboard-page .dashboard-page-domains .command-center-cards {
+    display:grid !important;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(0, 1fr)
+        ) !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    gap:12px !important;
+
+    margin:0 !important;
+    padding:0 !important;
+}
+
+.dashboard-page-domains
+.command-center-card {
+    grid-column:auto !important;
+    grid-row:auto !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/*
+ * Only collapse the dashboard domain cards on
+ * genuinely small/mobile screens.
+ */
+@media(max-width:650px) {
+
+    .dashboard-page-domains > .command-center-cards,
+    .dashboard-page .dashboard-page-domains .command-center-cards {
+        grid-template-columns:1fr !important;
+    }
+
+}
+
+/* =========================================================
+   FINAL DASHBOARD HRI DOMAIN LAYOUT
+   Authoritative override — keep LAST in this file
+========================================================= */
+
+.dashboard-page
+.dashboard-page-domains
+#summaryCards.command-center-cards {
+    display:grid !important;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr)) !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    gap:12px !important;
+}
+
+
+/* Make every HRI card occupy exactly one grid column. */
+
+.dashboard-page
+.dashboard-page-domains
+#summaryCards.command-center-cards
+> .command-center-card {
+    grid-column:auto !important;
+    grid-row:auto !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/*
+ * Only stack the three cards on an actual small/mobile
+ * display. Do NOT switch to two columns on desktop/tablet.
+ */
+
+@media(max-width:600px) {
+
+    .dashboard-page
+    .dashboard-page-domains
+    #summaryCards.command-center-cards {
+        grid-template-columns:1fr !important;
+    }
+
+}
+
+/* =========================================================
+   DASHBOARD — FINAL THREE-CARD LAYOUT
+========================================================= */
+
+.dashboard-page
+.dashboard-page-domains
+#summaryCards.command-center-cards {
+    display:grid !important;
+    grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    gap:12px !important;
+}
+
+.dashboard-page
+.dashboard-page-domains
+#summaryCards.command-center-cards
+> .command-center-card {
+    grid-column:auto !important;
+    grid-row:auto !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/* Only stack on genuinely narrow mobile screens */
+
+@media(max-width:600px) {
+
+    .dashboard-page
+    .dashboard-page-domains
+    #summaryCards.command-center-cards {
+        grid-template-columns:1fr !important;
+    }
+
+}
+
+/* =========================================================
+   ASSESSMENT — HISTORICAL CONTEXT FULL-WIDTH CARDS
+   Keep last in style.css.
+========================================================= */
+
+.assessment-page
+.assessment-historical-context {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+.assessment-page
+.assessment-historical-context
+.historical-expectations-section {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+.assessment-page
+.assessment-historical-context
+.historical-expectations-grid {
+    display:grid !important;
+
+    grid-template-columns:
+        repeat(7, minmax(0, 1fr)) !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    gap:8px !important;
+}
+
+.assessment-page
+.assessment-historical-context
+.historical-expectation-card {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/* Responsive */
+
+@media(max-width:1200px) {
+
+    .assessment-page
+    .assessment-historical-context
+    .historical-expectations-grid {
+        grid-template-columns:
+            repeat(4, minmax(0, 1fr)) !important;
+    }
+
+}
+
+@media(max-width:850px) {
+
+    .assessment-page
+    .assessment-historical-context
+    .historical-expectations-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr)) !important;
+    }
+
+}
+
+@media(max-width:600px) {
+
+    .assessment-page
+    .assessment-historical-context
+    .historical-expectations-grid {
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+/* =========================================================
+   ASSESSMENT — FULL-WIDTH HISTORICAL CONTEXT
+   Keep LAST in style.css.
+========================================================= */
+
+.assessment-page
+.assessment-historical-context {
+    width:auto !important;
+
+    margin-left:-18px !important;
+    margin-right:-18px !important;
+    margin-top:14px !important;
+}
+
+.assessment-page
+.assessment-historical-context
+.historical-expectations-section {
+    width:100% !important;
+    max-width:none !important;
+
+    margin:0 !important;
+
+    padding-left:18px !important;
+    padding-right:18px !important;
+}
+
+.assessment-page
+.assessment-historical-context
+.historical-expectations-grid {
+    display:grid !important;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr)) !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    gap:8px !important;
+}
+
+.assessment-page
+.assessment-historical-context
+.historical-expectation-card {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+
+/* Smaller displays */
+
+@media(max-width:900px) {
+
+    .assessment-page
+    .assessment-historical-context
+    .historical-expectations-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr)) !important;
+    }
+
+}
+
+@media(max-width:650px) {
+
+    .assessment-page
+    .assessment-historical-context {
+        margin-left:-14px !important;
+        margin-right:-14px !important;
+    }
+
+    .assessment-page
+    .assessment-historical-context
+    .historical-expectations-section {
+        padding-left:14px !important;
+        padding-right:14px !important;
+    }
+
+    .assessment-page
+    .assessment-historical-context
+    .historical-expectations-grid {
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+/* =========================================================
+   OPERATIONAL DETAIL — DRIVERS & RESPONSE HIERARCHY
+   Recommended Actions first and full width.
+   Primary Drivers second and full width.
+   Keep LAST in style.css.
+========================================================= */
+
+
+/* ---------------------------------------------------------
+   RESPONSE SECTION
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-detail-section-response {
+    width:100%;
+    min-width:0;
+}
+
+
+/* ---------------------------------------------------------
+   VERTICAL RESPONSE STACK
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-detail-response-stack {
+    display:flex !important;
+    flex-direction:column !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    gap:12px !important;
+}
+
+
+/* ---------------------------------------------------------
+   RECOMMENDED ACTIONS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-detail-actions {
+    display:block !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    margin:0 !important;
+}
+
+.operational-detail-page
+.operational-detail-actions
+> * {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    margin-left:0 !important;
+    margin-right:0 !important;
+}
+
+
+/* ---------------------------------------------------------
+   PRIMARY DRIVERS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-detail-drivers {
+    display:block !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    margin:0 !important;
+}
+
+.operational-detail-page
+.operational-detail-drivers
+> * {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+
+    margin-left:0 !important;
+    margin-right:0 !important;
+}
+
+
+/* ---------------------------------------------------------
+   COLLAPSIBLE PANELS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-detail-response-stack
+.collapsible-panel {
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+}
+
+/* =========================================================
+   OPERATIONAL FORECAST — VERSION 2.2 OUTLOOK
+   Current → +2 Hours → +4 Hours
+   Keep LAST in style.css.
+========================================================= */
+
+
+/* ---------------------------------------------------------
+   MAIN CONTAINER
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-container {
+    width:100%;
+    min-width:0;
+    max-width:none;
+}
+
+.operational-detail-page
+.operational-forecast-content {
+    display:flex;
+    flex-direction:column;
+
+    width:100%;
+    min-width:0;
+
+    gap:14px;
+}
+
+
+/* ---------------------------------------------------------
+   OUTLOOK HEADER
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-outlook-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+
+    gap:16px;
+
+    width:100%;
+
+    padding:12px 14px;
+
+    border:1px solid rgba(15,23,42,0.08);
+    border-radius:12px;
+
+    background:
+        rgba(248,250,252,0.92);
+}
+
+.operational-detail-page
+.operational-forecast-outlook-header > div {
+    display:flex;
+    flex-direction:column;
+
+    gap:3px;
+}
+
+.operational-detail-page
+.operational-forecast-eyebrow {
+    font-size:0.72rem;
+    font-weight:700;
+
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+
+    opacity:0.66;
+}
+
+.operational-detail-page
+.operational-forecast-outlook-header strong {
+    font-size:1.18rem;
+    line-height:1.2;
+}
+
+.operational-detail-page
+.operational-forecast-outlook-header p {
+    margin:0;
+
+    font-size:0.82rem;
+    line-height:1.35;
+
+    opacity:0.68;
+
+    text-align:right;
+}
+
+
+/* ---------------------------------------------------------
+   CURRENT / +2 / +4 COMPARISON
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-comparison-grid {
+    display:grid !important;
+
+    grid-template-columns:
+        repeat(3,minmax(0,1fr)) !important;
+
+    width:100% !important;
+    min-width:0 !important;
+
+    gap:12px !important;
+}
+
+
+/* ---------------------------------------------------------
+   FORECAST CARDS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-card {
+    display:flex;
+    flex-direction:column;
+
+    width:100%;
+    min-width:0;
+
+    padding:14px;
+
+    gap:10px;
+
+    border:1px solid rgba(15,23,42,0.09);
+    border-radius:12px;
+
+    background:#ffffff;
+
+    overflow:hidden;
+}
+
+
+.operational-detail-page
+.operational-forecast-current-card {
+    background:
+        rgba(248,250,252,0.82);
+}
+
+
+/* ---------------------------------------------------------
+   CARD HEADER
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-card-header {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+
+    gap:10px;
+
+    padding-bottom:10px;
+
+    border-bottom:
+        1px solid rgba(15,23,42,0.07);
+}
+
+.operational-detail-page
+.operational-forecast-card-header > div {
+    display:flex;
+    flex-direction:column;
+
+    gap:2px;
+}
+
+.operational-detail-page
+.operational-forecast-card-header span {
+    font-size:0.68rem;
+    font-weight:700;
+
+    letter-spacing:0.055em;
+    text-transform:uppercase;
+
+    opacity:0.58;
+}
+
+.operational-detail-page
+.operational-forecast-card-header h4 {
+    margin:0;
+
+    font-size:1.15rem;
+    line-height:1.2;
+}
+
+.operational-detail-page
+.operational-forecast-level-icon {
+    display:flex;
+
+    align-items:center;
+    justify-content:center;
+
+    width:30px;
+    height:30px;
+
+    flex:0 0 30px;
+
+    border-radius:8px;
+
+    background:
+        color-mix(
+            in srgb,
+            var(--forecast-level-color) 12%,
+            white
+        );
+
+    font-size:1rem;
+}
+
+
+/* ---------------------------------------------------------
+   DIRECTION
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-direction-row {
+    display:flex;
+
+    align-items:center;
+    justify-content:space-between;
+
+    gap:10px;
+
+    padding:7px 9px;
+
+    border-radius:8px;
+
+    background:
+        rgba(248,250,252,0.95);
+}
+
+.operational-detail-page
+.operational-forecast-direction-row span {
+    font-size:0.76rem;
+    font-weight:600;
+
+    opacity:0.65;
+}
+
+.operational-detail-page
+.operational-forecast-direction-row strong {
+    font-size:0.82rem;
+}
+
+
+/* ---------------------------------------------------------
+   METRIC ROWS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-metric {
+    display:flex;
+
+    align-items:flex-end;
+    justify-content:space-between;
+
+    gap:10px;
+
+    width:100%;
+
+    padding:8px 0;
+
+    border-bottom:
+        1px solid rgba(15,23,42,0.055);
+}
+
+.operational-detail-page
+.operational-forecast-metric:last-of-type {
+    border-bottom:0;
+}
+
+.operational-detail-page
+.operational-forecast-metric > div {
+    display:flex;
+    flex-direction:column;
+
+    min-width:0;
+
+    gap:2px;
+}
+
+.operational-detail-page
+.operational-forecast-metric span {
+    font-size:0.72rem;
+    font-weight:600;
+
+    opacity:0.62;
+}
+
+.operational-detail-page
+.operational-forecast-metric strong {
+    font-size:1.32rem;
+    line-height:1.1;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+.operational-detail-page
+.operational-forecast-metric small {
+    max-width:48%;
+
+    font-size:0.7rem;
+    line-height:1.25;
+
+    text-align:right;
+
+    font-weight:600;
+
+    opacity:0.8;
+}
+
+
+/* ---------------------------------------------------------
+   SCENARIO LEVEL
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-level {
+    display:flex;
+
+    align-items:center;
+    justify-content:space-between;
+
+    gap:12px;
+
+    margin-top:auto;
+
+    padding-top:9px;
+
+    border-top:
+        1px solid rgba(15,23,42,0.07);
+}
+
+.operational-detail-page
+.operational-forecast-level span {
+    font-size:0.72rem;
+    font-weight:600;
+
+    opacity:0.62;
+}
+
+.operational-detail-page
+.operational-forecast-level strong {
+    font-size:0.84rem;
+}
+
+
+/* ---------------------------------------------------------
+   DIRECTION / CHANGE COLORS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.forecast-direction-improving,
+.operational-detail-page
+.forecast-value-improving {
+    color:#18794e;
+}
+
+.operational-detail-page
+.forecast-direction-stable,
+.operational-detail-page
+.forecast-value-stable {
+    color:#475569;
+}
+
+.operational-detail-page
+.forecast-direction-worsening {
+    color:#b45309;
+}
+
+.operational-detail-page
+.forecast-direction-rapidly-worsening,
+.operational-detail-page
+.forecast-value-increasing {
+    color:#b42318;
+}
+
+
+/* ---------------------------------------------------------
+   ACUTE-CARE CAPACITY
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-acute-capacity {
+    display:flex;
+    flex-direction:column;
+
+    width:100%;
+
+    gap:12px;
+
+    padding:15px;
+
+    border:
+        1px solid rgba(15,23,42,0.09);
+
+    border-radius:12px;
+
+    background:
+        rgba(248,250,252,0.72);
+}
+
+
+.operational-detail-page
+.operational-forecast-acute-header {
+    display:flex;
+
+    align-items:flex-start;
+    justify-content:space-between;
+
+    gap:16px;
+}
+
+.operational-detail-page
+.operational-forecast-acute-header > div:first-child {
+    display:flex;
+    flex-direction:column;
+
+    gap:2px;
+}
+
+.operational-detail-page
+.operational-forecast-acute-header span {
+    font-size:0.7rem;
+    font-weight:700;
+
+    letter-spacing:0.045em;
+    text-transform:uppercase;
+
+    opacity:0.62;
+}
+
+.operational-detail-page
+.operational-forecast-acute-header h4 {
+    margin:0;
+
+    font-size:1.05rem;
+}
+
+
+.operational-detail-page
+.operational-forecast-acute-result {
+    display:flex;
+    flex-direction:column;
+
+    align-items:flex-end;
+
+    gap:2px;
+}
+
+.operational-detail-page
+.operational-forecast-acute-result strong {
+    font-size:1.45rem;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+
+/* ---------------------------------------------------------
+   ACUTE CAPACITY SUMMARY
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-acute-summary {
+    display:grid;
+
+    grid-template-columns:
+        repeat(3,minmax(0,1fr));
+
+    gap:8px;
+}
+
+.operational-detail-page
+.operational-forecast-acute-summary > div {
+    display:flex;
+    flex-direction:column;
+
+    gap:4px;
+
+    padding:10px;
+
+    border-radius:9px;
+
+    border:
+        1px solid rgba(15,23,42,0.065);
+
+    background:#ffffff;
+}
+
+.operational-detail-page
+.operational-forecast-acute-summary span {
+    font-size:0.7rem;
+    font-weight:600;
+
+    opacity:0.6;
+}
+
+.operational-detail-page
+.operational-forecast-acute-summary strong {
+    font-size:1.05rem;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+
+/* ---------------------------------------------------------
+   CAPACITY FLOW
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-capacity-flow {
+    display:grid;
+
+    grid-template-columns:
+        repeat(5,minmax(0,1fr));
+
+    gap:7px;
+}
+
+.operational-detail-page
+.operational-forecast-capacity-flow-item {
+    display:flex;
+    flex-direction:column;
+
+    justify-content:space-between;
+
+    min-width:0;
+
+    gap:6px;
+
+    padding:9px;
+
+    border:
+        1px solid rgba(15,23,42,0.06);
+
+    border-radius:8px;
+
+    background:#ffffff;
+}
+
+.operational-detail-page
+.operational-forecast-capacity-flow-item span {
+    font-size:0.68rem;
+    line-height:1.25;
+
+    opacity:0.66;
+}
+
+.operational-detail-page
+.operational-forecast-capacity-flow-item strong {
+    font-size:1rem;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+
+.operational-detail-page
+.operational-forecast-capacity-note {
+    margin:0;
+
+    font-size:0.71rem;
+    line-height:1.35;
+
+    opacity:0.6;
+}
+
+
+/* ---------------------------------------------------------
+   FORECAST BASIS
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-basis {
+    display:flex;
+    flex-direction:column;
+
+    gap:9px;
+
+    width:100%;
+
+    padding:12px 14px;
+
+    border:
+        1px solid rgba(15,23,42,0.07);
+
+    border-radius:10px;
+
+    background:
+        rgba(248,250,252,0.58);
+}
+
+
+.operational-detail-page
+.operational-forecast-basis-header span {
+    display:block;
+
+    font-size:0.66rem;
+    font-weight:700;
+
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+
+    opacity:0.55;
+}
+
+.operational-detail-page
+.operational-forecast-basis-header strong {
+    display:block;
+
+    margin-top:2px;
+
+    font-size:0.82rem;
+}
+
+
+.operational-detail-page
+.operational-forecast-basis-grid {
+    display:grid;
+
+    grid-template-columns:
+        repeat(3,minmax(0,1fr));
+
+    gap:8px;
+}
+
+.operational-detail-page
+.operational-forecast-basis-grid > div {
+    display:flex;
+    flex-direction:column;
+
+    gap:2px;
+
+    min-width:0;
+}
+
+.operational-detail-page
+.operational-forecast-basis-grid span {
+    font-size:0.66rem;
+    font-weight:600;
+
+    opacity:0.57;
+}
+
+.operational-detail-page
+.operational-forecast-basis-grid strong {
+    font-size:0.77rem;
+}
+
+
+/* ---------------------------------------------------------
+   DISCLAIMER
+--------------------------------------------------------- */
+
+.operational-detail-page
+.operational-forecast-disclaimer {
+    padding:10px 12px;
+
+    border-radius:9px;
+
+    background:
+        rgba(248,250,252,0.72);
+
+    border:
+        1px solid rgba(15,23,42,0.055);
+}
+
+.operational-detail-page
+.operational-forecast-disclaimer strong {
+    display:block;
+
+    margin-bottom:3px;
+
+    font-size:0.72rem;
+}
+
+.operational-detail-page
+.operational-forecast-disclaimer p {
+    margin:0;
+
+    font-size:0.69rem;
+    line-height:1.42;
+
+    opacity:0.61;
+}
+
+
+/* ---------------------------------------------------------
+   RESPONSIVE
+--------------------------------------------------------- */
+
+@media(max-width:1050px) {
+
+    .operational-detail-page
+    .operational-forecast-capacity-flow {
+        grid-template-columns:
+            repeat(3,minmax(0,1fr));
+    }
+
+}
+
+
+@media(max-width:850px) {
+
+    .operational-detail-page
+    .operational-forecast-comparison-grid {
+        grid-template-columns:
+            1fr !important;
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-acute-summary {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-capacity-flow {
+        grid-template-columns:
+            repeat(2,minmax(0,1fr));
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-basis-grid {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-outlook-header {
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-outlook-header p {
+        text-align:left;
+    }
+
+}
+
+
+@media(max-width:600px) {
+
+    .operational-detail-page
+    .operational-forecast-capacity-flow {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-acute-header {
+        flex-direction:column;
+    }
+
+
+    .operational-detail-page
+    .operational-forecast-acute-result {
+        align-items:flex-start;
+    }
+
+}
+
+/* =========================================================
+   OPERATIONAL OUTLOOK — ALIGNMENT REFINEMENTS
+========================================================= */
+
+
+/* Keep the invisible Current-State direction row
+   in the layout so metric rows align across all 3 cards. */
+
+.operational-detail-page
+.operational-forecast-direction-placeholder {
+    visibility:hidden !important;
+}
+
+
+/* Projected Available is already displayed in the
+   +4-hour result, leaving only Current and Change below. */
+
+.operational-detail-page
+.operational-forecast-acute-summary {
+    grid-template-columns:
+        repeat(2,minmax(0,1fr)) !important;
+}
+
+
+/* Keep the two remaining capacity boxes balanced. */
+
+.operational-detail-page
+.operational-forecast-acute-summary > div {
+    width:100%;
+    min-width:0;
+}
+
+
+@media(max-width:850px) {
+
+    .operational-detail-page
+    .operational-forecast-acute-summary {
+        grid-template-columns:
+            repeat(2,minmax(0,1fr)) !important;
+    }
+
+}
+
+
+@media(max-width:600px) {
+
+    .operational-detail-page
+    .operational-forecast-acute-summary {
+        grid-template-columns:
+            1fr !important;
+    }
+
+}
+
+/* =========================================================
+   ASSESSMENT — LIVE BED AVAILABILITY
+========================================================= */
+
+.assessment-page
+.capacity-availability-summary {
+    width:100%;
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid #d8dee8;
+    background:#f8fafc;
+    font-size:0.84rem;
+    font-weight:700;
+    line-height:1.35;
+    text-align:center;
+}
+
+
+.assessment-page
+.capacity-availability-positive {
+    border-color:#b7ddc9;
+    background:#f1faf5;
+    color:#18794e;
+}
+
+
+.assessment-page
+.capacity-availability-zero {
+    border-color:#d8dee8;
+    background:#f8fafc;
+    color:#475569;
+}
+
+
+.assessment-page
+.capacity-availability-deficit {
+    border-color:#f0b8b8;
+    background:#fff5f5;
+    color:#b42318;
+}
+
+/* =========================================================
+   ASSESSMENT — EXPANDED RECENT HISTORY
+========================================================= */
+
+.assessment-history-card-list {
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    width:100%;
+}
+
+
+.assessment-history-card {
+    width:100%;
+    min-width:0;
+    padding:14px;
+    border:1px solid #d8dee8;
+    border-radius:10px;
+    background:#ffffff;
+}
+
+
+.assessment-history-card-header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding-bottom:12px;
+    margin-bottom:12px;
+    border-bottom:1px solid #e8edf3;
+}
+
+
+.assessment-history-card-identity {
+    display:flex;
+    align-items:center;
+    gap:18px;
+    min-width:0;
+}
+
+
+.assessment-history-card-time {
+    font-size:0.88rem;
+    font-weight:700;
+    white-space:nowrap;
+}
+
+
+.assessment-history-card-entered-by {
+    display:flex;
+    align-items:baseline;
+    gap:5px;
+    min-width:0;
+}
+
+
+.assessment-history-card-entered-by > span {
+    font-size:0.72rem;
+    color:#64748b;
+}
+
+
+.assessment-history-card-entered-by > strong {
+    font-size:0.82rem;
+}
+
+
+.assessment-history-card-entered-by > small {
+    font-size:0.7rem;
+    color:#64748b;
+}
+
+
+.assessment-history-card-result {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:14px;
+    flex-wrap:wrap;
+}
+
+
+.assessment-history-card-score {
+    display:flex;
+    align-items:baseline;
+    gap:5px;
+}
+
+
+.assessment-history-card-score > span {
+    font-size:0.7rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:#64748b;
+}
+
+
+.assessment-history-card-score > strong {
+    font-size:1.05rem;
+}
+
+
+.assessment-history-card-data {
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:8px;
+    width:100%;
+}
+
+
+.assessment-history-data-point {
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    min-width:0;
+    min-height:58px;
+    padding:8px 10px;
+    border:1px solid #e4e9f0;
+    border-radius:7px;
+    background:#f8fafc;
+}
+
+
+.assessment-history-data-point > span {
+    margin-bottom:3px;
+    font-size:0.68rem;
+    line-height:1.2;
+    color:#64748b;
+}
+
+
+.assessment-history-data-point > strong {
+    font-size:0.94rem;
+    line-height:1.2;
+}
+
+
+@media(max-width:1100px) {
+
+    .assessment-history-card-data {
+        grid-template-columns:repeat(3,minmax(0,1fr));
+    }
+
+}
+
+
+@media(max-width:750px) {
+
+    .assessment-history-card-header {
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+
+    .assessment-history-card-result {
+        justify-content:flex-start;
+    }
+
+
+    .assessment-history-card-data {
+        grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+
+}
+
+
+@media(max-width:500px) {
+
+    .assessment-history-card-identity {
+        align-items:flex-start;
+        flex-direction:column;
+        gap:5px;
+    }
+
+
+    .assessment-history-card-data {
+        grid-template-columns:1fr;
+    }
+
+}
+
+/* =========================================================
+   ASSESSMENT HISTORY — CONTAINED SCROLL
+========================================================= */
+
+.assessment-history-card-list {
+    max-height: 560px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    overscroll-behavior: contain;
+}
+
+
+/* Keep a little breathing room at the bottom */
+
+.assessment-history-card-list::after {
+    content: "";
+    display: block;
+    height: 2px;
+}
+
+
+/* Subtle scrollbar */
+
+.assessment-history-card-list {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+
+.assessment-history-card-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+
+.assessment-history-card-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+.assessment-history-card-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+}
+
+
+.assessment-history-card-list::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }

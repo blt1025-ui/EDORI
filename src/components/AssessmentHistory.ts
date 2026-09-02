@@ -59,16 +59,6 @@ from "../types/EdoriSnapshot";
 
 
 /**
- * Maximum number of recent assessments displayed on
- * the Assessment working page.
- *
- * Full saved history remains available to reporting,
- * export, restore, and administrative workflows.
- */
-const MAXIMUM_DISPLAYED_ROWS = 10;
-
-
-/**
  * Render the Assessment History panel.
  */
 export function AssessmentHistory():string {
@@ -138,150 +128,49 @@ export function initializeAssessmentHistory():void {
 function updateAssessmentHistory():void {
 
     const container = document.getElementById(
-
         "assessmentHistoryContent"
-
     );
 
-
     if(!container){
-
         return;
-
     }
-
 
     try {
 
         const snapshots =
-
             getValidChronologicalSnapshots();
 
-
         updateHistoryCount(
-
             snapshots.length
-
         );
-
 
         if(snapshots.length === 0){
 
             container.innerHTML =
-
                 createEmptyHistoryState();
 
-
             return;
-
         }
 
-
         const rows = createHistoryRows(
-
             snapshots
-
         );
-
 
         container.innerHTML = `
 
-            <div class="assessment-history-table-wrapper">
+            <div class="assessment-history-card-list">
 
-                <table class="assessment-history-table">
-
-                    <thead>
-
-                        <tr>
-
-                            <th scope="col">
-                                Time
-                            </th>
-
-                            <th scope="col">
-                                Entered By
-                            </th>
-
-                            <th scope="col">
-                                Level
-                            </th>
-
-                            <th scope="col">
-                                Score
-                            </th>
-
-                            <th scope="col">
-                                Change
-                            </th>
-
-                            <th scope="col">
-                                ED Volume
-                            </th>
-
-                            <th scope="col">
-                                Boarding
-                            </th>
-
-                            <th scope="col">
-                                Acute Care
-                            </th>
-
-
-                        </tr>
-
-                    </thead>
-
-
-                    <tbody>
-
-                        ${rows
-
-                            .slice(
-
-                                -MAXIMUM_DISPLAYED_ROWS
-
+                ${rows
+                    .reverse()
+                    .map(
+                        row =>
+                            createHistoryRowMarkup(
+                                row
                             )
-
-                            .reverse()
-
-                            .map(
-
-                                row =>
-
-                                    createHistoryRowMarkup(
-
-                                        row
-
-                                    )
-
-                            )
-
-                            .join("")}
-
-                    </tbody>
-
-                </table>
+                    )
+                    .join("")}
 
             </div>
-
-
-            ${snapshots.length > MAXIMUM_DISPLAYED_ROWS
-
-                ? `
-
-                    <div class="assessment-history-limit-note">
-
-                        Showing the ${MAXIMUM_DISPLAYED_ROWS} most recent assessments.
-                        ${snapshots.length - MAXIMUM_DISPLAYED_ROWS}
-                        older saved assessments remain available in EDORI history and administrative tools.
-
-                    </div>
-
-                `
-
-                : ""
-
-            }
 
         `;
 
@@ -289,20 +178,13 @@ function updateAssessmentHistory():void {
     catch(error){
 
         console.error(
-
             "Unable to update assessment history:",
-
             error
-
         );
-
 
         updateHistoryCount(
-
             0
-
         );
-
 
         container.innerHTML = `
 
@@ -470,213 +352,259 @@ function createHistoryRows(
 function createHistoryRowMarkup(
 
     row:{
-
         snapshot:EdoriSnapshot;
-
         scoreChange:number | null;
-
     }
 
 ):string {
 
     const state = getConfiguredOperationalState(
-
         row.snapshot.score
-
     );
-
 
     const safeScore = Math.min(
-
         100,
-
         Math.max(
-
             0,
-
             Math.round(
-
                 row.snapshot.score
-
             )
-
         )
-
     );
 
-
     const scoreChangeClass =
-
         createScoreChangeClass(
-
             row.scoreChange
-
         );
-
 
     const scoreChangeText =
-
         createScoreChangeText(
-
             row.scoreChange
-
         );
-
 
     return `
 
-        <tr>
+        <article class="assessment-history-card">
 
-            <td>
+            <div class="assessment-history-card-header">
 
-                <time
-                    datetime="${escapeAttribute(
-                        new Date(
-                            row.snapshot.timestamp
-                        ).toISOString()
-                    )}"
-                >
+                <div class="assessment-history-card-identity">
 
-                    ${escapeHtml(
-                        formatAssessmentDate(
+                    <time
+                        class="assessment-history-card-time"
+                        datetime="${escapeAttribute(
                             new Date(
                                 row.snapshot.timestamp
+                            ).toISOString()
+                        )}"
+                    >
+                        ${escapeHtml(
+                            formatAssessmentDate(
+                                new Date(
+                                    row.snapshot.timestamp
+                                )
                             )
-                        )
-                    )}
+                        )}
+                    </time>
 
-                </time>
+                    <div class="assessment-history-card-entered-by">
 
-            </td>
+                        <span>
+                            Entered by
+                        </span>
 
-
-            <td>
-
-                <strong class="assessment-history-entered-by">
-
-                    ${escapeHtml(
-                        row.snapshot.enteredByDisplayName
-                    )}
-
-                </strong>
-
-                ${row.snapshot.enteredByUsername
-
-                    ? `
-
-                        <small class="assessment-history-entered-by-username">
-
+                        <strong>
                             ${escapeHtml(
-                                row.snapshot.enteredByUsername
+                                row.snapshot.enteredByDisplayName
                             )}
+                        </strong>
 
-                        </small>
+                        ${row.snapshot.enteredByUsername
 
-                    `
+                            ? `
 
-                    : ""
+                                <small>
+                                    ${escapeHtml(
+                                        row.snapshot.enteredByUsername
+                                    )}
+                                </small>
 
-                }
+                            `
 
-            </td>
+                            : ""
+
+                        }
+
+                    </div>
+
+                </div>
 
 
-            <td>
-
-                <span
-                    class="assessment-history-level"
-                    style="
-                        --history-level-color:
-                        ${escapeAttribute(
-                            state.color
-                        )};
-                    "
-                >
+                <div class="assessment-history-card-result">
 
                     <span
-                        class="assessment-history-level-icon"
-                        aria-hidden="true"
+                        class="assessment-history-level"
+                        style="
+                            --history-level-color:
+                            ${escapeAttribute(
+                                state.color
+                            )};
+                        "
                     >
 
-                        ${escapeHtml(
-                            state.icon
-                        )}
+                        <span
+                            class="assessment-history-level-icon"
+                            aria-hidden="true"
+                        >
+                            ${escapeHtml(
+                                state.icon
+                            )}
+                        </span>
+
+                        <strong>
+                            ${escapeHtml(
+                                state.title
+                            )}
+                        </strong>
 
                     </span>
 
 
-                    <strong>
+                    <div class="assessment-history-card-score">
 
+                        <span>
+                            HRI
+                        </span>
+
+                        <strong>
+                            ${safeScore}
+                        </strong>
+
+                    </div>
+
+
+                    <span
+                        class="
+                            assessment-history-change
+                            ${scoreChangeClass}
+                        "
+                    >
                         ${escapeHtml(
-                            state.title
+                            scoreChangeText
                         )}
+                    </span>
 
-                    </strong>
+                </div>
 
-                </span>
-
-            </td>
-
-
-            <td>
-
-                <strong class="assessment-history-score">
-
-                    ${safeScore}
-
-                </strong>
-
-            </td>
+            </div>
 
 
-            <td>
+            <div class="assessment-history-card-data">
 
-                <span
-                    class="
-                        assessment-history-change
-                        ${scoreChangeClass}
-                    "
-                >
-
-                    ${escapeHtml(
-                        scoreChangeText
-                    )}
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                ${formatSnapshotValue(
-                    row.snapshot.totalEDVolume
+                ${createHistoryDataPoint(
+                    "ED Volume",
+                    formatSnapshotValue(
+                        row.snapshot.totalEDVolume
+                    )
                 )}
 
-            </td>
-
-
-            <td>
-
-                ${formatSnapshotValue(
-                    row.snapshot.boardedPatients
+                ${createHistoryDataPoint(
+                    "Boarding Patients",
+                    formatSnapshotValue(
+                        row.snapshot.boardedPatients
+                    )
                 )}
 
-            </td>
-
-
-            <td>
-
-                ${formatCapacitySnapshot(
-                    row.snapshot.occupiedAcuteCareBeds,
-                    row.snapshot.staffedAcuteCareBeds
+                ${createHistoryDataPoint(
+                    "ESI 1",
+                    formatSnapshotValue(
+                        row.snapshot.esi1
+                    )
                 )}
 
-            </td>
+                ${createHistoryDataPoint(
+                    "ESI 2",
+                    formatSnapshotValue(
+                        row.snapshot.esi2
+                    )
+                )}
+
+                ${createHistoryDataPoint(
+                    "Acute Staffed",
+                    formatSnapshotValue(
+                        row.snapshot.staffedAcuteCareBeds
+                    )
+                )}
+
+                ${createHistoryDataPoint(
+                    "Acute Occupied",
+                    formatSnapshotValue(
+                        row.snapshot.occupiedAcuteCareBeds
+                    )
+                )}
+
+                ${createHistoryDataPoint(
+                    "Critical Staffed",
+                    formatSnapshotValue(
+                        row.snapshot.staffedCriticalCareBeds
+                    )
+                )}
+
+                ${createHistoryDataPoint(
+                    "Critical Occupied",
+                    formatSnapshotValue(
+                        row.snapshot.occupiedCriticalCareBeds
+                    )
+                )}
+
+                ${createHistoryDataPoint(
+                    "Direct Admissions",
+                    formatSnapshotValue(
+                        row.snapshot.currentDirectAdmissions
+                    )
+                )}
+
+                ${createHistoryDataPoint(
+                    "Surgical / Procedural",
+                    formatSnapshotValue(
+                        row.snapshot.currentSurgicalAdmissions
+                    )
+                )}
+
+            </div>
+
+        </article>
+
+    `;
+
+}
 
 
+function createHistoryDataPoint(
 
-        </tr>
+    label:string,
+
+    value:string
+
+):string {
+
+    return `
+
+        <div class="assessment-history-data-point">
+
+            <span>
+                ${escapeHtml(
+                    label
+                )}
+            </span>
+
+            <strong>
+                ${escapeHtml(
+                    value
+                )}
+            </strong>
+
+        </div>
 
     `;
 
@@ -834,34 +762,6 @@ function formatAssessmentDate(
         }
 
     );
-
-}
-
-
-/**
- * Format occupied / staffed capacity for a saved
- * Hospital Readiness snapshot.
- */
-function formatCapacitySnapshot(
-
-    occupied:number,
-
-    staffed:number
-
-):string {
-
-    if(
-        !Number.isFinite(occupied)
-        ||
-        !Number.isFinite(staffed)
-    ){
-
-        return "--";
-
-    }
-
-
-    return `${formatSnapshotValue(occupied)} / ${formatSnapshotValue(staffed)}`;
 
 }
 

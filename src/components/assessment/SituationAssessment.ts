@@ -650,6 +650,15 @@ function createAcuteCareSection():string {
 
             </div>
 
+
+            <div
+                id="acuteCareAvailabilitySummary"
+                class="capacity-availability-summary"
+                aria-live="polite"
+            >
+                Available acute-care beds: 0
+            </div>
+
         </div>
 
     `;
@@ -707,6 +716,15 @@ function createCriticalCareSection():string {
 
                 )}
 
+            </div>
+
+
+            <div
+                id="criticalCareAvailabilitySummary"
+                class="capacity-availability-summary"
+                aria-live="polite"
+            >
+                Available critical-care beds: 0
             </div>
 
         </div>
@@ -823,30 +841,14 @@ function createHistoricalSection():string {
 
                 ${createExpectationDisplay(
 
-                    "expectedEDVolumeDisplay",
-
-                    "Expected ED Volume"
-
-                )}
-
-
-                ${createExpectationDisplay(
-
-                    "expectedEDBoardersDisplay",
-
-                    "Expected ED Boarders"
-
-                )}
-
-
-                ${createExpectationDisplay(
-
                     "expectedEDAdmissions4hDisplay",
 
                     "Expected Additional ED Admissions — Next 4 Hours"
 
                 )}
-${createExpectationDisplay(
+
+
+                ${createExpectationDisplay(
 
                     "expectedInpatientDepartures4hDisplay",
 
@@ -969,6 +971,8 @@ export function initializeSituationAssessment():void {
     restoreHistoricalDisplay();
 
     updateHighAcuitySummary();
+
+    updateCapacityAvailabilitySummaries();
 
     updateInitialAssessmentMessage();
 
@@ -1168,6 +1172,13 @@ function initializeCurrentValueInputs():void {
                     }
 
 
+                    if(isCapacityRelatedField(field)){
+
+                        updateCapacityAvailabilitySummaries();
+
+                    }
+
+
                     showDraftChangedMessage();
 
                     updateAssessmentWorkflow();
@@ -1179,6 +1190,101 @@ function initializeCurrentValueInputs():void {
         }
 
     );
+
+}
+
+
+/*
+ * =====================================================
+ * Live capacity availability summaries
+ * =====================================================
+ */
+function updateCapacityAvailabilitySummaries():void {
+
+    updateCapacityAvailabilitySummary(
+        "acuteCareAvailabilitySummary",
+        "acute-care",
+        draftInput.staffedAcuteCareBeds,
+        draftInput.occupiedAcuteCareBeds
+    );
+
+    updateCapacityAvailabilitySummary(
+        "criticalCareAvailabilitySummary",
+        "critical-care",
+        draftInput.staffedCriticalCareBeds,
+        draftInput.occupiedCriticalCareBeds
+    );
+
+}
+
+
+function updateCapacityAvailabilitySummary(
+
+    elementId:string,
+    label:string,
+    staffedBeds:number,
+    occupiedBeds:number
+
+):void {
+
+    const element = document.getElementById(
+        elementId
+    );
+
+    if(!element){
+        return;
+    }
+
+    const availableBeds =
+        staffedBeds
+        -
+        occupiedBeds;
+
+    element.classList.remove(
+        "capacity-availability-positive",
+        "capacity-availability-zero",
+        "capacity-availability-deficit"
+    );
+
+    if(availableBeds > 0){
+        element.classList.add(
+            "capacity-availability-positive"
+        );
+    }
+    else if(availableBeds < 0){
+        element.classList.add(
+            "capacity-availability-deficit"
+        );
+    }
+    else {
+        element.classList.add(
+            "capacity-availability-zero"
+        );
+    }
+
+    if(availableBeds < 0){
+        element.textContent =
+            `${Math.abs(availableBeds)} ${label} beds over staffed capacity`;
+
+        return;
+    }
+
+    element.textContent =
+        `${availableBeds} ${label} ${availableBeds === 1 ? "bed" : "beds"} available`;
+
+}
+
+
+function isCapacityRelatedField(
+
+    field:keyof EdoriAssessmentInput
+
+):boolean {
+
+    return field === "staffedAcuteCareBeds"
+        || field === "occupiedAcuteCareBeds"
+        || field === "staffedCriticalCareBeds"
+        || field === "occupiedCriticalCareBeds";
 
 }
 
@@ -1347,7 +1453,7 @@ function submitAssessmentToEngine():void {
              * Compatibility-only field.
              *
              * Current ED admissions are not separately
-             * entered in Version 2.2 because existing
+             * entered in Version 2.1 because existing
              * ED admission demand is represented by
              * boardedPatients.
              */
@@ -1525,7 +1631,48 @@ function previewHistoricalExpectation(
         )
 
     );
-setElementText(
+
+
+    setElementText(
+
+        "expectedDirectAdmissions4hDisplay",
+
+        formatHistoricalValue(
+
+            expectedValues.expectedDirectAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedSurgicalAdmissions4hDisplay",
+
+        formatHistoricalValue(
+
+            expectedValues.expectedSurgicalAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedHospitalInflow4hDisplay",
+
+        formatHistoricalValue(
+
+            expectedValues.expectedHospitalInflow4h
+
+        )
+
+    );
+
+
+    setElementText(
 
         "expectedInpatientDepartures4hDisplay",
 
@@ -1616,7 +1763,48 @@ function restoreHistoricalDisplay():void {
         )
 
     );
-setElementText(
+
+
+    setElementText(
+
+        "expectedDirectAdmissions4hDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedDirectAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedSurgicalAdmissions4hDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedSurgicalAdmissions4h
+
+        )
+
+    );
+
+
+    setElementText(
+
+        "expectedHospitalInflow4hDisplay",
+
+        formatHistoricalValue(
+
+            state.expectedHospitalInflow4h
+
+        )
+
+    );
+
+
+    setElementText(
 
         "expectedInpatientDepartures4hDisplay",
 
@@ -1807,7 +1995,14 @@ function clearExpectedValueDisplays():void {
         "expectedEDBoardersDisplay",
 
         "expectedEDAdmissions4hDisplay",
-"expectedInpatientDepartures4hDisplay"
+
+        "expectedDirectAdmissions4hDisplay",
+
+        "expectedSurgicalAdmissions4hDisplay",
+
+        "expectedHospitalInflow4hDisplay",
+
+        "expectedInpatientDepartures4hDisplay"
 
     ].forEach(
 
