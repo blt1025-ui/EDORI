@@ -837,26 +837,44 @@ function createHistoricalSection():string {
             </div>
 
 
-            <div class="historical-expectations-grid">
+           <div class="historical-expectations-grid">
 
-                ${createExpectationDisplay(
+    ${createExpectationDisplay(
 
-                    "expectedEDAdmissions4hDisplay",
+        "expectedEDVolumeDisplay",
 
-                    "Expected Additional ED Admissions — Next 4 Hours"
+        "Expected ED Volume"
 
-                )}
+    )}
 
 
-                ${createExpectationDisplay(
+    ${createExpectationDisplay(
 
-                    "expectedInpatientDepartures4hDisplay",
+        "expectedEDBoardersDisplay",
 
-                    "Expected Inpatient Departures — Next 4 Hours"
+        "Expected ED Boarders"
 
-                )}
+    )}
 
-            </div>
+
+    ${createExpectationDisplay(
+
+        "expectedEDAdmissions4hDisplay",
+
+        "Expected Additional ED Admissions — Next 4 Hours"
+
+    )}
+
+
+    ${createExpectationDisplay(
+
+        "expectedInpatientDepartures4hDisplay",
+
+        "Expected Inpatient Departures — Next 4 Hours"
+
+    )}
+
+</div>
 
 
             <p class="historical-expectation-note">
@@ -1348,13 +1366,13 @@ function submitAssessmentToEngine():void {
 
     ){
 
-        showAssessmentMessage(
+       showAssessmentMessage(
 
-            "Your EDORI role allows viewing assessments but does not allow calculating or saving a new assessment.",
+    "Your Hospital Readiness role allows viewing assessments but does not allow calculating or saving a new assessment.",
 
-            "error"
+    "error"
 
-        );
+);
 
 
         return;

@@ -61,7 +61,7 @@ export function LoginPage():string {
                         </strong>
 
                         <span>
-                            Sign in with your assigned EDORI username and password.
+                            Sign in with your assigned Hospital Readiness username and password.
                         </span>
 
                     </div>
@@ -73,9 +73,9 @@ export function LoginPage():string {
 
                     <div class="edori-login-card-header">
 
-                        <span class="edori-login-card-eyebrow">
-                            EDORI
-                        </span>
+                      <span class="edori-login-card-eyebrow">
+    Hospital Readiness
+</span>
 
 
                         <h2 id="edoriLoginTitle">
@@ -173,7 +173,7 @@ export function LoginPage():string {
                     <div class="edori-login-footer">
 
                         <span>
-                            EDORI · Hospital Readiness Index
+                            Hospital Readiness Index
                         </span>
 
                         <small>

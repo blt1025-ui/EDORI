@@ -1,17 +1,15 @@
 export function Header(){
 
-return `
+    return `
 
-<header class="header">
+        <header class="header">
 
-<h1>
+            <h1>
+                Hospital Readiness Index
+            </h1>
 
-Emergency Department Operational Readiness Index
+        </header>
 
-</h1>
-
-</header>
-
-`;
+    `;
 
 }

@@ -318,15 +318,7 @@ function updateDashboardCommandBar():void {
                 .length;
 
 
-        const levelEscalated =
-
-            finalState.title
-
-            !==
-
-            operationalAssessment
-                .baseOperationalState
-                .title;
+        
 
 
         container.className =
@@ -375,23 +367,11 @@ function updateDashboardCommandBar():void {
                     </strong>
 
 
-                    <small>
-
-                        ${levelEscalated
-
-                            ? `Elevated from ${escapeHtml(
-                                operationalAssessment
-                                    .baseOperationalState
-                                    .title
-                            )} by active triggers`
-
-                            : `Score-derived ${escapeHtml(
-                                finalState.title
-                            )} level`
-
-                        }
-
-                    </small>
+                  <small>
+    Score-derived ${escapeHtml(
+        finalState.title
+    )} level
+</small>
 
                 </div>
 
@@ -401,7 +381,7 @@ function updateDashboardCommandBar():void {
             <div class="dashboard-command-score">
 
                 <span>
-                    EDORI
+                        HRI
                 </span>
 
                 <strong>
@@ -612,7 +592,7 @@ function createAwaitingMarkup():string {
             <div>
 
                 <strong>
-                    Awaiting EDORI Assessment
+                    Awaiting HRI Assessment
                 </strong>
 
                 <p>
@@ -642,7 +622,7 @@ function createAwaitingMarkup():string {
             <div>
 
                 <span>
-                    EDORI Score
+                    HRI Score
                 </span>
 
                 <strong>

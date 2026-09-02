@@ -371,8 +371,8 @@ export function AdministrationPage():string {
                         title:
                             "User Management",
 
-                        description:
-                            "Create, edit, deactivate, and manage EDORI application users",
+                  description:
+    "Create, edit, deactivate, and manage Hospital Readiness application users",
 
                         content:
                             UserManagement(),

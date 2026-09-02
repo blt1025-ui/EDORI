@@ -1249,9 +1249,9 @@ function createAwaitingAssessmentState():string {
                 Awaiting assessment
             </strong>
 
-            <p>
-                Calculate EDORI to generate prioritized operational actions.
-            </p>
+           <p>
+    Calculate HRI to generate prioritized operational actions.
+</p>
 
         </div>
 

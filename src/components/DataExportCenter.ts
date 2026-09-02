@@ -1134,17 +1134,17 @@ function createSnapshotCsvRow(
         occupiedAcuteCareBeds:
             snapshot.occupiedAcuteCareBeds,
 
-        staffedCriticalCareBeds:
-            snapshot.staffedCriticalCareBeds,
+       staffedCriticalCareBeds:
+    snapshot.staffedCriticalCareBeds,
 
-        occupiedCriticalCareBeds:
-            snapshot.occupiedCriticalCareBeds,
+occupiedCriticalCareBeds:
+    snapshot.occupiedCriticalCareBeds,
 
+currentDirectAdmissions:
+    snapshot.currentDirectAdmissions,
 
-    
-
-        currentSurgicalAdmissions:
-            snapshot.currentSurgicalAdmissions,
+currentSurgicalAdmissions:
+    snapshot.currentSurgicalAdmissions,
 
         knownNonEDInflow:
     snapshot.currentHospitalInflow,

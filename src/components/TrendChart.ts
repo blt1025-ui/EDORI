@@ -1,14 +1,14 @@
 /**
  * TrendChart
  *
- * Displays the saved EDORI score trend using the
- * Alpha–Echo operational-level model.
+* Displays the saved HRI score trend using the
+* Alpha–Echo operational-level model.
  *
  * The chart reads persistent SnapshotService data.
  *
  * It does not:
  *
- * - Calculate EDORI
+ * - Calculate HRI
  * - Evaluate operational triggers
  * - Save or alter snapshot history
  * - Reconstruct past trigger-adjusted levels
@@ -95,7 +95,7 @@ interface TrendPoint {
 
 
 /**
- * Render the EDORI Trend panel.
+ * Render the HRI Trend panel.
  */
 export function TrendChart():string {
 
@@ -473,7 +473,7 @@ function createTrendChartMarkup(
             <div>
 
                 <span>
-                    Latest Score
+                    Latest HRI Score
                 </span>
 
                 <strong>
@@ -1220,11 +1220,11 @@ function createTrendPointMarkup(
             stroke-width="3"
             tabindex="0"
             aria-label="${escapeAttribute(
-                `${formatLongDateTime(
-                    new Date(
-                        point.snapshot.timestamp
-                    )
-                )}: EDORI ${Math.round(point.score)}, level ${state.title}`
+              `${formatLongDateTime(
+    new Date(
+        point.snapshot.timestamp
+    )
+)}: HRI ${Math.round(point.score)}, level ${state.title}`
             )}"
         >
 
@@ -1238,7 +1238,7 @@ function createTrendPointMarkup(
                     )
                 )}
 
-                — EDORI ${Math.round(point.score)}
+               — HRI ${Math.round(point.score)}
 
                 — ${escapeHtml(state.title)}
 
@@ -1493,9 +1493,9 @@ function createEmptyTrendState():string {
                 No trend data
             </strong>
 
-            <p>
-                Saved EDORI assessments will appear after calculation.
-            </p>
+          <p>
+    Saved HRI assessments will appear after calculation.
+</p>
 
         </div>
 

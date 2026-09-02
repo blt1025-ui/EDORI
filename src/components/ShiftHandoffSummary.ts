@@ -1108,10 +1108,8 @@ function createPlainTextHandoff(
                     `- ${recommendation.priority}: ${recommendation.title} — ${recommendation.description}`
             );
 
-    const escalationLine =
-        finalState.title !== baseState.title
-            ? `Final level was elevated from ${baseState.title} to ${finalState.title} by active operational triggers.`
-            : `Final level matches the score-derived ${baseState.title} level.`;
+    const scoreDerivedStateLine =
+    `Operational level is score-derived: ${finalState.title}.`;
 
     return [
 
@@ -1134,7 +1132,7 @@ function createPlainTextHandoff(
             : formatSignedNumber(scoreChange)
         }`,
 
-        escalationLine,
+        scoreDerivedStateLine,
 
         "",
 
@@ -2205,9 +2203,7 @@ function createAwaitingAssessmentState():string {
                 Awaiting assessment
             </strong>
 
-            <p>
-                Calculate Hospital Readiness to generate a shift handoff summary.
-            </p>
+            Calculate the HRI to generate a shift handoff summary.
 
         </div>
 

@@ -289,7 +289,7 @@ export function Sidebar():string {
         <aside
             id="applicationSidebar"
             class="sidebar"
-            aria-label="EDORI application navigation"
+            aria-label="Hospital Readiness application navigation"
         >
 
             <div class="sidebar-header">
@@ -359,7 +359,7 @@ export function Sidebar():string {
                     class="sidebar-footer-status sidebar-sync-status sidebar-sync-status-idle"
                     role="status"
                     aria-live="polite"
-                    aria-label="EDORI synchronization status"
+                    aria-label="Hospital Readiness synchronization status"
                 >
 
                     <span

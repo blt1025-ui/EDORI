@@ -765,9 +765,9 @@ function createEmptyState():string {
                 Awaiting assessment
             </strong>
 
-            <p>
-                Complete the Hospital Readiness Assessment and calculate Hospital Readiness.
-            </p>
+           <p>
+    Complete the Hospital Readiness Assessment and calculate the HRI.
+</p>
 
         </div>
 

@@ -581,9 +581,9 @@ function createExecutiveReportMarkup(
 
                 <div class="executive-report-score">
 
-                    <span>
-                        Hospital Readiness Score
-                    </span>
+                   <span>
+    HRI Score
+</span>
 
                     <strong>
                         ${score}

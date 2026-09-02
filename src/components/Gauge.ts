@@ -834,9 +834,9 @@ function createAwaitingAssessmentState():string {
                 Awaiting assessment
             </strong>
 
-            <p>
-                Calculate EDORI to display the command-center gauge.
-            </p>
+          <p>
+    Calculate HRI to display the command-center gauge.
+</p>
 
         </div>
 

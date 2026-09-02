@@ -10,7 +10,7 @@
  * - Restore the built-in dataset
  *
  * Changing the active historical dataset invalidates
- * the current EDORI result and requires recalculation.
+ * the current HRI result and requires recalculation.
  */
 
 import {
@@ -206,20 +206,36 @@ export function HistoricalDataManager():string {
 
                 <p class="historical-file-help">
 
-                    Required columns:
+                    <strong>
+                        Current model historical inputs:
+                    </strong>
 
-                    day, hour, expectedEDVolume,
+                    expectedEDVolume,
                     expectedEDBoarders,
-                    expectedStaffedAcuteCareBeds,
-                    expectedOccupiedAcuteCareBeds,
                     expectedEDAdmissions,
-                    expectedDirectAdmissions,
-                    expectedSurgicalAdmissions,
                     expectedInpatientDepartures.
 
-                    The file must contain exactly one
-                    record for every weekday/hour
-                    combination (168 records total).
+                    <br><br>
+
+                    <strong>
+                        Compatibility / analytics fields:
+                    </strong>
+
+                    expectedStaffedAcuteCareBeds,
+                    expectedOccupiedAcuteCareBeds,
+                    expectedDirectAdmissions,
+                    expectedSurgicalAdmissions.
+
+                    <br><br>
+
+                    Required identifier columns:
+                    day, hour.
+
+                    All columns remain required for
+                    backward compatibility. The file must
+                    contain exactly one record for every
+                    weekday/hour combination
+                    (168 records total).
 
                 </p>
 
@@ -352,7 +368,7 @@ function initializeTemplateButton():void {
 
 
 /**
- * Download a complete 168-row Version 2.1 CSV
+ * Download a complete 168-row Version 2.2-compatible CSV
  * template with weekday/hour buckets pre-populated.
  */
 function downloadHistoricalCsvTemplate():void {
@@ -464,7 +480,7 @@ function downloadHistoricalCsvTemplate():void {
     link.href = url;
 
     link.download =
-        "EDORI_Historical_Expectations_Template.csv";
+        "Hospital_Readiness_Historical_Expectations_Template.csv";
 
 
     document.body.appendChild(
@@ -872,7 +888,7 @@ function importValidatedDataset():void {
 
         showImportMessage(
 
-            "Historical expectations were imported successfully. Recalculate EDORI using the active dataset.",
+            "Historical expectations were imported successfully. Recalculate Hospital Readiness using the active dataset.",
 
             "success"
 
@@ -987,7 +1003,7 @@ function restoreBuiltInDataset():void {
 
     const confirmed = window.confirm(
 
-        "Remove the imported historical dataset and restore the built-in data? The current EDORI result will require recalculation."
+        "Remove the imported historical dataset and restore the built-in data? The current Hospital Readiness result will require recalculation."
 
     );
 
@@ -1034,7 +1050,7 @@ function restoreBuiltInDataset():void {
 
         showImportMessage(
 
-            "Imported historical data were removed. The built-in dataset is active and EDORI must be recalculated.",
+            "Imported historical data were removed. The built-in dataset is active and Hospital Readiness must be recalculated.",
 
             "success"
 
@@ -1376,12 +1392,12 @@ function displayCandidatePreview(
                         <th>Hour</th>
                         <th>ED Census</th>
                         <th>Boarders</th>
+                        <th>ED Admissions</th>
+                        <th>Inpatient Departures</th>
                         <th>Staffed Acute Beds</th>
                         <th>Occupied Acute Beds</th>
-                        <th>ED Admissions</th>
                         <th>Direct Admissions</th>
                         <th>Surgical Admissions</th>
-                        <th>Inpatient Departures</th>
                     </tr>
 
                 </thead>
@@ -1397,12 +1413,12 @@ function displayCandidatePreview(
                                 <td>${record.hour}</td>
                                 <td>${record.expectedEDVolume}</td>
                                 <td>${record.expectedEDBoarders}</td>
+                                <td>${record.expectedEDAdmissions}</td>
+                                <td>${record.expectedInpatientDepartures}</td>
                                 <td>${record.expectedStaffedAcuteCareBeds}</td>
                                 <td>${record.expectedOccupiedAcuteCareBeds}</td>
-                                <td>${record.expectedEDAdmissions}</td>
                                 <td>${record.expectedDirectAdmissions}</td>
                                 <td>${record.expectedSurgicalAdmissions}</td>
-                                <td>${record.expectedInpatientDepartures}</td>
                             </tr>
 
                         `

@@ -68,8 +68,8 @@ export function PasswordChangePage():string {
                 <p>
 
                     ${forced
-                        ? "Before continuing to EDORI, create a new password known only to you."
-                        : "Update the password for your EDORI account."
+                     ? "Before continuing to Hospital Readiness, create a new password known only to you."
+: "Update the password for your Hospital Readiness account."
                     }
 
                 </p>
@@ -80,7 +80,7 @@ export function PasswordChangePage():string {
                     <strong>
                         ${escapeHtml(
                             user?.displayName
-                            ?? "EDORI User"
+?? "Hospital Readiness User"
                         )}
                     </strong>
 
@@ -418,7 +418,7 @@ async function submitPasswordChange(
 
                 result.error
                 ??
-                "EDORI could not change the password."
+                "Hospital Readiness could not change the password."
 
             );
 

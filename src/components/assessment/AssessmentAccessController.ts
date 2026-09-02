@@ -322,7 +322,7 @@ function updateAssessmentButton(
 
         button.title =
 
-            "Your EDORI role allows viewing assessments but does not allow calculating or saving a new assessment.";
+    "Your Hospital Readiness role allows viewing assessments but does not allow calculating or saving a new assessment.";
 
 
         return;
@@ -470,11 +470,11 @@ function updateAssessmentAccessNotice(
                 View-only assessment access
             </strong>
 
-            <p>
-                Your EDORI role can review the current assessment
-                and assessment history, but cannot change operational
-                inputs or calculate and save a new assessment.
-            </p>
+           <p>
+    Your Hospital Readiness role can review the current assessment
+    and assessment history, but cannot change operational
+    inputs or calculate and save a new assessment.
+</p>
 
         </div>
 

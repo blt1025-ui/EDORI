@@ -1389,9 +1389,9 @@ function createAwaitingAssessmentState():string {
                 Awaiting assessment
             </strong>
 
-            <p>
-                Calculate Hospital Readiness to display the committed operational values.
-            </p>
+          <p>
+    Calculate the HRI to display the committed operational values.
+</p>
 
         </div>
 
