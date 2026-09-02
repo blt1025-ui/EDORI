@@ -1057,8 +1057,7 @@ function createPlainTextHandoff(
 
     const finalState = operationalAssessment.finalOperationalState;
 
-    const baseState = operationalAssessment.baseOperationalState;
-
+    
     const scoreChange = determineScoreChange(
         snapshots,
         score
