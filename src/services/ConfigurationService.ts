@@ -475,7 +475,7 @@ Promise<boolean> {
 
 
     const normalized =
-        normalizeConfiguration(
+        migratePersistedConfiguration(
             serverOverride.configuration
         );
 
