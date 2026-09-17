@@ -2976,42 +2976,31 @@ function bindButton(
  * Read text input or textarea.
  */
 function readInputValue(
-
     id:string
-
 ):string | null {
 
     const element =
-
         document.getElementById(
-
             id
-
         );
 
-
     if(
-
         element
-
         instanceof
-
         HTMLInputElement
-
         ||
-
         element
-
         instanceof
-
         HTMLTextAreaElement
-
+        ||
+        element
+        instanceof
+        HTMLSelectElement
     ){
 
         return element.value;
 
     }
-
 
     return null;
 

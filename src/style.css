@@ -26447,3 +26447,120 @@ small {
         grid-template-columns: 1fr;
     }
 }
+
+/* =========================================================
+   UI POLISH — SIGNED-IN USER AVATAR
+   ========================================================= */
+
+.sidebar-user-avatar,
+.sidebar-user-initials,
+.user-avatar,
+.user-initials {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    border-radius: 50% !important;
+
+    line-height: 1 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+
+    flex: 0 0 34px !important;
+}
+
+.sidebar-user-avatar > *,
+.sidebar-user-initials > *,
+.user-avatar > *,
+.user-initials > * {
+    margin: 0 !important;
+    line-height: 1 !important;
+}
+
+/* =========================================================
+   UI POLISH — SIDEBAR SIGNED-IN USER
+   ========================================================= */
+
+.sidebar-current-user-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.sidebar-current-user-avatar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    flex: 0 0 34px !important;
+
+    border-radius: 50% !important;
+
+    line-height: 34px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+
+    box-sizing: border-box !important;
+}
+
+.sidebar-current-user-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* =========================================================
+   UI POLISH — SURGE PLAN CATEGORY CHEVRONS
+   ========================================================= */
+
+.surge-plan-category-chevron {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    flex: 0 0 24px !important;
+
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.surge-plan-category-chevron-glyph {
+    display: block;
+    width: 6px;
+    height: 6px;
+
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+
+    transform: rotate(45deg) translate(-1px, -1px);
+    transform-origin: center;
+}
+
+.surge-plan-category-heading[aria-expanded="false"]
+.surge-plan-category-chevron-glyph {
+    transform: rotate(-45deg) translate(-1px, -1px);
+}
