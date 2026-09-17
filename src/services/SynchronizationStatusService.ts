@@ -173,6 +173,11 @@ void {
 
 /**
  * Mark an unsuccessful synchronization cycle.
+ *
+ * A single transient failure should not make the
+ * application appear out of synchronization. The
+ * sidebar reports a delayed state only after multiple
+ * consecutive failures.
  */
 export function markSynchronizationFailed(
 
@@ -195,6 +200,19 @@ export function markSynchronizationFailed(
         navigator.onLine === false;
 
 
+    /*
+     * Require multiple consecutive failures before
+     * reporting synchronization as delayed.
+     *
+     * This prevents an isolated failed request from
+     * making an otherwise healthy workstation appear
+     * out of synchronization.
+     */
+    const delayed =
+
+        failures >= 3;
+
+
     updateStatus({
 
         ...status,
@@ -202,7 +220,11 @@ export function markSynchronizationFailed(
         health:
             offline
                 ? "offline"
-                : "delayed",
+                : delayed
+                    ? "delayed"
+                    : status.lastSuccessfulSyncAt
+                        ? "synchronized"
+                        : "syncing",
 
         lastAttemptAt:
             now,
@@ -213,14 +235,15 @@ export function markSynchronizationFailed(
         message:
             offline
                 ? "This workstation appears to be offline."
-                : createFailureMessage(
-                    error
-                )
+                : delayed
+                    ? createFailureMessage(
+                        error
+                    )
+                    : "A synchronization attempt was unsuccessful. Retrying automatically."
 
     });
 
 }
-
 
 /**
  * Reset status when authentication ends.
