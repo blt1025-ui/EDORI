@@ -338,7 +338,7 @@ Promise<void> {
 
 
         const normalized =
-            normalizeConfiguration(
+            migratePersistedConfiguration(
                 serverOverride.configuration
             );
 
@@ -688,7 +688,7 @@ async function persistConfigurationToServer(
 
 
         const normalized =
-            normalizeConfiguration(
+            migratePersistedConfiguration(
                 serverOverride.configuration
             );
 
@@ -1413,6 +1413,112 @@ function normalizeConfiguration(
             )
 
     };
+
+}
+
+
+/**
+ * Migrate previously persisted model configuration into
+ * the current Version 2.2 three-domain HRI model.
+ *
+ * Retired domain weights are removed and the remaining
+ * authoritative domain weights are proportionally
+ * normalized to 100%.
+ *
+ * This is used only when reading previously persisted
+ * PostgreSQL configuration. Normal interactive save
+ * validation remains strict.
+ */
+function migratePersistedConfiguration(
+
+    configuration:ConfigurationOverrides
+
+):ConfigurationOverrides {
+
+    const migrated =
+        normalizeConfiguration(
+            configuration
+        );
+
+
+    const edPressure =
+        migrated.domainWeights.edPressure;
+
+
+    const projectedCapacity =
+        migrated.domainWeights.projectedCapacity;
+
+
+    const criticalCapacity =
+        migrated.domainWeights.criticalCapacity;
+
+
+    const activeTotal =
+
+        edPressure
+        +
+        projectedCapacity
+        +
+        criticalCapacity;
+
+
+    /*
+     * A positive finite total can safely be migrated by
+     * preserving the relative proportions of the three
+     * domains that remain authoritative in Version 2.2.
+     */
+    if(
+
+        Number.isFinite(activeTotal)
+
+        &&
+
+        activeTotal > WEIGHT_TOLERANCE
+
+        &&
+
+        Math.abs(
+            activeTotal - 1
+        ) > WEIGHT_TOLERANCE
+
+    ){
+
+        migrated.domainWeights.edPressure =
+            edPressure / activeTotal;
+
+
+        migrated.domainWeights.projectedCapacity =
+            projectedCapacity / activeTotal;
+
+
+        migrated.domainWeights.criticalCapacity =
+            criticalCapacity / activeTotal;
+
+
+        console.info(
+
+            "Hospital Readiness migrated persisted domain weights to the Version 2.2 three-domain model.",
+
+            {
+                previousActiveTotal:
+                    activeTotal,
+
+                edPressure:
+                    migrated.domainWeights.edPressure,
+
+                projectedCapacity:
+                    migrated.domainWeights.projectedCapacity,
+
+                criticalCapacity:
+                    migrated.domainWeights.criticalCapacity
+            }
+
+        );
+
+    }
+
+
+    return migrated;
 
 }
 

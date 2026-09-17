@@ -1055,6 +1055,148 @@ function normalizeConfiguration(
 
 
 /**
+ * Migrate previously persisted PostgreSQL trigger configuration
+ * into the current trigger/recommendation library.
+ *
+ * Obsolete trigger overrides are ignored and obsolete
+ * intervention references are removed. Current valid
+ * customizations are preserved.
+ *
+ * This migration is intentionally limited to configuration read
+ * from PostgreSQL. Interactive save/import validation remains
+ * strict so new invalid references cannot be saved.
+ */
+function migratePersistedTriggerConfiguration(
+
+    configuration:TriggerConfiguration
+
+):TriggerConfiguration {
+
+    const normalized =
+        normalizeConfiguration(
+            configuration
+        );
+
+
+    const validTriggerIds =
+        new Set(
+            OPERATIONAL_TRIGGERS.map(
+                trigger =>
+                    trigger.id
+            )
+        );
+
+
+    const validInterventionIds =
+        new Set(
+            getSurgePlan()
+                .interventions
+                .map(
+                    intervention =>
+                        intervention.id
+                )
+        );
+
+
+    let removedTriggerCount = 0;
+
+    let removedInterventionCount = 0;
+
+
+    const overrides =
+        normalized.overrides
+            .filter(
+                override => {
+
+                    const valid =
+                        validTriggerIds.has(
+                            override.triggerId
+                        );
+
+
+                    if(!valid){
+
+                        removedTriggerCount += 1;
+
+                    }
+
+
+                    return valid;
+
+                }
+            )
+            .map(
+                override => {
+
+                    const interventionIds =
+                        override.interventionIds.filter(
+                            interventionId => {
+
+                                const valid =
+                                    validInterventionIds.has(
+                                        interventionId
+                                    );
+
+
+                                if(!valid){
+
+                                    removedInterventionCount += 1;
+
+                                }
+
+
+                                return valid;
+
+                            }
+                        );
+
+
+                    return {
+
+                        ...override,
+
+                        interventionIds
+
+                    };
+
+                }
+            );
+
+
+    if(
+
+        removedTriggerCount > 0
+
+        ||
+
+        removedInterventionCount > 0
+
+    ){
+
+        console.info(
+            "Hospital Readiness ignored obsolete persisted trigger configuration references.",
+            {
+                removedTriggerCount,
+                removedInterventionCount
+            }
+        );
+
+    }
+
+
+    return {
+
+        schemaVersion:
+            SCHEMA_VERSION,
+
+        overrides
+
+    };
+
+}
+
+
+/**
  * Load the authoritative optional trigger configuration
  * from PostgreSQL after authentication has been
  * established.
@@ -1099,7 +1241,7 @@ Promise<void> {
 
         const normalized =
 
-            normalizeConfiguration(
+            migratePersistedTriggerConfiguration(
                 serverOverride.configuration as TriggerConfiguration
             );
 
@@ -1230,7 +1372,7 @@ Promise<boolean> {
 
 
     const normalized =
-        normalizeConfiguration(
+        migratePersistedTriggerConfiguration(
             serverOverride.configuration as TriggerConfiguration
         );
 
