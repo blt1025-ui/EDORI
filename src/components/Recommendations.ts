@@ -204,6 +204,24 @@ export function initializeRecommendations():void {
 
     );
 
+
+    subscribe(
+
+        APP_EVENTS.SURGE_PLAN_CHANGED,
+
+        updateRecommendations
+
+    );
+
+
+    subscribe(
+
+        APP_EVENTS.TRIGGER_CONFIGURATION_CHANGED,
+
+        updateRecommendations
+
+    );
+
 }
 
 
@@ -733,11 +751,7 @@ function createActionCard(
     );
 
 
-    const rationale = normalizeOptionalText(
-
-        recommendation.rationale
-
-    );
+   
 
 
 
@@ -821,31 +835,7 @@ function createActionCard(
                 </div>
 
 
-                ${rationale
-
-                    ? `
-
-                        <div class="action-center-rationale">
-
-                            <strong>
-                                Why now
-                            </strong>
-
-                            <p>
-
-                                ${escapeHtml(
-                                    rationale
-                                )}
-
-                            </p>
-
-                        </div>
-
-                    `
-
-                    : ""
-
-                }
+              
 
 
             </div>

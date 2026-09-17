@@ -26,11 +26,11 @@
 
 import {
 
-    getOperationalIntervention
+    getSurgePlanIntervention
 
 }
 
-from "../config/interventions";
+from "./SurgePlanService";
 
 
 import {
@@ -1651,11 +1651,11 @@ function createOperationalRecommendations(
 
                         const intervention =
 
-                            getOperationalIntervention(
+    getSurgePlanIntervention(
 
-                                interventionId
+        interventionId
 
-                            );
+    );
 
 
                         if(!intervention){
