@@ -20,11 +20,15 @@ from "../config/appEvents";
 
 import {
 
-    OPERATIONAL_TRIGGERS
+    getOperationalTriggers,
+
+    getTriggerConfiguration,
+
+    saveTriggerConfiguration
 
 }
 
-from "../config/operationalTriggers";
+from "../services/TriggerConfigurationService";
 
 
 import {
@@ -59,7 +63,9 @@ from "../services/SurgePlanService";
 
 import type {
 
-    OperationalIntervention
+    OperationalIntervention,
+
+    OperationalInterventionCategory
 
 }
 
@@ -88,6 +94,13 @@ from "../types/SurgePlanConfiguration";
  * Local editor state.
  */
 let editing = false;
+
+
+/**
+ * In-memory draft used while editing. This prevents
+ * expand/collapse actions from discarding unsaved changes.
+ */
+let editorDraftPlan:SurgePlanConfiguration | null = null;
 
 
 /**
@@ -176,6 +189,8 @@ export function initializeSurgePlanConfigurationPanel():void {
 
             editing = false;
 
+            editorDraftPlan = null;
+
             expandedEditorActions.clear();
 
             refresh();
@@ -225,7 +240,15 @@ function createMarkup():string {
 
     const plan =
 
-        getSurgePlan();
+        editing && editorDraftPlan
+
+            ? clonePlan(
+
+                editorDraftPlan
+
+            )
+
+            : getSurgePlan();
 
 
     const savedAt =
@@ -951,13 +974,22 @@ function createEditor(
                     </strong>
 
                     <p>
-                        Customize hospital response actions while keeping internal IDs stable for trigger mapping.
+                        Add and customize recommendations, including the operational triggers that activate each recommendation.
                     </p>
 
                 </div>
 
 
                 <div class="surge-plan-editor-toolbar-actions">
+
+                    <button
+                        id="addSurgePlanActionButton"
+                        class="system-configuration-primary-button"
+                        type="button"
+                    >
+                        + Add Recommendation
+                    </button>
+
 
                     <button
                         id="importSurgePlanButton"
@@ -1248,13 +1280,7 @@ function createActionEditor(
 
 ):string {
 
-    const triggerTitles =
-
-        getTriggerTitlesForIntervention(
-
-            intervention.id
-
-        );
+    
 
 
     const expanded =
@@ -1403,6 +1429,49 @@ function createActionEditor(
                     <label>
 
                         <span>
+                            Category
+                        </span>
+
+                        <select
+                            id="surgeActionCategory${index}"
+                        >
+                            ${createCategoryOptions(
+                                intervention.category
+                            )}
+                        </select>
+
+                    </label>
+
+
+                    <label>
+
+                        <span>
+                            Reassessment Interval (minutes)
+                        </span>
+
+                        <input
+                            id="surgeActionReassessment${index}"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value="${
+                                intervention.reassessmentMinutes === null
+                                    ? ""
+                                    : escapeAttribute(
+                                        String(
+                                            intervention.reassessmentMinutes
+                                        )
+                                    )
+                            }"
+                            placeholder="Optional"
+                        >
+
+                    </label>
+
+
+                    <label>
+
+                        <span>
                             Responsible Group
                         </span>
 
@@ -1454,26 +1523,18 @@ function createActionEditor(
                 <div class="surge-plan-action-editor-trigger-note">
 
                     <span>
-                        Current Trigger Associations
+                        Trigger Associations
                     </span>
 
-                    <strong>
-                        ${triggerTitles.length > 0
-
-                            ? escapeHtml(
-                                triggerTitles.join(
-                                    ", "
-                                )
-                            )
-
-                            : "No current trigger"
-
-                        }
-                    </strong>
-
                     <small>
-                        Trigger associations are managed in Operational Trigger Configuration. Return there to change when this action is recommended.
+                        Select every operational trigger that should recommend this action. Trigger thresholds and HRI scoring are not changed here.
                     </small>
+
+                    <div class="surge-plan-trigger-association-grid">
+                        ${createTriggerAssociationOptions(
+                            intervention.id
+                        )}
+                    </div>
 
                 </div>
 
@@ -1510,6 +1571,95 @@ function getCategories(
         )
 
     );
+
+}
+
+
+/**
+ * Supported response-action categories.
+ */
+function createCategoryOptions(
+
+    current:OperationalInterventionCategory
+
+):string {
+
+    const categories:OperationalInterventionCategory[] = [
+
+        "ED Capacity",
+        "ED Flow",
+        "Boarding",
+        "Hospital Throughput",
+        "Leadership Escalation",
+        "Clinical Operations",
+        "Monitoring"
+
+    ];
+
+
+    return categories
+
+        .map(
+
+            category => `
+
+                <option
+                    value="${escapeAttribute(category)}"
+                    ${category === current ? "selected" : ""}
+                >
+                    ${escapeHtml(category)}
+                </option>
+
+            `
+
+        )
+
+        .join("");
+
+}
+
+
+/**
+ * Trigger checkboxes for one recommendation.
+ */
+function createTriggerAssociationOptions(
+
+    interventionId:string
+
+):string {
+
+    return getOperationalTriggers()
+
+        .map(
+
+            trigger => {
+
+                const checked =
+                    trigger.interventionIds.includes(
+                        interventionId
+                    );
+
+
+                return `
+                    <label class="surge-plan-trigger-association-option">
+                        <input
+                            type="checkbox"
+                            data-surge-trigger-association="${escapeAttribute(interventionId)}"
+                            data-surge-trigger-id="${escapeAttribute(trigger.id)}"
+                            ${checked ? "checked" : ""}
+                        >
+                        <span>
+                            <strong>${escapeHtml(trigger.title)}</strong>
+                            <small>${escapeHtml(trigger.category)}</small>
+                        </span>
+                    </label>
+                `;
+
+            }
+
+        )
+
+        .join("");
 
 }
 
@@ -1577,6 +1727,12 @@ function bindControls():void {
 
             editing = true;
 
+            editorDraftPlan = clonePlan(
+
+                getSurgePlan()
+
+            );
+
             expandedEditorActions.clear();
 
             refresh();
@@ -1599,6 +1755,15 @@ function bindControls():void {
             refresh();
 
         }
+
+    );
+
+
+    bindButton(
+
+        "addSurgePlanActionButton",
+
+        addRecommendation
 
     );
 
@@ -1737,6 +1902,8 @@ function bindControls():void {
                         }
 
 
+                        captureEditorDraft();
+
                         refresh();
 
                     }
@@ -1847,6 +2014,8 @@ function bindControls():void {
                         );
 
 
+                        captureEditorDraft();
+
                         refresh();
 
                     }
@@ -1937,42 +2106,75 @@ function toggleSetValue(
  */
 function saveEditor():void {
 
-    const plan =
+    const previousPlan =
+        getSurgePlan();
 
+    const plan =
         readPlanFromEditor();
 
 
     if(!plan){
 
         showValidationErrors([
-
             "Unable to read the Hospital Surge Plan editor."
-
         ]);
-
 
         return;
 
     }
 
 
-    const result =
-
-        saveSurgePlan(
-
+    const triggerConfiguration =
+        readTriggerAssociationsFromEditor(
             plan
-
         );
 
 
-    if(!result.valid){
+    if(!triggerConfiguration){
+
+        showValidationErrors([
+            "Unable to read recommendation trigger associations."
+        ]);
+
+        return;
+
+    }
+
+
+    const surgeResult =
+        saveSurgePlan(
+            plan
+        );
+
+
+    if(!surgeResult.valid){
 
         showValidationErrors(
-
-            result.errors
-
+            surgeResult.errors
         );
 
+        return;
+
+    }
+
+
+    const triggerResult =
+        saveTriggerConfiguration(
+            triggerConfiguration
+        );
+
+
+    if(!triggerResult.valid){
+
+        // Restore the prior plan in memory/server if the
+        // trigger mapping unexpectedly fails validation.
+        saveSurgePlan(
+            previousPlan
+        );
+
+        showValidationErrors(
+            triggerResult.errors
+        );
 
         return;
 
@@ -1980,7 +2182,7 @@ function saveEditor():void {
 
 
     editing = false;
-
+    editorDraftPlan = null;
     expandedEditorActions.clear();
 
 }
@@ -1995,7 +2197,15 @@ SurgePlanConfiguration | null {
 
     const current =
 
-        getSurgePlan();
+        editorDraftPlan
+
+            ? clonePlan(
+
+                editorDraftPlan
+
+            )
+
+            : getSurgePlan();
 
 
     const name =
@@ -2069,6 +2279,24 @@ SurgePlanConfiguration | null {
             );
 
 
+        const categoryValue =
+
+            readInputValue(
+
+                `surgeActionCategory${index}`
+
+            );
+
+
+        const reassessmentMinutes =
+
+            readOptionalPositiveNumber(
+
+                `surgeActionReassessment${index}`
+
+            );
+
+
         const responsibleGroup =
 
             readInputValue(
@@ -2115,6 +2343,14 @@ SurgePlanConfiguration | null {
 
             ||
 
+            categoryValue === null
+
+            ||
+
+            reassessmentMinutes === undefined
+
+            ||
+
             responsibleGroup === null
 
             ||
@@ -2147,6 +2383,11 @@ SurgePlanConfiguration | null {
 
             defaultPriority:
                 priority,
+
+            category:
+                categoryValue as OperationalInterventionCategory,
+
+            reassessmentMinutes,
 
             responsibleGroup,
 
@@ -2196,6 +2437,8 @@ function restoreDefaults():void {
 
 
     editing = false;
+
+    editorDraftPlan = null;
 
     expandedEditorActions.clear();
 
@@ -2253,7 +2496,7 @@ function downloadPlan():void {
 
         anchor.download =
 
-            "EDORI_Hospital_Surge_Plan.json";
+            "Hospital_Readiness_Surge_Plan.json";
 
 
         document.body.appendChild(
@@ -2376,6 +2619,8 @@ async function importPlanFile(
 
         editing = false;
 
+        editorDraftPlan = null;
+
         expandedEditorActions.clear();
 
     }
@@ -2403,6 +2648,253 @@ async function importPlanFile(
 
 
 /**
+ * Add a new editable recommendation to the draft plan.
+ */
+function addRecommendation():void {
+
+    captureEditorDraft();
+
+    const current =
+        editorDraftPlan
+            ? clonePlan(editorDraftPlan)
+            : getSurgePlan();
+
+    const id =
+        createUniqueRecommendationId(
+            current
+        );
+
+    current.interventions.push({
+        id,
+        title:
+            "New Recommendation",
+        description:
+            "",
+        category:
+            "Clinical Operations",
+        defaultPriority:
+            "Moderate",
+        responsibleGroup:
+            "",
+        objective:
+            "",
+        reassessmentMinutes:
+            240,
+        enabled:
+            true
+    });
+
+    editorDraftPlan = current;
+    expandedEditorActions.add(id);
+    collapsedCategories.delete(
+        "Clinical Operations"
+    );
+
+    refresh();
+
+}
+
+
+function createUniqueRecommendationId(
+
+    plan:SurgePlanConfiguration
+
+):string {
+
+    const used =
+        new Set(
+            plan.interventions.map(
+                intervention => intervention.id
+            )
+        );
+
+    const base =
+        `custom-recommendation-${Date.now()}`;
+
+    let candidate = base;
+    let suffix = 2;
+
+    while(used.has(candidate)){
+        candidate = `${base}-${suffix}`;
+        suffix += 1;
+    }
+
+    return candidate;
+
+}
+
+
+/**
+ * Capture visible editor values before a UI-only refresh.
+ */
+function captureEditorDraft():void {
+
+    if(!editing){
+        return;
+    }
+
+    const draft =
+        readPlanFromEditor();
+
+    if(draft){
+        editorDraftPlan = draft;
+    }
+
+}
+
+
+/**
+ * Build the trigger override configuration represented by
+ * the recommendation association checkboxes.
+ */
+function readTriggerAssociationsFromEditor(
+
+    plan:SurgePlanConfiguration
+
+):ReturnType<typeof getTriggerConfiguration> | null {
+
+    const configuration =
+        getTriggerConfiguration();
+
+    const validRecommendationIds =
+        new Set(
+            plan.interventions.map(
+                intervention => intervention.id
+            )
+        );
+
+
+    for(const override of configuration.overrides){
+
+        const trigger =
+            getOperationalTriggers().find(
+                item => item.id === override.triggerId
+            );
+
+        if(!trigger){
+            return null;
+        }
+
+        const selectedIds:string[] = [];
+
+        for(const intervention of plan.interventions){
+
+            const selector =
+                `input[data-surge-trigger-association="${cssEscape(intervention.id)}"][data-surge-trigger-id="${cssEscape(trigger.id)}"]`;
+
+            const input =
+                document.querySelector<HTMLInputElement>(
+                    selector
+                );
+
+            if(input?.checked){
+                selectedIds.push(
+                    intervention.id
+                );
+            }
+
+        }
+
+        // Preserve any legacy mapping IDs that are not part
+        // of the current plan rather than silently deleting
+        // them from an imported configuration.
+        const legacyIds =
+            override.interventionIds.filter(
+                id => !validRecommendationIds.has(id)
+            );
+
+        override.interventionIds =
+            Array.from(
+                new Set([
+                    ...selectedIds,
+                    ...legacyIds
+                ])
+            );
+
+    }
+
+    return configuration;
+
+}
+
+
+function readOptionalPositiveNumber(
+
+    id:string
+
+):number | null | undefined {
+
+    const element =
+        document.getElementById(id);
+
+    if(!(element instanceof HTMLInputElement)){
+        return undefined;
+    }
+
+    const value =
+        element.value.trim();
+
+    if(value.length === 0){
+        return null;
+    }
+
+    const parsed = Number(value);
+
+    if(
+        !Number.isFinite(parsed)
+        ||
+        parsed <= 0
+    ){
+        return undefined;
+    }
+
+    return parsed;
+
+}
+
+
+function clonePlan(
+
+    plan:SurgePlanConfiguration
+
+):SurgePlanConfiguration {
+
+    return {
+        ...plan,
+        interventions:
+            plan.interventions.map(
+                intervention => ({
+                    ...intervention
+                })
+            )
+    };
+
+}
+
+
+function cssEscape(
+
+    value:string
+
+):string {
+
+    if(
+        typeof CSS !== "undefined"
+        &&
+        typeof CSS.escape === "function"
+    ){
+        return CSS.escape(value);
+    }
+
+    return value.replace(
+        /(["\\])/g,
+        "\\$1"
+    );
+
+}
+
+
+/**
  * Return trigger titles that currently reference an
  * intervention identifier.
  */
@@ -2412,7 +2904,7 @@ function getTriggerTitlesForIntervention(
 
 ):string[] {
 
-    return OPERATIONAL_TRIGGERS
+    return getOperationalTriggers()
 
         .filter(
 

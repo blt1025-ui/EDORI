@@ -26396,3 +26396,54 @@ small {
 .assessment-history-card-list::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
 }
+
+/* =========================================================
+   Hospital Readiness - Recommendation Editor additions
+   Append to src/styles.css
+   ========================================================= */
+
+.surge-plan-trigger-association-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.surge-plan-trigger-association-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color, #d7dde5);
+    border-radius: 8px;
+    background: var(--panel-background, #ffffff);
+    cursor: pointer;
+}
+
+.surge-plan-trigger-association-option input {
+    margin-top: 3px;
+    flex: 0 0 auto;
+}
+
+.surge-plan-trigger-association-option span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.surge-plan-trigger-association-option strong {
+    font-size: 0.86rem;
+    line-height: 1.25;
+}
+
+.surge-plan-trigger-association-option small {
+    font-size: 0.74rem;
+    opacity: 0.72;
+}
+
+@media (max-width: 900px) {
+    .surge-plan-trigger-association-grid {
+        grid-template-columns: 1fr;
+    }
+}
