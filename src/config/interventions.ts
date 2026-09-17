@@ -1,542 +1,179 @@
 /**
- * EDORI Operational Intervention Library
- *
- * Provides configured actions referenced by
- * operational trigger rules.
- *
- * These actions are decision-support suggestions.
- * They do not replace local policy, leadership
- * authority, or clinical judgment.
+ * Hospital Readiness operational intervention library.
+ * Updated from the approved HRI v2.2 trigger/recommendation workbook.
  */
 
-import type {
+import type { OperationalIntervention } from "../types/OperationalIntervention";
 
-    OperationalIntervention
-
-}
-
-from "../types/OperationalIntervention";
-
-
-export const OPERATIONAL_INTERVENTIONS:
-
-OperationalIntervention[] = [
-
+export const OPERATIONAL_INTERVENTIONS:OperationalIntervention[] = [
     {
-
-        id:
-            "review-ed-capacity",
-
-        title:
-            "Review Available ED Capacity",
-
-        description:
-            "Review current treatment-space use, closed or unavailable rooms, hallway care areas, and opportunities to restore functional ED capacity.",
-
-        category:
-            "ED Capacity",
-
-        defaultPriority:
-            "Moderate",
-
-        responsibleGroup:
-            "ED Leadership",
-
-        objective:
-            "Identify immediately available emergency department treatment capacity.",
-
-        reassessmentMinutes:
-            60,
-
-        enabled:
-            true
-
+        id:"evaluate-overflow-space",
+        title:"Evaluate Overflow Treatment Space",
+        description:"Assess whether approved overflow or alternate treatment areas should be opened based on current census, boarding burden, staffing capability, and local surge procedures.",
+        category:"ED Capacity",
+        defaultPriority:"High",
+        responsibleGroup:"ED Nursing",
+        objective:"Increase functional treatment capacity during demand above normal operating limits.",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "evaluate-overflow-space",
-
-        title:
-            "Evaluate Overflow Treatment Space",
-
-        description:
-            "Assess whether approved overflow or alternate treatment areas should be opened based on current census, boarding burden, staffing capability, and local surge procedures.",
-
-        category:
-            "ED Capacity",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "ED Leadership",
-
-        objective:
-            "Increase functional treatment capacity during demand above normal operating limits.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"notify-hospital-operations",
+        title:"Notify Hospital Operations",
+        description:"Notify the hospital operations leader, nursing supervisor, or designated command structure of the active ED operational triggers.",
+        category:"Leadership Escalation",
+        defaultPriority:"High",
+        responsibleGroup:"Hospital Operations",
+        objective:"Establish coordinated hospital-wide awareness and intervention.",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "review-ed-flow",
-
-        title:
-            "Review ED Patient Flow",
-
-        description:
-            "Review current intake, diagnostic, disposition, and discharge barriers that may be contributing to ED census growth.",
-
-        category:
-            "ED Flow",
-
-        defaultPriority:
-            "Moderate",
-
-        responsibleGroup:
-            "ED Leadership",
-
-        objective:
-            "Identify and address current barriers delaying emergency department throughput.",
-
-        reassessmentMinutes:
-            60,
-
-        enabled:
-            true
-
+        id:"Increase-acute-care-capacity",
+        title:"Increase Acute Care Capacity",
+        description:"Reassess acute-care staffing. Stretch assignments by up to 2 patients per unit when appropriate.\n\nReach out to the UMMS Staffing Center for potential additional resources if staffing is a barrier.",
+        category:"Clinical Operations",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Bed Management and Hospital Operations",
+        objective:"Increase available bed capacity",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "notify-ed-leadership",
-
-        title:
-            "Notify ED Leadership",
-
-        description:
-            "Notify the appropriate emergency department nursing and medical leaders of the current operational conditions and active triggers.",
-
-        category:
-            "Leadership Escalation",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "Charge Nurse or ED Operations Lead",
-
-        objective:
-            "Ensure department leadership has timely situational awareness and can coordinate escalation.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"Remove-Time-Restriction",
+        title:"Remove Time Restrictions",
+        description:"Blackout periods (08:00–08:30) and the 15-minute delay from .phrase entry to transport are no longer in effect.",
+        category:"Hospital Throughput",
+        defaultPriority:"Immediate",
+        responsibleGroup:"ED Nursing",
+        objective:"Decompress ED boarding",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "notify-bed-management",
-
-        title:
-            "Notify Bed Management",
-
-        description:
-            "Notify bed-management and patient-flow teams of the current boarding burden and request focused review of admission placement barriers.",
-
-        category:
-            "Boarding",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "Bed Management",
-
-        objective:
-            "Accelerate movement of admitted patients from the ED to appropriate inpatient locations.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"reallocate-staff-to-ED",
+        title:"Reallocate Staff to ED Boarders",
+        description:"If all inpatient units are at physical capacity, reassess staffing and, when feasible, redeploy staff to the ED to care for boarding patients.",
+        category:"ED Flow",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Nursing Operations and Bed Flow",
+        objective:"Support ED boarding volumes",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "review-boarding-barriers",
-
-        title:
-            "Review Boarding Barriers",
-
-        description:
-            "Review admitted ED patients for unresolved placement, specialty, isolation, transport, staffing, or bed-readiness barriers.",
-
-        category:
-            "Boarding",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "Bed Management and Hospital Operations",
-
-        objective:
-            "Identify actionable causes of prolonged ED boarding.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"connect-with-EVS-and-transport",
+        title:"Target Transport and EVS Staff",
+        description:"Bed Flow will communicate needs with EVS and Transport to prioritize efforts around moving patients and turning over beds.",
+        category:"Hospital Throughput",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Bed Flow and Operations Leadership",
+        objective:"Improve patient flow",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "escalate-inpatient-throughput",
-
-        title:
-            "Escalate Inpatient Throughput",
-
-        description:
-            "Escalate unresolved inpatient flow barriers and request coordinated review of bed assignment, discharge progression, transport, and bed turnover.",
-
-        category:
-            "Hospital Throughput",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "Hospital Operations",
-
-        objective:
-            "Increase inpatient throughput and reduce admitted-patient boarding in the ED.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"reallocate-staff-to-from CC",
+        title:"Reallocate Staff in Acute and Critical Care",
+        description:"When appropriate, assess the ability to float nurses from ICU to IMC or from IMC to 8W/4W to increase staffed bed capacity in those areas.",
+        category:"Clinical Operations",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Critical Care and Acute Care Nursing",
+        objective:"Increase staffed capacity",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "review-pending-discharges",
-
-        title:
-            "Review Pending Inpatient Discharges",
-
-        description:
-            "Review anticipated and delayed inpatient discharges, identify barriers, and prioritize actions that may safely release medical-bed capacity.",
-
-        category:
-            "Hospital Throughput",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "Inpatient Leadership and Hospital Operations",
-
-        objective:
-            "Create usable inpatient capacity for admitted emergency department patients.",
-
-        reassessmentMinutes:
-            60,
-
-        enabled:
-            true
-
+        id:"Bring-in-ICUIMC-Nurse",
+        title:"Bring in Additional ICU/IMC Nurse",
+        description:"If additional ICU physical space is available, consider the following as needed:\n- Bring in the on-call nurse\n- Pull in the Rapid Response nurse\n- Stretch 1–2 nurse assignments when appropriate\n- Pull in the second Rapid Response nurse\n- Pull in the ANM",
+        category:"Clinical Operations",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Critical Care Nursing",
+        objective:"Increase critical-care capacity",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "notify-hospital-operations",
-
-        title:
-            "Notify Hospital Operations",
-
-        description:
-            "Notify the hospital operations leader, nursing supervisor, or designated command structure of the active ED operational triggers.",
-
-        category:
-            "Leadership Escalation",
-
-        defaultPriority:
-            "Immediate",
-
-        responsibleGroup:
-            "Hospital Operations",
-
-        objective:
-            "Establish coordinated hospital-wide awareness and intervention.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"Admit-ICU-Boarders-waiting-tx-out",
+        title:"Admit ICU Boarders with Pending Transfers",
+        description:"Admit ICU boarders to open physical ICU beds while waiting for acute-care-level downgrades to transfer out.\n\nThe admission can be taken by the RRT RN, Charge RN, or a temporarily stretched RN assignment while waiting for downgrades.",
+        category:"Clinical Operations",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Critical Care Nursing",
+        objective:"Increase critical-care capacity",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "activate-hospital-surge",
-
-        title:
-            "Consider Hospital Surge Activation",
-
-        description:
-            "Evaluate activation of the appropriate hospital surge-plan tier according to local policy and leadership authority.",
-
-        category:
-            "Leadership Escalation",
-
-        defaultPriority:
-            "Immediate",
-
-        responsibleGroup:
-            "Hospital Operations and Executive Leadership",
-
-        objective:
-            "Coordinate the organizational response to severe ED and hospital capacity strain.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"ED-Boarders-to-hallway",
+        title:"Pull ED Boarders to Hallways",
+        description:"Move stable ED boarders to approved hallway locations while awaiting transport so treatment rooms can be turned over and returned to use more quickly.",
+        category:"ED Flow",
+        defaultPriority:"Immediate",
+        responsibleGroup:"ED Nursing",
+        objective:"Create usable patient-care space in the ED",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "prepare-for-demand-growth",
-
-        title:
-            "Prepare for Expected Demand Growth",
-
-        description:
-            "Review anticipated arrivals, available treatment capacity, pending dispositions, and operational resources in preparation for expected census growth.",
-
-        category:
-            "ED Flow",
-
-        defaultPriority:
-            "Moderate",
-
-        responsibleGroup:
-            "ED Leadership",
-
-        objective:
-            "Prepare the department before expected arrivals exceed expected departures.",
-
-        reassessmentMinutes:
-            60,
-
-        enabled:
-            true
-
+        id:"2E-assessment",
+        title:"Reassess Patients Referred to 2E",
+        description:"Reassess consults sent to 2E for acceptance, including both ED and inpatient referrals.",
+        category:"Hospital Throughput",
+        defaultPriority:"High",
+        responsibleGroup:"Psychiatry",
+        objective:"Increase capacity",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "review-clinical-assignments",
-
-        title:
-            "Review Clinical Assignments",
-
-        description:
-            "Review clinical assignments and distribution of high-acuity patients to ensure available teams and treatment areas are aligned with current patient complexity.",
-
-        category:
-            "Clinical Operations",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "ED Nursing and Medical Leadership",
-
-        objective:
-            "Maintain safe distribution of high-acuity workload across available clinical teams.",
-
-        reassessmentMinutes:
-            60,
-
-        enabled:
-            true
-
+        id:"Pause-kaiser",
+        title:"Consider Pausing Kaiser Transfers",
+        description:"Assess support for pausing Kaiser transfers to 4S and 5S. Kaiser leadership must be notified.",
+        category:"Leadership Escalation",
+        defaultPriority:"High",
+        responsibleGroup:"Executive Leadership",
+        objective:"Increase capacity",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
     {
-
-        id:
-            "increase-reassessment-frequency",
-
-        title:
-            "Increase EDORI Reassessment Frequency",
-
-        description:
-            "Repeat the EDORI assessment at a shorter interval until operational conditions stabilize or improve.",
-
-        category:
-            "Monitoring",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "ED Operations Lead",
-
-        objective:
-            "Detect continued deterioration or improvement promptly.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
+        id:"Consider-HICS-Activation",
+        title:"Consider HICS Activation",
+        description:"The HRI operational level has remained at Delta or Echo for at least 6 consecutive assessments. Consider activation of HICS.",
+        category:"Leadership Escalation",
+        defaultPriority:"Immediate",
+        responsibleGroup:"Hospital Operations",
+        objective:"Assess resource utilization and additional operational opportunities",
+        reassessmentMinutes:240,
+        enabled:true
     },
-
-
-    {
-
-        id:
-            "review-active-triggers",
-
-        title:
-            "Review Active Operational Triggers",
-
-        description:
-            "Review all active and approaching EDORI triggers with the operational team and confirm that each relevant response has been considered.",
-
-        category:
-            "Monitoring",
-
-        defaultPriority:
-            "High",
-
-        responsibleGroup:
-            "ED and Hospital Operations",
-
-        objective:
-            "Ensure that active operational risks receive a coordinated response.",
-
-        reassessmentMinutes:
-            30,
-
-        enabled:
-            true
-
-    }
-
 ];
 
-
 /**
- * Return one enabled intervention by identifier.
+ * Resolve one enabled built-in operational intervention by identifier.
+ *
+ * OperationalAssessmentService relies on this helper when converting
+ * active triggers into recommendations.
  */
 export function getOperationalIntervention(
-
     interventionId:string
-
 ):OperationalIntervention | null {
-
     const intervention =
-
         OPERATIONAL_INTERVENTIONS.find(
-
             item =>
-
                 item.id === interventionId
-
                 &&
-
                 item.enabled
-
         );
-
 
     if(!intervention){
-
         return null;
-
     }
 
-
     return {
-
         ...intervention
-
     };
-
 }
 
-
-/**
- * Return all enabled interventions.
- */
-export function getEnabledOperationalInterventions():
-
-OperationalIntervention[] {
-
-    return OPERATIONAL_INTERVENTIONS
-
-        .filter(
-
-            intervention =>
-
-                intervention.enabled
-
-        )
-
-        .map(
-
-            intervention => ({
-
-                ...intervention
-
-            })
-
-        );
-
-}

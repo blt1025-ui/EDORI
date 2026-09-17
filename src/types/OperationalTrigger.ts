@@ -168,6 +168,8 @@ export type OperationalTriggerMetric =
 
     | "consecutiveScoreIncreases"
 
+    | "consecutiveDeltaOrHigherAssessments"
+
     | "scoreChange";
 
 

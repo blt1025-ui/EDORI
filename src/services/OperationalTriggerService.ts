@@ -782,6 +782,9 @@ const edTreatmentBeds =
         case "consecutiveScoreIncreases":
             return calculateConsecutiveScoreIncreases(context);
 
+        case "consecutiveDeltaOrHigherAssessments":
+            return calculateConsecutiveDeltaOrHigherAssessments(context);
+
         case "scoreChange":
             return calculateLatestScoreChange(context);
 
@@ -896,6 +899,69 @@ function calculateConsecutiveScoreIncreases(
 
 }
 
+
+
+/**
+ * Count consecutive completed/current assessments at
+ * Delta or Echo, ending with the current assessment.
+ */
+function calculateConsecutiveDeltaOrHigherAssessments(
+
+    context:OperationalTriggerContext
+
+):number {
+
+    const snapshots = context.snapshots
+        .filter(snapshot =>
+            !Number.isNaN(new Date(snapshot.timestamp).getTime())
+        )
+        .slice()
+        .sort((first,second) =>
+            new Date(first.timestamp).getTime()
+            -
+            new Date(second.timestamp).getTime()
+        );
+
+    const states = snapshots.map(
+        snapshot => snapshot.operationalState.title
+    );
+
+    const latestSnapshot = snapshots[snapshots.length - 1];
+    const latestSnapshotTime = latestSnapshot
+        ? new Date(latestSnapshot.timestamp).getTime()
+        : null;
+    const currentResultTime = new Date(
+        context.result.timestamp
+    ).getTime();
+
+    const currentAlreadyIncluded =
+        latestSnapshot !== undefined
+        &&
+        latestSnapshot.score === context.result.score
+        &&
+        latestSnapshotTime === currentResultTime;
+
+    if(!currentAlreadyIncluded){
+        states.push(
+            context.result.operationalState.title
+        );
+    }
+
+    let consecutive = 0;
+
+    for(let index = states.length - 1; index >= 0; index -= 1){
+        const state = states[index];
+
+        if(state === "Delta" || state === "Echo"){
+            consecutive += 1;
+            continue;
+        }
+
+        break;
+    }
+
+    return consecutive;
+}
 
 /**
  * Calculate change from the previous score.
@@ -1532,6 +1598,9 @@ function getMetricLabel(
 
         consecutiveScoreIncreases:
             "Consecutive Score Increases",
+
+        consecutiveDeltaOrHigherAssessments:
+            "Consecutive Delta/Echo Assessments",
 
         scoreChange:
             "Hospital Readiness Score Change"

@@ -1254,6 +1254,11 @@ function createPlainLanguageCondition(
             return `Hospital Readiness pressure has increased across ${formatOperatorWords(condition.operator)} ${value} consecutive assessment transitions`;
 
 
+        case "consecutiveDeltaOrHigherAssessments":
+
+            return `Hospital Readiness has remained at Delta or Echo for ${formatOperatorWords(condition.operator)} ${value} consecutive assessments`;
+
+
         case "scoreChange":
 
             return `Hospital Readiness score increased by ${formatOperatorWords(condition.operator)} ${value} points from the previous stored assessment`;
