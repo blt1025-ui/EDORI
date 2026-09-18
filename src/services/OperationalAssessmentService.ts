@@ -190,11 +190,53 @@ export function createOperationalAssessment(
     };
 
 
-    const triggerResults =
+    /*
+     * Version 2.2 trigger-eligibility rule:
+     *
+     * Operational trigger conditions are evaluated for
+     * diagnostic/audit purposes at every HRI level, but a
+     * trigger may become active only when the score-derived
+     * HRI is Delta or Echo.
+     *
+     * Current Version 2.2 score bands:
+     *
+     * Alpha   0-19
+     * Bravo  20-39
+     * Charlie 40-59
+     * Delta  60-79
+     * Echo   80-100
+     *
+     * The HRI score remains the sole authority for operational
+     * level. Triggers cannot elevate the HRI into Delta/Echo.
+     */
+    const triggerActivationEligible =
+
+        normalizedContext.result.score >= 60;
+
+
+    const evaluatedTriggerResults =
 
         evaluateOperationalTriggers(
 
             normalizedContext
+
+        );
+
+
+    const triggerResults =
+
+        evaluatedTriggerResults.map(
+
+            result => ({
+
+                ...result,
+
+                active:
+                    triggerActivationEligible
+                    &&
+                    result.active
+
+            })
 
         );
 
