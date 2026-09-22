@@ -399,65 +399,70 @@ export function OperationalDetailPage():string {
 
                 <div class="operational-detail-support-grid">
 
-                    ${CollapsiblePanel({
+    <div class="operational-detail-support-full-width">
 
-    id:
-        "assessment-details-panel",
+        ${CollapsiblePanel({
 
-    title:
-        "Assessment Details",
+            id:
+                "executive-assessment-report-panel",
 
-    description:
-        "Submitted values and historical comparisons",
+            title:
+                "Executive Assessment Report",
 
-    content:
-        AssessmentDetails(),
+            description:
+                "Printable leadership summary",
 
-    initiallyOpen:
-        false
+            content:
+                ExecutiveAssessmentReport(),
 
-})}
+            initiallyOpen:
+                false
+
+        })}
+
+    </div>
 
 
-                    ${CollapsiblePanel({
+    ${CollapsiblePanel({
 
-    id:
-        "shift-handoff-panel",
+        id:
+            "assessment-details-panel",
 
-    title:
-        "Shift Handoff Summary",
+        title:
+            "Assessment Details",
 
-    description:
-        "Concise operational handoff summary",
+        description:
+            "Submitted values and historical comparisons",
 
-    content:
-        ShiftHandoffSummary(),
+        content:
+            AssessmentDetails(),
 
-    initiallyOpen:
-        false
+        initiallyOpen:
+            false
 
-})}
+    })}
 
-                    ${CollapsiblePanel({
 
-    id:
-        "executive-assessment-report-panel",
+    ${CollapsiblePanel({
 
-    title:
-        "Executive Assessment Report",
+        id:
+            "shift-handoff-panel",
 
-    description:
-        "Printable leadership summary",
+        title:
+            "Shift Handoff Summary",
 
-    content:
-        ExecutiveAssessmentReport(),
+        description:
+            "Operational handoff summary",
 
-    initiallyOpen:
-        false
+        content:
+            ShiftHandoffSummary(),
 
-})}
+        initiallyOpen:
+            false
 
-                </div>
+    })}
+
+</div>
 
             </section>
 

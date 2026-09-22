@@ -26787,3 +26787,18 @@ small {
     }
 
 }
+
+/* ==========================================
+   Operational Detail
+   Full-width supporting report
+   ========================================== */
+
+.operational-detail-support-full-width {
+    grid-column: 1 / -1;
+    min-width: 0;
+    width: 100%;
+}
+
+.operational-detail-support-full-width > * {
+    width: 100%;
+}
