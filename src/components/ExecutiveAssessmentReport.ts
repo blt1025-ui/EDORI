@@ -135,9 +135,11 @@ const ED_TREATMENT_BEDS = 63;
  */
 const MAXIMUM_REPORT_DRIVERS = 5;
 
-const MAXIMUM_REPORT_TRIGGERS = 8;
 
 const MAXIMUM_REPORT_ACTIONS = 8;
+
+
+const MAXIMUM_REPORT_TREND_POINTS = 24;
 
 
 /**
@@ -556,13 +558,6 @@ function createExecutiveReportMarkup(
                 MAXIMUM_REPORT_DRIVERS
             );
 
-    const activeTriggers =
-        operationalAssessment.activeTriggers
-            .slice(
-                0,
-                MAXIMUM_REPORT_TRIGGERS
-            );
-
     const recommendations =
         operationalAssessment.recommendations
             .slice()
@@ -725,13 +720,6 @@ function createExecutiveReportMarkup(
                                 scoreChange
                             )
                         }
-                    </strong>
-                </div>
-
-                <div>
-                    <span>Active Triggers</span>
-                    <strong>
-                        ${operationalAssessment.activeTriggers.length}
                     </strong>
                 </div>
 
@@ -981,10 +969,6 @@ function createExecutiveReportMarkup(
 
                 ${createDriverReportSection(
                     leadingDrivers
-                )}
-
-                ${createTriggerReportSection(
-                    activeTriggers
                 )}
 
                 ${createRecommendationReportSection(
@@ -1260,107 +1244,6 @@ function createDriverReportSection(
 
                                             ${Math.round(
                                                 driver.severity
-                                            )}
-
-                                        </span>
-
-                                    </article>
-
-                                `
-
-                            )
-
-                            .join("")}
-
-                    </div>
-
-                `
-
-            }
-
-        </section>
-
-    `;
-
-}
-
-
-/**
- * Create the trigger report section.
- */
-function createTriggerReportSection(
-
-    triggers:OperationalAssessment["activeTriggers"]
-
-):string {
-
-    return `
-
-        <section class="executive-report-list-section">
-
-            <div class="executive-report-section-heading">
-
-                <span>
-                    Active Conditions
-                </span>
-
-                <h3>
-                    Operational Triggers
-                </h3>
-
-            </div>
-
-
-            ${triggers.length === 0
-
-                ? createReportEmptyState(
-
-                    "No operational triggers are currently active."
-
-                )
-
-                : `
-
-                    <div class="executive-report-list">
-
-                        ${triggers
-
-                            .map(
-
-                                triggerResult => `
-
-                                    <article class="executive-report-list-item">
-
-                                        <div>
-
-                                            <strong>
-
-                                                ${escapeHtml(
-                                                    triggerResult
-                                                        .trigger
-                                                        .title
-                                                )}
-
-                                            </strong>
-
-                                            <p>
-
-                                                ${escapeHtml(
-                                                    triggerResult
-                                                        .activationReason
-                                                )}
-
-                                            </p>
-
-                                        </div>
-
-
-                                        <span>
-
-                                            ${escapeHtml(
-                                                triggerResult
-                                                    .trigger
-                                                    .priority
                                             )}
 
                                         </span>
@@ -1755,13 +1638,6 @@ function createExecutiveReportPayload(
                 MAXIMUM_REPORT_DRIVERS
             );
 
-    const activeTriggers =
-        operationalAssessment.activeTriggers
-            .slice(
-                0,
-                MAXIMUM_REPORT_TRIGGERS
-            );
-
     const recommendations =
         operationalAssessment.recommendations
             .slice()
@@ -1802,17 +1678,17 @@ function createExecutiveReportPayload(
         confidence:
             operationalAssessment.confidence,
 
-        scoreChange:
-            determineScoreChange(
-                snapshots,
-                Math.round(score)
-            ),
+      scoreChange:
+    determineScoreChange(
+        snapshots,
+        Math.round(score)
+    ),
 
-        activeTriggerCount:
-            operationalAssessment.activeTriggers.length,
+activeTriggerCount:
+    0,
 
-        priorityActionCount:
-            operationalAssessment.recommendations.length,
+priorityActionCount:
+    operationalAssessment.recommendations.length,
 
         domains:{
 
@@ -1912,32 +1788,32 @@ function createExecutiveReportPayload(
 
         },
 
-        drivers:
-            leadingDrivers.map(
-                driver => createReportPayloadItem(
-                    driver.title,
-                    driver.description,
-                    `Impact ${Math.round(driver.severity)}`
-                )
-            ),
+      drivers:
+    leadingDrivers.map(
+        driver => createReportPayloadItem(
+            driver.title,
+            driver.description,
+            `Impact ${Math.round(driver.severity)}`
+        )
+    ),
 
-        triggers:
-            activeTriggers.map(
-                triggerResult => createReportPayloadItem(
-                    triggerResult.trigger.title,
-                    triggerResult.activationReason,
-                    triggerResult.trigger.priority
-                )
-            ),
+triggers:
+    [],
 
-        recommendations:
-            recommendations.map(
+recommendations:
+    recommendations.map(
                 recommendation => createReportPayloadItem(
                     recommendation.title,
                     recommendation.description,
                     recommendation.priority
                 )
             ),
+
+        trend:
+            createExecutiveReportTrend(
+                snapshots
+            ),
+
 
         outlook:{
 
@@ -1959,6 +1835,55 @@ function createExecutiveReportPayload(
 
     };
 
+}
+
+
+
+/**
+ * Build distribution-only HRI trend data from saved snapshots.
+ * The on-screen Executive Assessment Report does not render it.
+ */
+function createExecutiveReportTrend(
+    snapshots:EdoriSnapshot[]
+):ExecutiveReportPayload["trend"] {
+
+    return snapshots
+        .filter(
+            snapshot =>
+                Number.isFinite(snapshot.score)
+                &&
+                !Number.isNaN(
+                    new Date(snapshot.timestamp).getTime()
+                )
+        )
+        .slice()
+        .sort(
+            (first, second) =>
+                new Date(first.timestamp).getTime()
+                -
+                new Date(second.timestamp).getTime()
+        )
+        .slice(-MAXIMUM_REPORT_TREND_POINTS)
+        .map(
+            snapshot => ({
+                timestamp:
+                    new Date(snapshot.timestamp).toISOString(),
+                score:
+                    Math.max(0, Math.min(100, snapshot.score)),
+                operationalLevel:
+                    getTrendOperationalLevel(snapshot.score)
+            })
+        );
+}
+
+
+function getTrendOperationalLevel(score:number):string {
+
+    if(score >= 80) return "Echo";
+    if(score >= 60) return "Delta";
+    if(score >= 40) return "Charlie";
+    if(score >= 20) return "Bravo";
+    return "Alpha";
 }
 
 
@@ -2477,7 +2402,7 @@ function createOutlookDescription(
             projectedAvailableBeds
         )} staffed acute-care beds are projected to remain available, but ED boarding remains ${formatNumber(
             boardingDifference
-        )} patients above baseline. Continue monitoring inpatient throughput and active triggers.`;
+        )} patients above baseline. Continue monitoring inpatient throughput.`;
 
     }
 

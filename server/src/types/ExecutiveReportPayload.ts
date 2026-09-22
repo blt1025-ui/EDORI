@@ -20,6 +20,17 @@ export interface ExecutiveReportListItem {
 }
 
 
+export interface ExecutiveReportTrendPoint {
+
+    timestamp:string;
+
+    score:number;
+
+    operationalLevel:string;
+
+}
+
+
 export interface ExecutiveReportPayload {
 
     assessmentTimestamp:string;
@@ -40,6 +51,11 @@ export interface ExecutiveReportPayload {
 
     scoreChange:number | null;
 
+    /*
+     * Retained for API compatibility.
+     * Operational triggers are not displayed in the
+     * Executive Assessment Report, email, or PDF.
+     */
     activeTriggerCount:number;
 
     priorityActionCount:number;
@@ -110,9 +126,20 @@ export interface ExecutiveReportPayload {
 
     drivers:ExecutiveReportListItem[];
 
+    /*
+     * Retained for API compatibility only.
+     * This collection is not rendered in the report.
+     */
     triggers:ExecutiveReportListItem[];
 
     recommendations:ExecutiveReportListItem[];
+
+
+    /**
+     * Distribution-only recent HRI history.
+     * Oldest point first; maximum 24 points.
+     */
+    trend:ExecutiveReportTrendPoint[];
 
 
     outlook:{

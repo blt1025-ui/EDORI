@@ -1,8 +1,8 @@
 /**
  * OperationalForecast
  *
- * Produces a transparent, directional 2-hour and
- * 4-hour Hospital Readiness operational outlook.
+ * Produces a transparent, directional 4-hour, 8-hour, and
+ * 12-hour Hospital Readiness operational outlook.
  *
  * Historical weekday/hour patterns are used internally
  * to estimate future ED census and boarding conditions.
@@ -11,8 +11,9 @@
  *
  * - Current conditions
  * - Expected change from current
- * - +2 hour operational outlook
  * - +4 hour operational outlook
+ * - +8 hour operational outlook
+ * - +12 hour operational outlook
  * - Scenario HRI impact
  * - Projected acute-care bed availability
  *
@@ -150,7 +151,7 @@ export function OperationalForecast():string {
                     </h3>
 
                     <p class="panel-description">
-                        Expected operational change over the next 2 and 4 hours
+                        Expected operational change over the next 4, 8, and 12 hours
                     </p>
 
                 </div>
@@ -307,14 +308,6 @@ function updateOperationalForecast():void {
             );
 
 
-        const twoHourFuturePeriod =
-            resolveFutureDayHour(
-                assessment.day,
-                assessment.hour,
-                2
-            );
-
-
         const fourHourFuturePeriod =
             resolveFutureDayHour(
                 assessment.day,
@@ -323,10 +316,19 @@ function updateOperationalForecast():void {
             );
 
 
-        const twoHourHistorical =
-            getHistoricalExpectation(
-                twoHourFuturePeriod.day,
-                twoHourFuturePeriod.hour
+        const eightHourFuturePeriod =
+            resolveFutureDayHour(
+                assessment.day,
+                assessment.hour,
+                8
+            );
+
+
+        const twelveHourFuturePeriod =
+            resolveFutureDayHour(
+                assessment.day,
+                assessment.hour,
+                12
             );
 
 
@@ -334,6 +336,20 @@ function updateOperationalForecast():void {
             getHistoricalExpectation(
                 fourHourFuturePeriod.day,
                 fourHourFuturePeriod.hour
+            );
+
+
+        const eightHourHistorical =
+            getHistoricalExpectation(
+                eightHourFuturePeriod.day,
+                eightHourFuturePeriod.hour
+            );
+
+
+        const twelveHourHistorical =
+            getHistoricalExpectation(
+                twelveHourFuturePeriod.day,
+                twelveHourFuturePeriod.hour
             );
 
 
@@ -353,40 +369,6 @@ function updateOperationalForecast():void {
                 assessment.totalEDVolume,
                 edCapacity
             );
-
-
-        const twoHourEstimate =
-            createForecastEstimate({
-
-                horizonHours:
-                    2,
-
-                currentVolume:
-                    assessment.totalEDVolume,
-
-                currentBoarders:
-                    assessment.boardedPatients,
-
-                currentCapacityPercent,
-
-                currentScore:
-                    result.score,
-
-                currentVolumeDeviation,
-
-                currentBoardingDeviation,
-
-                futureExpectedVolume:
-                    twoHourHistorical.expectedEDVolume,
-
-                futureExpectedBoarders:
-                    twoHourHistorical.expectedEDBoarders,
-
-                recentHourlyScoreChange,
-
-                edCapacity
-
-            });
 
 
         const fourHourEstimate =
@@ -415,6 +397,74 @@ function updateOperationalForecast():void {
 
                 futureExpectedBoarders:
                     fourHourHistorical.expectedEDBoarders,
+
+                recentHourlyScoreChange,
+
+                edCapacity
+
+            });
+
+
+        const eightHourEstimate =
+            createForecastEstimate({
+
+                horizonHours:
+                    8,
+
+                currentVolume:
+                    assessment.totalEDVolume,
+
+                currentBoarders:
+                    assessment.boardedPatients,
+
+                currentCapacityPercent,
+
+                currentScore:
+                    result.score,
+
+                currentVolumeDeviation,
+
+                currentBoardingDeviation,
+
+                futureExpectedVolume:
+                    eightHourHistorical.expectedEDVolume,
+
+                futureExpectedBoarders:
+                    eightHourHistorical.expectedEDBoarders,
+
+                recentHourlyScoreChange,
+
+                edCapacity
+
+            });
+
+
+        const twelveHourEstimate =
+            createForecastEstimate({
+
+                horizonHours:
+                    12,
+
+                currentVolume:
+                    assessment.totalEDVolume,
+
+                currentBoarders:
+                    assessment.boardedPatients,
+
+                currentCapacityPercent,
+
+                currentScore:
+                    result.score,
+
+                currentVolumeDeviation,
+
+                currentBoardingDeviation,
+
+                futureExpectedVolume:
+                    twelveHourHistorical.expectedEDVolume,
+
+                futureExpectedBoarders:
+                    twelveHourHistorical.expectedEDBoarders,
 
                 recentHourlyScoreChange,
 
@@ -499,9 +549,11 @@ function updateOperationalForecast():void {
 
                 recentHourlyScoreChange,
 
-                twoHourEstimate,
-
                 fourHourEstimate,
+
+                eightHourEstimate,
+
+                twelveHourEstimate,
 
                 acuteCapacityProjection
 
@@ -986,9 +1038,11 @@ function createForecastMarkup(
 
         recentHourlyScoreChange:number;
 
-        twoHourEstimate:ForecastEstimate;
-
         fourHourEstimate:ForecastEstimate;
+
+        eightHourEstimate:ForecastEstimate;
+
+        twelveHourEstimate:ForecastEstimate;
 
         acuteCapacityProjection:
             AcuteCapacityProjection;
@@ -999,8 +1053,9 @@ function createForecastMarkup(
 
     const overallDirection =
         determineOverallDirection(
-            options.twoHourEstimate,
-            options.fourHourEstimate
+            options.fourHourEstimate,
+            options.eightHourEstimate,
+            options.twelveHourEstimate
         );
 
 
@@ -1054,12 +1109,17 @@ function createForecastMarkup(
 
 
             ${createForecastCard(
-                options.twoHourEstimate
+                options.fourHourEstimate
             )}
 
 
             ${createForecastCard(
-                options.fourHourEstimate
+                options.eightHourEstimate
+            )}
+
+
+            ${createForecastCard(
+                options.twelveHourEstimate
             )}
 
         </div>
@@ -1162,7 +1222,7 @@ function createForecastMarkup(
  * Create the current-state comparison card.
  *
  * The invisible direction placeholder preserves the
- * same vertical spacing used by the +2 and +4 hour cards.
+ * same vertical spacing used by the future-hour cards.
  * This keeps all major metrics aligned horizontally.
  */
 function createCurrentCard(
@@ -1743,14 +1803,16 @@ function determineForecastDirection(
 
 
 /**
- * Determine overall outlook using the more severe
- * of the two forecast horizons.
+ * Determine overall outlook using the most severe
+ * of the three forecast horizons.
  */
 function determineOverallDirection(
 
-    twoHourEstimate:ForecastEstimate,
+    fourHourEstimate:ForecastEstimate,
 
-    fourHourEstimate:ForecastEstimate
+    eightHourEstimate:ForecastEstimate,
+
+    twelveHourEstimate:ForecastEstimate
 
 ):ForecastEstimate["direction"] {
 
@@ -1774,13 +1836,21 @@ function determineOverallDirection(
     };
 
 
-    return ranks[fourHourEstimate.direction]
-        >=
-        ranks[twoHourEstimate.direction]
+    const estimates = [
+        fourHourEstimate,
+        eightHourEstimate,
+        twelveHourEstimate
+    ];
 
-            ? fourHourEstimate.direction
 
-            : twoHourEstimate.direction;
+    return estimates.reduce(
+        (mostSevere, estimate) =>
+            ranks[estimate.direction]
+            >
+            ranks[mostSevere.direction]
+                ? estimate
+                : mostSevere
+    ).direction;
 
 }
 
@@ -1908,7 +1978,7 @@ function createAwaitingAssessmentState():string {
             </strong>
 
             <p>
-                Calculate Hospital Readiness to generate the 2-hour and 4-hour operational outlook.
+                Calculate Hospital Readiness to generate the 4-hour, 8-hour, and 12-hour operational outlook.
             </p>
 
         </div>

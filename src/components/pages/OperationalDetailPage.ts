@@ -351,7 +351,7 @@ export function OperationalDetailPage():string {
                             TrendChart(),
 
                         initiallyOpen:
-                            true
+                            false
 
                     })}
 

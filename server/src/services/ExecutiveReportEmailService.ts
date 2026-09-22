@@ -416,68 +416,68 @@ function createExecutiveSummaryHtml(
     const projectedBeds =
         report.capacity.projectedAvailableAcuteCareBeds;
 
-
-    const scoreChange =
-
-        report.scoreChange === null
-
-            ? "No prior comparison"
-
-            : formatSignedNumber(
-                report.scoreChange
-            );
-
-
     const driverMarkup =
-
-        createHtmlList(
-
+        createCompactEmailList(
             report.drivers,
-
             "No dominant Hospital Readiness drivers were identified."
-
         );
-
-
-    const triggerMarkup =
-
-        createHtmlList(
-
-            report.triggers,
-
-            "No operational triggers are currently active."
-
-        );
-
 
     const recommendationMarkup =
-
-        createHtmlList(
-
+        createCompactEmailList(
             report.recommendations,
-
             "No operational intervention is currently recommended."
-
         );
 
+    const domainCards = createEmailCardRow([
+        {
+            label:"ED Operational Pressure",
+            value:`${formatNumber(report.domains.edOperationalPressure)} / 100`,
+            detail:"45% weight"
+        },
+        {
+            label:"Projected Acute-Care Capacity",
+            value:`${formatNumber(report.domains.projectedAcuteCareCapacity)} / 100`,
+            detail:"35% weight"
+        },
+        {
+            label:"Critical-Care Capacity",
+            value:`${formatNumber(report.domains.criticalCareCapacity)} / 100`,
+            detail:"20% weight"
+        }
+    ]);
+
+    const acuityCards = createEmailCardRow([
+        {
+            label:"ESI 1",
+            value:formatNumber(report.acuity.esi1),
+            detail:"Highest acuity"
+        },
+        {
+            label:"ESI 2",
+            value:formatNumber(report.acuity.esi2),
+            detail:"High acuity"
+        },
+        {
+            label:"ESI 3–5",
+            value:formatNumber(report.acuity.esi3to5),
+            detail:"Remaining census"
+        },
+        {
+            label:"High Acuity",
+            value:formatNumber(report.acuity.highAcuityCount),
+            detail:`${formatNumber(report.acuity.highAcuityPercent)}% of ED census`
+        }
+    ]);
 
     return `<!DOCTYPE html>
-
 <html>
-
 <head>
-
     <meta charset="utf-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"
     >
-
-    <title>
-        Hospital Readiness Executive Assessment Report
-    </title>
-
+    <title>Hospital Readiness Executive Assessment Report</title>
 </head>
 
 <body
@@ -489,7 +489,192 @@ function createExecutiveSummaryHtml(
         color:#172033;
     "
 >
+<table
+    role="presentation"
+    width="100%"
+    cellspacing="0"
+    cellpadding="0"
+    border="0"
+    style="width:100%;background:#f3f5f8;"
+>
+<tr>
+<td align="center" style="padding:22px 10px;">
 
+<table
+    role="presentation"
+    width="760"
+    cellspacing="0"
+    cellpadding="0"
+    border="0"
+    style="
+        width:100%;
+        max-width:760px;
+        background:#ffffff;
+        border-collapse:separate;
+        border-spacing:0;
+        border:1px solid #d8dee8;
+        border-radius:12px;
+        overflow:hidden;
+    "
+>
+
+<tr>
+<td style="padding:22px 24px 14px 24px;">
+    <div
+        style="
+            color:#5f6b7a;
+            font-size:10px;
+            line-height:14px;
+            font-weight:700;
+            letter-spacing:1.1px;
+            text-transform:uppercase;
+        "
+    >
+        Hospital Readiness Index
+    </div>
+
+    <div
+        style="
+            margin-top:4px;
+            color:#172033;
+            font-size:24px;
+            line-height:29px;
+            font-weight:700;
+        "
+    >
+        Executive Assessment Report
+    </div>
+
+    <div
+        style="
+            margin-top:5px;
+            color:#5f6b7a;
+            font-size:12px;
+            line-height:17px;
+        "
+    >
+        Assessment ${escapeHtml(formatDateTime(report.assessmentTimestamp))}
+    </div>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 16px 24px;">
+<table
+    role="presentation"
+    width="100%"
+    cellspacing="0"
+    cellpadding="0"
+    border="0"
+    style="
+        width:100%;
+        border-collapse:separate;
+        border-spacing:0;
+        background:#f4f6f9;
+        border-left:6px solid ${escapeAttribute(normalizeColor(report.operationalColor))};
+        border-radius:8px;
+    "
+>
+<tr>
+    ${createStatusCell("HRI Score", String(Math.round(report.hriScore)), true)}
+    ${createStatusCell("Operational Level", report.operationalLevel)}
+    ${createStatusCell("Trend", report.riskDirection)}
+    ${createStatusCell("Confidence", report.confidence)}
+    ${createStatusCell("Priority Actions", String(report.priorityActionCount))}
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 16px 24px;">
+    ${createCompactSectionHeading("Hospital Readiness Domains")}
+    ${domainCards}
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 16px 24px;">
+    ${createCompactSectionHeading("HRI Trend")}
+    ${createHriTrendHtml(report)}
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 16px 24px;">
+<table
+    role="presentation"
+    width="100%"
+    cellspacing="0"
+    cellpadding="0"
+    border="0"
+    style="width:100%;border-collapse:collapse;"
+>
+<tr>
+<td width="49%" valign="top" style="width:49%;padding:0 8px 0 0;">
+    ${createCompactSectionHeading("Current Conditions")}
+    ${createKeyValuePanel([
+        ["ED Volume", `${formatNumber(report.capacity.totalEDVolume)} (${formatNumber(report.capacity.edCapacityPercent)}%)`],
+        ["Boarding", `${formatNumber(report.capacity.boardedPatients)} (${formatNumber(report.capacity.boardingSharePercent)}%)`],
+        ["Acute Beds", `${formatNumber(report.capacity.occupiedAcuteCareBeds)} / ${formatNumber(report.capacity.staffedAcuteCareBeds)}`],
+        ["Critical Beds", `${formatNumber(report.capacity.occupiedCriticalCareBeds)} / ${formatNumber(report.capacity.staffedCriticalCareBeds)}`]
+    ])}
+</td>
+
+<td width="2%" style="width:2%;font-size:1px;line-height:1px;">&nbsp;</td>
+
+<td width="49%" valign="top" style="width:49%;padding:0 0 0 8px;">
+    ${createCompactSectionHeading("Four-Hour Capacity Forecast")}
+    ${createKeyValuePanel([
+        ["Direct Admissions", formatNumber(report.capacity.knownDirectAdmissions4h)],
+        ["Surgical / Procedural", formatNumber(report.capacity.knownSurgicalAdmissions4h)],
+        ["Expected ED Admissions", formatNumber(report.capacity.expectedAdditionalEDAdmissions4h)],
+        ["Expected Departures", formatNumber(report.capacity.expectedInpatientDepartures4h)],
+        ["Projected Available", formatBedAvailability(projectedBeds)]
+    ])}
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 16px 24px;">
+    ${createCompactSectionHeading("Clinical Acuity")}
+    ${acuityCards}
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 16px 24px;">
+<table
+    role="presentation"
+    width="100%"
+    cellspacing="0"
+    cellpadding="0"
+    border="0"
+    style="width:100%;border-collapse:collapse;"
+>
+<tr>
+<td width="49%" valign="top" style="width:49%;padding:0 8px 0 0;">
+    ${createCompactSectionHeading("Primary Drivers")}
+    ${driverMarkup}
+</td>
+
+<td width="2%" style="width:2%;font-size:1px;line-height:1px;">&nbsp;</td>
+
+<td width="49%" valign="top" style="width:49%;padding:0 0 0 8px;">
+    ${createCompactSectionHeading("Recommended Actions")}
+    ${recommendationMarkup}
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<tr>
+<td style="padding:0 24px 20px 24px;">
+    ${createCompactSectionHeading("Operational Outlook")}
     <table
         role="presentation"
         width="100%"
@@ -498,526 +683,364 @@ function createExecutiveSummaryHtml(
         border="0"
         style="
             width:100%;
-            background:#f3f5f8;
+            background:#f4f6f9;
+            border:1px solid #d8dee8;
+            border-radius:8px;
         "
     >
+    <tr>
+    <td style="padding:13px 15px;">
+        <div
+            style="
+                color:#172033;
+                font-size:14px;
+                line-height:19px;
+                font-weight:700;
+            "
+        >
+            ${escapeHtml(report.outlook.heading)}
+        </div>
+        <div
+            style="
+                margin-top:4px;
+                color:#5f6b7a;
+                font-size:12px;
+                line-height:18px;
+            "
+        >
+            ${escapeHtml(report.outlook.description)}
+        </div>
+    </td>
+    </tr>
+    </table>
+</td>
+</tr>
 
-        <tr>
+<tr>
+<td
+    style="
+        padding:16px 24px;
+        background:#172033;
+        color:#dfe5ee;
+        font-size:10px;
+        line-height:15px;
+    "
+>
+    The complete Executive Assessment Report is attached as a PDF.
+    <br><br>
+    The Hospital Readiness Index is an operational decision-support tool.
+    Results should be interpreted with clinical and administrative judgment
+    and local surge policies.
+</td>
+</tr>
 
-            <td
-                align="center"
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>`;
+
+}
+
+
+function createStatusCell(
+    label:string,
+    value:string,
+    emphasized:boolean = false
+):string {
+
+    return `
+        <td
+            valign="top"
+            align="center"
+            style="
+                padding:13px 7px;
+                border-right:1px solid #d8dee8;
+            "
+        >
+            <div
                 style="
-                    padding:28px 12px;
+                    color:#5f6b7a;
+                    font-size:9px;
+                    line-height:12px;
+                    font-weight:700;
+                    text-transform:uppercase;
                 "
             >
+                ${escapeHtml(label)}
+            </div>
 
-                <table
-                    role="presentation"
-                    width="680"
-                    cellspacing="0"
-                    cellpadding="0"
-                    border="0"
-                    style="
-                        width:100%;
-                        max-width:680px;
-                        background:#ffffff;
-                        border-collapse:separate;
-                        border-spacing:0;
-                        border:1px solid #d8dee8;
-                        border-radius:12px;
-                        overflow:hidden;
-                    "
-                >
+            <div
+                style="
+                    margin-top:3px;
+                    color:#172033;
+                    font-size:${emphasized ? "24px" : "15px"};
+                    line-height:${emphasized ? "27px" : "20px"};
+                    font-weight:700;
+                "
+            >
+                ${escapeHtml(value)}
+            </div>
+        </td>
+    `;
 
-                    <tr>
+}
 
-                        <td
+
+function createCompactSectionHeading(
+    title:string
+):string {
+
+    return `
+        <div
+            style="
+                margin:0 0 7px 0;
+                color:#172033;
+                font-size:13px;
+                line-height:17px;
+                font-weight:700;
+            "
+        >
+            ${escapeHtml(title)}
+        </div>
+    `;
+
+}
+
+
+function createEmailCardRow(
+    cards:Array<{
+        label:string;
+        value:string;
+        detail:string;
+    }>
+):string {
+
+    if(cards.length === 0){
+        return "";
+    }
+
+    const width =
+        100 / cards.length;
+
+    return `
+        <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            style="width:100%;border-collapse:collapse;"
+        >
+        <tr>
+            ${cards.map(
+                card => `
+                    <td
+                        width="${width}%"
+                        valign="top"
+                        style="
+                            width:${width}%;
+                            padding:0 4px;
+                        "
+                    >
+                        <div
                             style="
-                                padding:28px 30px 20px 30px;
+                                min-height:58px;
+                                padding:9px 10px;
+                                border:1px solid #d8dee8;
+                                border-radius:7px;
                             "
                         >
-
                             <div
                                 style="
                                     color:#5f6b7a;
-                                    font-size:11px;
+                                    font-size:9px;
+                                    line-height:12px;
                                     font-weight:700;
-                                    letter-spacing:1.2px;
-                                    text-transform:uppercase;
                                 "
                             >
-                                Hospital Readiness Index
+                                ${escapeHtml(card.label)}
                             </div>
 
                             <div
                                 style="
-                                    margin-top:6px;
+                                    margin-top:3px;
                                     color:#172033;
-                                    font-size:26px;
-                                    line-height:32px;
+                                    font-size:15px;
+                                    line-height:19px;
                                     font-weight:700;
                                 "
                             >
-                                Executive Assessment Report
+                                ${escapeHtml(card.value)}
                             </div>
 
                             <div
                                 style="
-                                    margin-top:8px;
+                                    margin-top:2px;
                                     color:#5f6b7a;
-                                    font-size:13px;
-                                    line-height:19px;
+                                    font-size:9px;
+                                    line-height:12px;
                                 "
                             >
-                                Assessment completed
-                                ${escapeHtml(
-                                    formatDateTime(
-                                        report.assessmentTimestamp
-                                    )
-                                )}
+                                ${escapeHtml(card.detail)}
                             </div>
+                        </div>
+                    </td>
+                `
+            ).join("")}
+        </tr>
+        </table>
+    `;
 
-                        </td>
-
-                    </tr>
+}
 
 
+function createKeyValuePanel(
+    rows:Array<[string, string]>
+):string {
+
+    return `
+        <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            style="
+                width:100%;
+                border-collapse:collapse;
+                border:1px solid #d8dee8;
+            "
+        >
+            ${rows.map(
+                ([label, value], index) => `
                     <tr>
-
                         <td
+                            valign="top"
                             style="
-                                padding:0 30px 24px 30px;
+                                padding:7px 9px;
+                                color:#5f6b7a;
+                                font-size:10px;
+                                line-height:14px;
+                                ${index < rows.length - 1 ? "border-bottom:1px solid #e4e8ef;" : ""}
                             "
                         >
+                            ${escapeHtml(label)}
+                        </td>
 
-                            <table
-                                role="presentation"
-                                width="100%"
-                                cellspacing="0"
-                                cellpadding="0"
-                                border="0"
+                        <td
+                            valign="top"
+                            align="right"
+                            style="
+                                padding:7px 9px;
+                                color:#172033;
+                                font-size:11px;
+                                line-height:14px;
+                                font-weight:700;
+                                white-space:nowrap;
+                                ${index < rows.length - 1 ? "border-bottom:1px solid #e4e8ef;" : ""}
+                            "
+                        >
+                            ${escapeHtml(value)}
+                        </td>
+                    </tr>
+                `
+            ).join("")}
+        </table>
+    `;
+
+}
+
+
+function createCompactEmailList(
+    items:ExecutiveReportPayload["drivers"],
+    emptyMessage:string
+):string {
+
+    if(items.length === 0){
+        return `
+            <div
+                style="
+                    color:#5f6b7a;
+                    font-size:11px;
+                    line-height:16px;
+                "
+            >
+                ${escapeHtml(emptyMessage)}
+            </div>
+        `;
+    }
+
+    return `
+        <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            style="
+                width:100%;
+                border-collapse:collapse;
+                border:1px solid #d8dee8;
+            "
+        >
+            ${items.map(
+                (item, index) => `
+                    <tr>
+                        <td
+                            valign="top"
+                            style="
+                                padding:8px 9px;
+                                ${index < items.length - 1 ? "border-bottom:1px solid #e4e8ef;" : ""}
+                            "
+                        >
+                            <div
                                 style="
-                                    width:100%;
-                                    background:#f4f6f9;
-                                    border-left:6px solid ${escapeAttribute(
-                                        normalizeColor(
-                                            report.operationalColor
-                                        )
-                                    )};
-                                    border-radius:8px;
+                                    color:#172033;
+                                    font-size:11px;
+                                    line-height:15px;
+                                    font-weight:700;
                                 "
                             >
-
-                                <tr>
-
-                                    <td
-                                        style="
-                                            padding:18px 18px;
-                                        "
-                                    >
-
-                                        <div
-                                            style="
-                                                color:#5f6b7a;
-                                                font-size:10px;
-                                                font-weight:700;
-                                                text-transform:uppercase;
-                                            "
-                                        >
-                                            Operational Level
-                                        </div>
-
-                                        <div
-                                            style="
-                                                margin-top:4px;
-                                                color:#172033;
-                                                font-size:21px;
-                                                line-height:27px;
-                                                font-weight:700;
-                                            "
-                                        >
-                                            ${escapeHtml(
-                                                report.operationalLevel
-                                            )}
-                                        </div>
-
-                                    </td>
-
-
-                                    <td
-                                        width="110"
-                                        align="center"
-                                        style="
-                                            padding:18px 8px;
-                                        "
-                                    >
-
-                                        <div
-                                            style="
-                                                color:#5f6b7a;
-                                                font-size:10px;
-                                                font-weight:700;
-                                                text-transform:uppercase;
-                                            "
-                                        >
-                                            HRI Score
-                                        </div>
-
-                                        <div
-                                            style="
-                                                margin-top:2px;
-                                                color:#172033;
-                                                font-size:32px;
-                                                line-height:36px;
-                                                font-weight:700;
-                                            "
-                                        >
-                                            ${Math.round(
-                                                report.hriScore
-                                            )}
-                                        </div>
-
-                                    </td>
-
-                                </tr>
-
-                            </table>
-
-                        </td>
-
-                    </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:0 30px 24px 30px;
-                            "
-                        >
-
-                            ${createHtmlSectionHeading(
-                                "Current Operational Picture"
-                            )}
-
-                            ${createSummaryMetricTable([
-
-                                {
-                                    label:
-                                        "Trend",
-
-                                    value:
-                                        report.riskDirection
-                                },
-
-                                {
-                                    label:
-                                        "Confidence",
-
-                                    value:
-                                        report.confidence
-                                },
-
-                                {
-                                    label:
-                                        "Score Change",
-
-                                    value:
-                                        scoreChange
-                                },
-
-                                {
-                                    label:
-                                        "Active Triggers",
-
-                                    value:
-                                        String(
-                                            report.activeTriggerCount
-                                        )
-                                }
-
-                            ])}
-
-                        </td>
-
-                    </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:0 30px 24px 30px;
-                            "
-                        >
-
-                            ${createHtmlSectionHeading(
-                                "Hospital Readiness Domains"
-                            )}
-
-                            ${createSummaryMetricTable([
-
-                                {
-                                    label:
-                                        "ED Operational Pressure",
-
-                                    value:
-                                        `${formatNumber(
-                                            report.domains
-                                                .edOperationalPressure
-                                        )} / 100`
-                                },
-
-                                {
-                                    label:
-                                        "Projected Acute-Care Capacity",
-
-                                    value:
-                                        `${formatNumber(
-                                            report.domains
-                                                .projectedAcuteCareCapacity
-                                        )} / 100`
-                                },
-
-                                {
-                                    label:
-                                        "Critical-Care Capacity",
-
-                                    value:
-                                        `${formatNumber(
-                                            report.domains
-                                                .criticalCareCapacity
-                                        )} / 100`
-                                },
-
-                                {
-                                    label:
-                                        "Projected Available Acute Beds",
-
-                                    value:
-                                        formatBedAvailability(
-                                            projectedBeds
-                                        )
-                                }
-
-                            ])}
-
-                        </td>
-
-                    </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:0 30px 24px 30px;
-                            "
-                        >
-
-                            ${createHtmlSectionHeading(
-                                "Current Capacity"
-                            )}
-
-                            ${createSummaryMetricTable([
-
-                                {
-                                    label:
-                                        "Total ED Volume",
-
-                                    value:
-                                        formatNumber(
-                                            report.capacity.totalEDVolume
-                                        )
-                                },
-
-                                {
-                                    label:
-                                        "Boarding Patients",
-
-                                    value:
-                                        formatNumber(
-                                            report.capacity.boardedPatients
-                                        )
-                                },
-
-                                {
-                                    label:
-                                        "Acute-Care Occupancy",
-
-                                    value:
-                                        `${formatNumber(
-                                            report.capacity
-                                                .acuteOccupancyPercent
-                                        )}%`
-                                },
-
-                                {
-                                    label:
-                                        "Critical-Care Occupancy",
-
-                                    value:
-                                        `${formatNumber(
-                                            report.capacity
-                                                .criticalOccupancyPercent
-                                        )}%`
-                                }
-
-                            ])}
-
-                        </td>
-
-                    </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:0 30px 24px 30px;
-                            "
-                        >
-
-                            ${createHtmlSectionHeading(
-                                "Four-Hour Capacity Outlook"
-                            )}
+                                ${escapeHtml(item.title)}
+                            </div>
 
                             <div
                                 style="
-                                    background:#f4f6f9;
-                                    border:1px solid #d8dee8;
-                                    border-radius:8px;
-                                    padding:16px 18px;
+                                    margin-top:2px;
+                                    color:#5f6b7a;
+                                    font-size:10px;
+                                    line-height:14px;
                                 "
                             >
-
-                                <div
-                                    style="
-                                        color:#172033;
-                                        font-size:15px;
-                                        line-height:21px;
-                                        font-weight:700;
-                                    "
-                                >
-                                    ${escapeHtml(
-                                        report.outlook.heading
-                                    )}
-                                </div>
-
-                                <div
-                                    style="
-                                        margin-top:6px;
-                                        color:#5f6b7a;
-                                        font-size:13px;
-                                        line-height:20px;
-                                    "
-                                >
-                                    ${escapeHtml(
-                                        report.outlook.description
-                                    )}
-                                </div>
-
+                                ${escapeHtml(item.description)}
                             </div>
-
                         </td>
-
-                    </tr>
-
-
-                    <tr>
 
                         <td
+                            width="76"
+                            valign="top"
+                            align="right"
                             style="
-                                padding:0 30px 22px 30px;
+                                width:76px;
+                                padding:8px 9px;
+                                color:#5f6b7a;
+                                font-size:9px;
+                                line-height:13px;
+                                font-weight:700;
+                                text-transform:uppercase;
+                                white-space:nowrap;
+                                ${index < items.length - 1 ? "border-bottom:1px solid #e4e8ef;" : ""}
                             "
                         >
-
-                            ${createHtmlSectionHeading(
-                                "Primary Drivers"
-                            )}
-
-                            ${driverMarkup}
-
+                            ${escapeHtml(item.label)}
                         </td>
-
                     </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:0 30px 22px 30px;
-                            "
-                        >
-
-                            ${createHtmlSectionHeading(
-                                "Operational Triggers"
-                            )}
-
-                            ${triggerMarkup}
-
-                        </td>
-
-                    </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:0 30px 28px 30px;
-                            "
-                        >
-
-                            ${createHtmlSectionHeading(
-                                "Recommended Actions"
-                            )}
-
-                            ${recommendationMarkup}
-
-                        </td>
-
-                    </tr>
-
-
-                    <tr>
-
-                        <td
-                            style="
-                                padding:20px 30px;
-                                background:#172033;
-                                color:#dfe5ee;
-                                font-size:11px;
-                                line-height:17px;
-                            "
-                        >
-
-                            The complete Executive Assessment Report is
-                            attached as a PDF.
-
-                            <br><br>
-
-                            The Hospital Readiness Index is an operational
-                            decision-support tool. Results should be interpreted
-                            with clinical and administrative judgment and local
-                            surge policies.
-
-                        </td>
-
-                    </tr>
-
-                </table>
-
-            </td>
-
-        </tr>
-
-    </table>
-
-</body>
-
-</html>`;
+                `
+            ).join("")}
+        </table>
+    `;
 
 }
 
@@ -1073,6 +1096,14 @@ function createExecutiveSummaryText(
 
         "",
 
+        "HRI Trend",
+
+        ...createHriTrendText(
+            report
+        ),
+
+        "",
+
         "Current Capacity",
 
         `Total ED Volume: ${formatNumber(
@@ -1114,15 +1145,6 @@ function createExecutiveSummaryText(
 
         "",
 
-        "Operational Triggers",
-
-        ...createTextList(
-            report.triggers,
-            "No operational triggers are currently active."
-        ),
-
-        "",
-
         "Recommended Actions",
 
         ...createTextList(
@@ -1148,272 +1170,104 @@ function createExecutiveSummaryText(
 }
 
 
-function createHtmlSectionHeading(
 
-    title:string
+function createHriTrendHtml(report:ExecutiveReportPayload):string {
 
-):string {
-
-    return `
-
-        <div
-            style="
-                margin-bottom:10px;
-                color:#172033;
-                font-size:15px;
-                line-height:20px;
-                font-weight:700;
-            "
-        >
-            ${escapeHtml(title)}
-        </div>
-
-    `;
-
-}
-
-
-function createSummaryMetricTable(
-
-    metrics:Array<{
-
-        label:string;
-
-        value:string;
-
-    }>
-
-):string {
-
-    const rows:string[] = [];
-
-
-    for(
-        let index = 0;
-        index < metrics.length;
-        index += 2
-    ){
-
-        const first =
-            metrics[index];
-
-
-        const second =
-            metrics[index + 1];
-
-
-        rows.push(`
-
-            <tr>
-
-                ${createSummaryMetricCell(
-                    first
-                )}
-
-                ${second
-                    ? createSummaryMetricCell(
-                        second
-                    )
-                    : `
-                        <td
-                            width="50%"
-                            style="
-                                width:50%;
-                                padding:5px;
-                            "
-                        >
-                        </td>
-                    `
-                }
-
-            </tr>
-
-        `);
-
+    if(report.trend.length === 0){
+        return `<div style="color:#5f6b7a;font-size:13px;line-height:19px;">
+            No saved historical assessments are available.
+        </div>`;
     }
 
+    const recentPoints = report.trend.slice(-12);
+
+    const cells = recentPoints.map(
+        point => `
+            <td valign="bottom" align="center"
+                style="width:${100 / recentPoints.length}%;padding:4px 2px;">
+                <div style="color:#172033;font-size:12px;line-height:16px;font-weight:700;">
+                    ${Math.round(point.score)}
+                </div>
+                <div style="
+                    height:${Math.max(6, Math.round(point.score * 0.55))}px;
+                    margin:4px auto 5px auto;
+                    width:8px;
+                    background:${escapeAttribute(getTrendLevelColor(point.operationalLevel))};
+                    border-radius:3px 3px 0 0;">
+                </div>
+                <div style="color:#5f6b7a;font-size:9px;line-height:12px;">
+                    ${escapeHtml(formatTrendDate(point.timestamp))}
+                </div>
+            </td>`
+    ).join("");
+
+    const latest = recentPoints[recentPoints.length - 1];
 
     return `
-
-        <table
-            role="presentation"
-            width="100%"
-            cellspacing="0"
-            cellpadding="0"
-            border="0"
-            style="
-                width:100%;
-                border-collapse:collapse;
-            "
-        >
-
-            ${rows.join("")}
-
-        </table>
-
-    `;
-
-}
-
-
-function createSummaryMetricCell(
-
-    metric:{
-
-        label:string;
-
-        value:string;
-
-    }
-
-):string {
-
-    return `
-
-        <td
-            width="50%"
-            valign="top"
-            style="
-                width:50%;
-                padding:5px;
-            "
-        >
-
-            <div
-                style="
-                    border:1px solid #d8dee8;
-                    border-radius:7px;
-                    padding:11px 12px;
-                "
-            >
-
-                <div
-                    style="
-                        color:#5f6b7a;
-                        font-size:10px;
-                        line-height:14px;
-                        font-weight:700;
-                    "
-                >
-                    ${escapeHtml(
-                        metric.label
-                    )}
-                </div>
-
-                <div
-                    style="
-                        margin-top:4px;
-                        color:#172033;
-                        font-size:17px;
-                        line-height:22px;
-                        font-weight:700;
-                    "
-                >
-                    ${escapeHtml(
-                        metric.value
-                    )}
-                </div>
-
+        <div style="border:1px solid #d8dee8;border-radius:8px;padding:12px 12px 10px 12px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+                border="0" style="width:100%;border-collapse:collapse;">
+                <tr>${cells}</tr>
+            </table>
+            <div style="margin-top:8px;color:#5f6b7a;font-size:11px;line-height:16px;text-align:right;">
+                Latest: HRI ${Math.round(latest.score)} · ${escapeHtml(latest.operationalLevel)}
             </div>
-
-        </td>
-
-    `;
-
+        </div>`;
 }
 
 
-function createHtmlList(
+function createHriTrendText(report:ExecutiveReportPayload):string[] {
 
-    items:ExecutiveReportPayload["drivers"],
-
-    emptyMessage:string
-
-):string {
-
-    if(items.length === 0){
-
-        return `
-
-            <div
-                style="
-                    color:#5f6b7a;
-                    font-size:13px;
-                    line-height:19px;
-                "
-            >
-                ${escapeHtml(
-                    emptyMessage
-                )}
-            </div>
-
-        `;
-
+    if(report.trend.length === 0){
+        return ["No saved historical assessments are available."];
     }
 
+    return report.trend.slice(-12).map(
+        point =>
+            `${formatTrendDateTime(point.timestamp)}: HRI ${Math.round(point.score)} (${point.operationalLevel})`
+    );
+}
 
-    return items
 
-        .map(
+function getTrendLevelColor(level:string):string {
 
-            item => `
+    switch(level){
+        case "Echo": return "#8f1d2c";
+        case "Delta": return "#c65d1e";
+        case "Charlie": return "#b88900";
+        case "Bravo": return "#1565c0";
+        default: return "#2e7d32";
+    }
+}
 
-                <div
-                    style="
-                        padding:11px 0;
-                        border-bottom:1px solid #e4e8ef;
-                    "
-                >
 
-                    <div
-                        style="
-                            color:#172033;
-                            font-size:13px;
-                            line-height:18px;
-                            font-weight:700;
-                        "
-                    >
-                        ${escapeHtml(
-                            item.title
-                        )}
-                    </div>
+function formatTrendDate(value:string):string {
 
-                    <div
-                        style="
-                            margin-top:3px;
-                            color:#5f6b7a;
-                            font-size:12px;
-                            line-height:18px;
-                        "
-                    >
-                        ${escapeHtml(
-                            item.description
-                        )}
-                    </div>
+    const date = new Date(value);
+    if(Number.isNaN(date.getTime())) return "--";
 
-                    <div
-                        style="
-                            margin-top:4px;
-                            color:#5f6b7a;
-                            font-size:10px;
-                            line-height:14px;
-                            font-weight:700;
-                            text-transform:uppercase;
-                        "
-                    >
-                        ${escapeHtml(
-                            item.label
-                        )}
-                    </div>
+    return date.toLocaleDateString(
+        "en-US",
+        { month:"numeric", day:"numeric" }
+    );
+}
 
-                </div>
 
-            `
+function formatTrendDateTime(value:string):string {
 
-        )
+    const date = new Date(value);
+    if(Number.isNaN(date.getTime())) return value;
 
-        .join("");
-
+    return date.toLocaleString(
+        "en-US",
+        {
+            month:"short",
+            day:"numeric",
+            hour:"numeric",
+            minute:"2-digit",
+            timeZoneName:"short"
+        }
+    );
 }
 
 
@@ -1759,35 +1613,6 @@ function formatNumber(
             /\.0$/,
             ""
         );
-
-}
-
-
-function formatSignedNumber(
-
-    value:number
-
-):string {
-
-    if(!Number.isFinite(value)){
-
-        return "--";
-
-    }
-
-
-    if(value > 0){
-
-        return `+${formatNumber(
-            value
-        )}`;
-
-    }
-
-
-    return formatNumber(
-        value
-    );
 
 }
 

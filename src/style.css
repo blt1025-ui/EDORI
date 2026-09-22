@@ -25388,7 +25388,7 @@ small {
 
 
 /* ---------------------------------------------------------
-   CURRENT / +2 / +4 COMPARISON
+   CURRENT / +4 / +8 / +12 COMPARISON
 --------------------------------------------------------- */
 
 .operational-detail-page
@@ -25396,7 +25396,7 @@ small {
     display:grid !important;
 
     grid-template-columns:
-        repeat(3,minmax(0,1fr)) !important;
+        repeat(4,minmax(0,1fr)) !important;
 
     width:100% !important;
     min-width:0 !important;
@@ -26002,7 +26002,8 @@ small {
 }
 
 
-@media(max-width:850px) {
+
+   @media(max-width:700px) {
 
     .operational-detail-page
     .operational-forecast-comparison-grid {
@@ -26801,4 +26802,26 @@ small {
 
 .operational-detail-support-full-width > * {
     width: 100%;
+}
+
+
+
+/* =========================================================
+   EXECUTIVE ASSESSMENT REPORT — FULL WIDTH
+========================================================= */
+
+.operational-detail-support-grid
+> .operational-detail-support-full-width {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+.operational-detail-support-grid
+> .operational-detail-support-full-width
+> * {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
 }

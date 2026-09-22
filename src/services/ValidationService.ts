@@ -125,8 +125,6 @@ export function validateAssessment(
 
         assessment,
 
-        errors,
-
         warnings
 
     );
@@ -135,8 +133,6 @@ export function validateAssessment(
     validateCriticalCareCapacity(
 
         assessment,
-
-        errors,
 
         warnings
 
@@ -936,8 +932,6 @@ function validateAcuteCareCapacity(
 
     assessment:ValidatableAssessment,
 
-    errors:string[],
-
     warnings:string[]
 
 ):void {
@@ -985,24 +979,21 @@ function validateAcuteCareCapacity(
 
     if(
 
-        occupiedBeds
+    occupiedBeds
 
-        >
+    >
 
-        staffedBeds
+    staffedBeds
 
-    ){
+){
 
-        errors.push(
+    warnings.push(
 
-            "Occupied acute-care beds cannot exceed staffed acute-care beds."
+        `Acute-care occupancy exceeds staffed capacity by ${occupiedBeds - staffedBeds} beds.`
 
-        );
+    );
 
-
-        return;
-
-    }
+}
 
 
     const occupancy =
@@ -1016,7 +1007,9 @@ function validateAcuteCareCapacity(
         );
 
 
-    if(occupancy >= 100){
+   if(occupancy >= 100){
+
+    if(occupiedBeds === staffedBeds){
 
         warnings.push(
 
@@ -1024,10 +1017,12 @@ function validateAcuteCareCapacity(
 
         );
 
-
-        return;
-
     }
+
+
+    return;
+
+}
 
 
     if(occupancy >= 95){
@@ -1051,8 +1046,6 @@ function validateAcuteCareCapacity(
 function validateCriticalCareCapacity(
 
     assessment:ValidatableAssessment,
-
-    errors:string[],
 
     warnings:string[]
 
@@ -1101,24 +1094,21 @@ function validateCriticalCareCapacity(
 
     if(
 
-        occupiedBeds
+    occupiedBeds
 
-        >
+    >
 
-        staffedBeds
+    staffedBeds
 
-    ){
+){
 
-        errors.push(
+    warnings.push(
 
-            "Occupied critical-care beds cannot exceed staffed critical-care beds."
+        `Critical-care occupancy exceeds staffed capacity by ${occupiedBeds - staffedBeds} beds.`
 
-        );
+    );
 
-
-        return;
-
-    }
+}
 
 
     const occupancy =
@@ -1132,7 +1122,9 @@ function validateCriticalCareCapacity(
         );
 
 
-    if(occupancy >= 100){
+   if(occupancy >= 100){
+
+    if(occupiedBeds === staffedBeds){
 
         warnings.push(
 
@@ -1140,10 +1132,12 @@ function validateCriticalCareCapacity(
 
         );
 
-
-        return;
-
     }
+
+
+    return;
+
+}
 
 
     if(occupancy >= 95){

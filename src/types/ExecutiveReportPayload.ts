@@ -1,12 +1,12 @@
 /**
  * ExecutiveReportPayload
  *
- * Frontend representation of the structured,
- * non-PHI Executive Assessment Report sent to
- * the backend for email/PDF distribution.
+ * Structured, non-PHI snapshot of the authoritative
+ * Executive Assessment Report.
  *
- * This contains already-calculated report data.
- * It does not calculate Hospital Readiness.
+ * The frontend creates this payload from the already
+ * calculated OperationalAssessment. The backend does
+ * not recalculate Hospital Readiness.
  */
 
 export interface ExecutiveReportListItem {
@@ -16,6 +16,17 @@ export interface ExecutiveReportListItem {
     description:string;
 
     label:string;
+
+}
+
+
+export interface ExecutiveReportTrendPoint {
+
+    timestamp:string;
+
+    score:number;
+
+    operationalLevel:string;
 
 }
 
@@ -40,6 +51,11 @@ export interface ExecutiveReportPayload {
 
     scoreChange:number | null;
 
+    /*
+     * Retained for API compatibility.
+     * Operational triggers are not displayed in the
+     * Executive Assessment Report, email, or PDF.
+     */
     activeTriggerCount:number;
 
     priorityActionCount:number;
@@ -110,9 +126,20 @@ export interface ExecutiveReportPayload {
 
     drivers:ExecutiveReportListItem[];
 
+    /*
+     * Retained for API compatibility only.
+     * This collection is not rendered in the report.
+     */
     triggers:ExecutiveReportListItem[];
 
     recommendations:ExecutiveReportListItem[];
+
+
+    /**
+     * Distribution-only recent HRI history.
+     * Oldest point first; maximum 24 points.
+     */
+    trend:ExecutiveReportTrendPoint[];
 
 
     outlook:{

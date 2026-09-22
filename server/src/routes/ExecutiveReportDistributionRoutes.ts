@@ -1258,6 +1258,18 @@ function normalizeExecutiveReportPayload(
             8
         );
 
+const trend =
+    normalizeExecutiveReportTrend(
+        value.trend
+    );
+
+
+if(trend === null){
+
+    return null;
+
+}
+
 
     const outlook =
 
@@ -1319,16 +1331,168 @@ function normalizeExecutiveReportPayload(
 
         drivers,
 
-        triggers,
+triggers,
 
-        recommendations,
+recommendations,
 
-        outlook
+trend,
+
+outlook
 
     };
 
 }
 
+
+function normalizeExecutiveReportTrend(
+
+    value:unknown
+
+):ExecutiveReportPayload["trend"] | null {
+
+    if(!Array.isArray(value)){
+
+        return null;
+
+    }
+
+
+    const normalized:ExecutiveReportPayload["trend"] = [];
+
+
+    for(const item of value){
+
+        const point =
+            normalizeExecutiveReportTrendPoint(
+                item
+            );
+
+
+        if(!point){
+
+            return null;
+
+        }
+
+
+        normalized.push(
+            point
+        );
+
+    }
+
+
+    /*
+     * The frontend sends no more than 24 points.
+     * Enforce the same limit at the API boundary.
+     */
+    return normalized
+        .slice(
+            -24
+        )
+        .sort(
+            (
+                first,
+                second
+            ) =>
+                new Date(
+                    first.timestamp
+                ).getTime()
+                -
+                new Date(
+                    second.timestamp
+                ).getTime()
+        );
+
+}
+
+
+function normalizeExecutiveReportTrendPoint(
+
+    value:unknown
+
+):ExecutiveReportPayload["trend"][number] | null {
+
+    if(
+        typeof value !== "object"
+        ||
+        value === null
+        ||
+        Array.isArray(value)
+    ){
+
+        return null;
+
+    }
+
+
+    const candidate =
+        value as Record<string, unknown>;
+
+
+    const timestamp =
+        typeof candidate.timestamp === "string"
+            ? candidate.timestamp.trim()
+            : "";
+
+
+    const score =
+        normalizeFiniteNumber(
+            candidate.score
+        );
+
+
+    const operationalLevel =
+        typeof candidate.operationalLevel === "string"
+            ? candidate.operationalLevel.trim()
+            : "";
+
+
+    if(
+        !timestamp
+        ||
+        Number.isNaN(
+            new Date(
+                timestamp
+            ).getTime()
+        )
+        ||
+        score === null
+        ||
+        score < 0
+        ||
+        score > 100
+        ||
+        ![
+            "Alpha",
+            "Bravo",
+            "Charlie",
+            "Delta",
+            "Echo"
+        ].includes(
+            operationalLevel
+        )
+    ){
+
+        return null;
+
+    }
+
+
+    return {
+
+        timestamp:
+            new Date(
+                timestamp
+            ).toISOString(),
+
+        score,
+
+        operationalLevel
+
+    };
+
+}
 
 function normalizeDomains(
 
