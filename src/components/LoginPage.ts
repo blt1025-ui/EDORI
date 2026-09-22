@@ -1,7 +1,7 @@
 /**
  * LoginPage
  *
- * Username/password entry screen for EDORI.
+ * Username/password entry screen for Hospital Readiness.
  *
  * Authentication mechanics are delegated to
  * AuthenticationService so this component remains
@@ -18,7 +18,7 @@ from "../services/AuthenticationService";
 
 
 /**
- * Render the signed-out EDORI experience.
+ * Render the signed-out Hospital Readiness experience.
  */
 export function LoginPage():string {
 
@@ -250,7 +250,7 @@ export function initializeLoginPage():void {
 
         console.error(
 
-            "EDORI login controls could not be initialized."
+            "Hospital Readiness login controls could not be initialized."
 
         );
 

@@ -2,7 +2,7 @@
  * SurgePlanRoutes
  *
  * Authenticated API for the optional hospital-specific
- * EDORI surge-plan override.
+ * Hospital Readiness surge-plan override.
  */
 
 import {
@@ -189,7 +189,7 @@ surgePlanRouter.put(
                         "invalid_surge_plan",
 
                     message:
-                        "The EDORI Hospital Surge Plan is invalid."
+                        "The Hospital Readiness Hospital Surge Plan is invalid."
 
                 });
 

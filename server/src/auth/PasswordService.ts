@@ -1,7 +1,7 @@
 /**
  * PasswordService
  *
- * Server-side EDORI password hashing and verification.
+ * Server-side Hospital Readiness password hashing and verification.
  *
  * Uses Node.js scrypt with a unique random salt.
  * Plaintext passwords are never persisted.
@@ -73,7 +73,7 @@ export interface PasswordCredentialData {
 
 
 /**
- * Hash a new EDORI password.
+ * Hash a new Hospital Readiness password.
  */
 export async function hashPassword(
 
@@ -159,7 +159,7 @@ export async function verifyPassword(
 
         throw new Error(
 
-            `Unsupported EDORI password algorithm: ${credential.passwordAlgorithm}`
+            `Unsupported Hospital Readiness password algorithm: ${credential.passwordAlgorithm}`
 
         );
 
@@ -241,7 +241,7 @@ export function validatePassword(
 
         throw new Error(
 
-            `EDORI passwords must contain at least ${MINIMUM_PASSWORD_LENGTH} characters.`
+            `Hospital Readiness passwords must contain at least ${MINIMUM_PASSWORD_LENGTH} characters.`
 
         );
 
@@ -252,7 +252,7 @@ export function validatePassword(
 
         throw new Error(
 
-            `EDORI passwords cannot exceed ${MAXIMUM_PASSWORD_LENGTH} characters.`
+            `Hospital Readiness passwords cannot exceed ${MAXIMUM_PASSWORD_LENGTH} characters.`
 
         );
 

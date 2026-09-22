@@ -1,7 +1,7 @@
 /**
  * UserDirectoryApiService
  *
- * Frontend API client for PostgreSQL-backed EDORI user
+ * Frontend API client for PostgreSQL-backed Hospital Readiness user
  * administration.
  */
 
@@ -57,7 +57,7 @@ export async function loadServerUsers():Promise<User[]> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load the user directory."
+            ?? "Hospital Readiness could not load the user directory."
 
         );
 
@@ -141,7 +141,7 @@ export async function createServerUser(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not create the user."
+            ?? "Hospital Readiness could not create the user."
 
         );
 
@@ -221,7 +221,7 @@ export async function updateServerUser(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not update the user."
+            ?? "Hospital Readiness could not update the user."
 
         );
 
@@ -291,7 +291,7 @@ export async function resetServerUserPassword(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not reset the password."
+            ?? "Hospital Readiness could not reset the password."
 
         );
 

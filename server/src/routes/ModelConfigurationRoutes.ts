@@ -1,7 +1,7 @@
 /**
  * ModelConfigurationRoutes
  *
- * Authenticated API for EDORI model configuration
+ * Authenticated API for Hospital Readiness model configuration
  * overrides.
  */
 
@@ -188,7 +188,7 @@ modelConfigurationRouter.put(
                         "invalid_model_configuration",
 
                     message:
-                        "The EDORI model configuration is invalid.",
+                        "The Hospital Readiness model configuration is invalid.",
 
                     errors:
                         validation.errors

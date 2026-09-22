@@ -1,7 +1,7 @@
 /**
  * SecurityAuditLog
  *
- * Read-only Administrator view of EDORI security and
+ * Read-only Administrator view of Hospital Readiness security and
  * account-management audit events.
  */
 
@@ -794,7 +794,7 @@ async function copyVisibleAuditLog():Promise<void> {
     catch(error){
 
         console.error(
-            "EDORI could not copy the security audit log.",
+            "Hospital Readiness could not copy the security audit log.",
             error
         );
 

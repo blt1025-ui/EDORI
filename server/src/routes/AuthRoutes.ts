@@ -1,7 +1,7 @@
 /**
  * AuthRoutes
  *
- * Server-side EDORI authentication endpoints.
+ * Server-side Hospital Readiness authentication endpoints.
  */
 
 import {
@@ -167,7 +167,7 @@ authRouter.post(
                         false,
 
                     summary:
-                        "EDORI login attempt failed.",
+                        "Hospital Readiness login attempt failed.",
 
                     details:{
                         locked:
@@ -218,7 +218,7 @@ authRouter.post(
 
                 throw new Error(
 
-                    "EDORI login succeeded without a session."
+                    "Hospital Readiness login succeeded without a session."
 
                 );
 
@@ -268,7 +268,7 @@ authRouter.post(
                     true,
 
                 summary:
-                    "EDORI user signed in successfully.",
+                    "Hospital Readiness user signed in successfully.",
 
                 details:{
                     role:
@@ -493,7 +493,7 @@ authRouter.post(
                         false,
 
                     summary:
-                        "EDORI password change failed.",
+                        "Hospital Readiness password change failed.",
 
                     details:{
                         reason:
@@ -513,7 +513,7 @@ authRouter.post(
 
                     message:
                         result.error
-                        ?? "EDORI could not change the password."
+                        ?? "Hospital Readiness could not change the password."
 
                 });
 
@@ -542,7 +542,7 @@ authRouter.post(
                     true,
 
                 summary:
-                    "EDORI password changed successfully.",
+                    "Hospital Readiness password changed successfully.",
 
                 request
 
@@ -620,7 +620,7 @@ authRouter.post(
                         true,
 
                     summary:
-                        "EDORI user signed out.",
+                        "Hospital Readiness user signed out.",
 
                     request
 

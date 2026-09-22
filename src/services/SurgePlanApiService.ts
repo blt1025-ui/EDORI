@@ -1,7 +1,7 @@
 /**
  * SurgePlanApiService
  *
- * Frontend API client for EDORI's optional hospital-
+ * Frontend API client for Hospital Readiness's optional hospital-
  * specific surge-plan override.
  */
 
@@ -67,7 +67,7 @@ Promise<ServerSurgePlanOverride | null> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load the Hospital Surge Plan."
+            ?? "Hospital Readiness could not load the Hospital Surge Plan."
 
         );
 
@@ -138,7 +138,7 @@ export async function saveServerSurgePlan(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not save the Hospital Surge Plan."
+            ?? "Hospital Readiness could not save the Hospital Surge Plan."
 
         );
 
@@ -188,7 +188,7 @@ Promise<boolean> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not restore the built-in Hospital Surge Plan."
+            ?? "Hospital Readiness could not restore the built-in Hospital Surge Plan."
 
         );
 

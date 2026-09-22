@@ -1,7 +1,7 @@
 /**
  * main
  *
- * Application entry point for EDORI.
+ * Application entry point for Hospital Readiness.
  *
  * Responsibilities:
  *
@@ -10,7 +10,7 @@
  * - Restore authoritative PostgreSQL-backed application state
  * - Prevent authenticated pages from rendering before hydration completes
  * - Render the login experience when signed out
- * - Render and initialize EDORI once authenticated
+ * - Render and initialize Hospital Readiness once authenticated
  * - Keep login/application visibility synchronized
  * - Expose development-only testing tools
  */
@@ -41,7 +41,7 @@ import { runEdoriValidationSuite } from "./scenarios/runEdoriValidationSuite";
 const appElement = document.querySelector<HTMLDivElement>("#app");
 
 if(!appElement){
-    throw new Error("EDORI could not find the #app root element.");
+    throw new Error("Hospital Readiness could not find the #app root element.");
 }
 
 let authenticatedApplicationInitialized = false;
@@ -91,7 +91,7 @@ async function initializeApplication():Promise<void> {
     }
     catch(error){
         console.error(
-            "EDORI authentication initialization failed:",
+            "Hospital Readiness authentication initialization failed:",
             error
         );
 
@@ -128,7 +128,7 @@ function hydrateAuthenticatedApplication():Promise<void> {
         catch(error){
             applicationStartupComplete = false;
             console.error(
-                "EDORI authenticated state hydration failed:",
+                "Hospital Readiness authenticated state hydration failed:",
                 error
             );
             throw error;
@@ -223,7 +223,7 @@ function renderAuthenticationInitializationError():void {
     authenticationHost.innerHTML = `
         <main class="edori-login-page">
             <section class="edori-login-card edori-login-fatal-error">
-                <h1>EDORI could not start</h1>
+                <h1>Hospital Readiness could not start</h1>
                 <p>
                     The authentication system or shared application state could not be initialized.
                     Review the browser console for details.
@@ -252,7 +252,7 @@ if(import.meta.env.DEV){
 
     console.info(
         [
-            "EDORI development tools are available:",
+            "Hospital Readiness development tools are available:",
             "runEdoriScenarios()",
             "showEdoriCalibration()",
             "copyEdoriScenarioResults()",

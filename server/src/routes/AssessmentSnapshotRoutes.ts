@@ -1,7 +1,7 @@
 /**
  * AssessmentSnapshotRoutes
  *
- * Authenticated EDORI assessment-history API.
+ * Authenticated Hospital Readiness assessment-history API.
  */
 
 import {
@@ -168,7 +168,7 @@ assessmentSnapshotRouter.get(
  *
  * Attribution is server-enforced from the authenticated
  * session, so browser-supplied entered-by values cannot
- * impersonate another EDORI user.
+ * impersonate another Hospital Readiness user.
  */
 assessmentSnapshotRouter.post(
 
@@ -220,7 +220,7 @@ assessmentSnapshotRouter.post(
                         "invalid_snapshot",
 
                     message:
-                        "The completed EDORI assessment snapshot is invalid."
+                        "The completed Hospital Readiness assessment snapshot is invalid."
 
                 });
 

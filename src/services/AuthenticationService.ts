@@ -1,7 +1,7 @@
 /**
  * AuthenticationService
  *
- * Browser boundary for PostgreSQL-backed EDORI
+ * Browser boundary for PostgreSQL-backed Hospital Readiness
  * authentication.
  *
  * The server owns:
@@ -108,7 +108,7 @@ export async function initializeAuthentication():Promise<void> {
 
             throw new Error(
 
-                `EDORI session check failed with HTTP ${response.status}.`
+                `Hospital Readiness session check failed with HTTP ${response.status}.`
 
             );
 
@@ -174,7 +174,7 @@ export async function initializeAuthentication():Promise<void> {
 
         console.error(
 
-            "EDORI could not restore the server session.",
+            "Hospital Readiness could not restore the server session.",
 
             error
 
@@ -186,7 +186,7 @@ export async function initializeAuthentication():Promise<void> {
 
 
 /**
- * Authenticate with the EDORI API.
+ * Authenticate with the Hospital Readiness API.
  */
 export async function login(
 
@@ -276,7 +276,7 @@ export async function login(
                     false,
 
                 error:
-                    "EDORI could not establish the authenticated session."
+                    "Hospital Readiness could not establish the authenticated session."
 
             };
 
@@ -321,7 +321,7 @@ export async function login(
 
         console.error(
 
-            "EDORI login request failed:",
+            "Hospital Readiness login request failed:",
 
             error
 
@@ -334,7 +334,7 @@ export async function login(
                 false,
 
             error:
-                "EDORI could not reach the authentication service."
+                "Hospital Readiness could not reach the authentication service."
 
         };
 
@@ -375,7 +375,7 @@ export async function logout():Promise<void> {
 
         console.error(
 
-            "EDORI logout request failed:",
+            "Hospital Readiness logout request failed:",
 
             error
 
@@ -441,7 +441,7 @@ export function requestPasswordChange():void {
 
         console.error(
 
-            "EDORI could not request password change.",
+            "Hospital Readiness could not request password change.",
 
             error
 
@@ -607,7 +607,7 @@ export async function changeCurrentPassword(
 
                 error:
                     payload.message
-                    ?? "EDORI could not change the password."
+                    ?? "Hospital Readiness could not change the password."
 
             };
 
@@ -633,7 +633,7 @@ export async function changeCurrentPassword(
 
         console.error(
 
-            "EDORI password-change request failed:",
+            "Hospital Readiness password-change request failed:",
 
             error
 
@@ -646,7 +646,7 @@ export async function changeCurrentPassword(
                 false,
 
             error:
-                "EDORI could not reach the authentication service."
+                "Hospital Readiness could not reach the authentication service."
 
         };
 
@@ -717,7 +717,7 @@ function clearRequestedPasswordChange():void {
 
         console.error(
 
-            "EDORI could not clear password-change state.",
+            "Hospital Readiness could not clear password-change state.",
 
             error
 

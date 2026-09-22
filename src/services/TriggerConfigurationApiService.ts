@@ -1,7 +1,7 @@
 /**
  * TriggerConfigurationApiService
  *
- * Frontend API client for EDORI hospital-specific
+ * Frontend API client for Hospital Readiness hospital-specific
  * operational-trigger overrides.
  */
 
@@ -78,7 +78,7 @@ Promise<ServerTriggerConfigurationEnvelope | null> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load trigger configuration."
+            ?? "Hospital Readiness could not load trigger configuration."
 
         );
 
@@ -149,7 +149,7 @@ export async function saveServerTriggerConfiguration(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not save trigger configuration."
+            ?? "Hospital Readiness could not save trigger configuration."
 
         );
 
@@ -199,7 +199,7 @@ Promise<boolean> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not restore built-in trigger configuration."
+            ?? "Hospital Readiness could not restore built-in trigger configuration."
 
         );
 

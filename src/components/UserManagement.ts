@@ -81,7 +81,7 @@ export function UserManagement():string {
                     </h2>
 
                     <p>
-                        Manage centralized EDORI user accounts, roles, access status, and temporary passwords.
+                        Manage centralized Hospital Readiness user accounts, roles, access status, and temporary passwords.
                     </p>
 
                 </div>
@@ -354,7 +354,7 @@ async function refreshUsers():Promise<void> {
         showPageMessage(
             getErrorMessage(
                 error,
-                "EDORI could not load users."
+                "Hospital Readiness could not load users."
             ),
             true
         );
@@ -1035,7 +1035,7 @@ async function saveEditor():Promise<void> {
         showEditorMessage(
             getErrorMessage(
                 error,
-                "EDORI could not save the user."
+                "Hospital Readiness could not save the user."
             ),
             true
         );
@@ -1177,7 +1177,7 @@ async function savePasswordReset():Promise<void> {
             "passwordResetMessage",
             getErrorMessage(
                 error,
-                "EDORI could not reset the password."
+                "Hospital Readiness could not reset the password."
             )
         );
 

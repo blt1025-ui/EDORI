@@ -1,7 +1,7 @@
 /**
  * CurrentOperationalStateRoutes
  *
- * Authenticated API for EDORI's single current committed
+ * Authenticated API for Hospital Readiness's single current committed
  * Hospital Readiness assessment.
  */
 
@@ -183,7 +183,7 @@ currentOperationalStateRouter.put(
                         "invalid_state",
 
                     message:
-                        "The current EDORI operational state is invalid."
+                        "The current Hospital Readiness operational state is invalid."
 
                 });
 

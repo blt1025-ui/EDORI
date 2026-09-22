@@ -1,7 +1,7 @@
 /**
  * HistoricalExpectationApiService
  *
- * Frontend API client for EDORI's optional imported
+ * Frontend API client for Hospital Readiness's optional imported
  * historical expectation dataset.
  */
 
@@ -69,7 +69,7 @@ Promise<ServerHistoricalDataset | null> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load historical expectations."
+            ?? "Hospital Readiness could not load historical expectations."
 
         );
 
@@ -146,7 +146,7 @@ export async function saveServerHistoricalDataset(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not save historical expectations."
+            ?? "Hospital Readiness could not save historical expectations."
 
         );
 
@@ -196,7 +196,7 @@ Promise<boolean> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not clear imported historical expectations."
+            ?? "Hospital Readiness could not clear imported historical expectations."
 
         );
 

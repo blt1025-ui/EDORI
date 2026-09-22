@@ -507,7 +507,7 @@ function createConfigurationMarkup():string {
                     "Hospital Surge Plan",
 
                 description:
-                    "Defines the hospital-specific actions EDORI recommends when configured operational triggers become active.",
+                    "Defines the hospital-specific actions Hospital Readiness recommends when configured operational triggers become active.",
 
                 status:
                     hasSurgePlanOverrides()

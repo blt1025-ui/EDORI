@@ -11,7 +11,7 @@
  * - History and Administration
  *
  * This component only organizes presentation.
- * It does not calculate or modify EDORI data.
+ * It does not calculate or modify Hospital Readiness data.
  */
 
 import {
@@ -194,7 +194,7 @@ export function DashboardRightColumn():string {
                     "gauge-panel",
 
                 title:
-                    "EDORI Gauge",
+                    "Hospital Readiness Gauge",
 
               description:
     "Current numerical HRI score and score-derived operational level",
@@ -400,7 +400,7 @@ export function DashboardRightColumn():string {
                     "History Restore Center",
 
                 description:
-                    "Validate and restore a saved EDORI JSON backup",
+                    "Validate and restore a saved Hospital Readiness JSON backup",
 
                 content:
                     HistoryRestoreCenter()
@@ -414,7 +414,7 @@ export function DashboardRightColumn():string {
                     "trend-chart-panel",
 
                 title:
-                    "EDORI Trend",
+                    "Hospital Readiness Trend",
 
                 description:
                     "Saved operational-readiness scores over time",
@@ -451,7 +451,7 @@ export function DashboardRightColumn():string {
                     "Assessment History",
 
                 description:
-                    "Saved EDORI assessment records",
+                    "Saved Hospital Readiness assessment records",
 
                 content:
                     AssessmentHistory()

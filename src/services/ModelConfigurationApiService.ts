@@ -1,7 +1,7 @@
 /**
  * ModelConfigurationApiService
  *
- * Frontend API client for EDORI model configuration
+ * Frontend API client for Hospital Readiness model configuration
  * overrides.
  */
 
@@ -67,7 +67,7 @@ Promise<ServerModelConfigurationOverride | null> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load model configuration."
+            ?? "Hospital Readiness could not load model configuration."
 
         );
 
@@ -145,7 +145,7 @@ export async function saveServerModelConfiguration(
             ??
             payload.message
             ??
-            "EDORI could not save model configuration."
+            "Hospital Readiness could not save model configuration."
 
         );
 
@@ -195,7 +195,7 @@ Promise<boolean> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not restore built-in model configuration."
+            ?? "Hospital Readiness could not restore built-in model configuration."
 
         );
 

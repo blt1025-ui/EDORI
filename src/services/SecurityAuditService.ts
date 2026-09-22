@@ -1,7 +1,7 @@
 /**
  * SecurityAuditService
  *
- * Frontend read-only cache for PostgreSQL-backed EDORI
+ * Frontend read-only cache for PostgreSQL-backed Hospital Readiness
  * security-audit records.
  *
  * The public synchronous API is intentionally retained so
@@ -207,7 +207,7 @@ Promise<void> {
             throw new Error(
 
                 payload.message
-                ?? "EDORI could not load the security audit log."
+                ?? "Hospital Readiness could not load the security audit log."
 
             );
 
@@ -241,7 +241,7 @@ Promise<void> {
 
         console.warn(
 
-            "EDORI could not load the PostgreSQL security audit log.",
+            "Hospital Readiness could not load the PostgreSQL security audit log.",
 
             error
 
@@ -299,7 +299,7 @@ export function recordSecurityAuditEvent(
 
     throw new Error(
 
-        "Browser-side security audit writes are disabled. EDORI security audit events are written by the server."
+        "Browser-side security audit writes are disabled. Hospital Readiness security audit events are written by the server."
 
     );
 
@@ -556,7 +556,7 @@ void {
 
         console.warn(
 
-            "EDORI could not remove legacy browser security-audit storage.",
+            "Hospital Readiness could not remove legacy browser security-audit storage.",
 
             error
 

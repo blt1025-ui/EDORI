@@ -76,7 +76,7 @@ export async function saveServerSnapshot(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not save the assessment to the server."
+            ?? "Hospital Readiness could not save the assessment to the server."
 
         );
 
@@ -137,7 +137,7 @@ export async function loadServerSnapshots(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load assessment history."
+            ?? "Hospital Readiness could not load assessment history."
 
         );
 
@@ -193,7 +193,7 @@ Promise<EdoriSnapshot | null> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load the latest assessment."
+            ?? "Hospital Readiness could not load the latest assessment."
 
         );
 
@@ -247,7 +247,7 @@ Promise<number> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not clear assessment history."
+            ?? "Hospital Readiness could not clear assessment history."
 
         );
 

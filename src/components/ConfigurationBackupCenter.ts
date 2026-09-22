@@ -3,7 +3,7 @@
  *
  * Administrative interface for exporting, validating,
  * previewing, and restoring a complete hospital-specific
- * EDORI configuration backup.
+ * Hospital Readiness configuration backup.
  *
  * Includes:
  *
@@ -61,7 +61,7 @@ export function ConfigurationBackupCenter():string {
             <div class="configuration-backup-introduction">
 
                 <p>
-                    Export or restore the hospital-specific EDORI calculation model,
+                    Export or restore the hospital-specific Hospital Readiness calculation model,
                     operational triggers, and Hospital Surge Plan configuration.
                 </p>
 
@@ -100,7 +100,7 @@ export function ConfigurationBackupCenter():string {
                     </h4>
 
                     <p>
-                        Save the current hospital-specific EDORI configuration as a portable JSON backup.
+                        Save the current hospital-specific Hospital Readiness configuration as a portable JSON backup.
                     </p>
 
                     <button
@@ -128,7 +128,7 @@ export function ConfigurationBackupCenter():string {
                     </h4>
 
                     <p>
-                        Select a previously exported EDORI configuration backup for validation and review.
+                        Select a previously exported Hospital Readiness configuration backup for validation and review.
                     </p>
 
                     <label
@@ -471,7 +471,7 @@ function renderPreview(
                 </h4>
 
                 <p>
-                    Review the selected backup before replacing the current EDORI configuration.
+                    Review the selected backup before replacing the current Hospital Readiness configuration.
                 </p>
 
             </div>
@@ -631,7 +631,7 @@ function restorePendingConfigurationBackup():void {
         window.confirm(
 
             [
-                "Restore this EDORI configuration backup?",
+                "Restore this Hospital Readiness configuration backup?",
                 "",
                 "This will replace the current:",
                 "",
@@ -684,7 +684,7 @@ function restorePendingConfigurationBackup():void {
 
 
     showMessage(
-        "EDORI configuration restored successfully. Recalculate the current assessment before relying on the displayed HRI result.",
+        "Hospital Readiness configuration restored successfully. Recalculate the current assessment before relying on the displayed HRI result.",
         "success"
     );
 

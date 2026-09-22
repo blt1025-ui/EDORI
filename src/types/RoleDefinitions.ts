@@ -1,7 +1,7 @@
 /**
  * RoleDefinitions
  *
- * Default EDORI role hierarchy and permission mappings.
+ * Default Hospital Readiness role hierarchy and permission mappings.
  */
 
 import type {
@@ -63,7 +63,7 @@ Record<RoleId,RoleDefinition> = {
             "Administrator",
 
         description:
-            "Full EDORI access including configuration, historical data, backup/restore, users, roles, and permissions."
+            "Full Hospital Readiness access including configuration, historical data, backup/restore, users, roles, and permissions."
 
     }
 

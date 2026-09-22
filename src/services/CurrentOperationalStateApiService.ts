@@ -1,7 +1,7 @@
 /**
  * CurrentOperationalStateApiService
  *
- * Frontend API client for EDORI's authoritative current
+ * Frontend API client for Hospital Readiness's authoritative current
  * committed Hospital Readiness assessment.
  */
 
@@ -65,7 +65,7 @@ Promise<ServerCurrentOperationalState | null> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not load the current operational state."
+            ?? "Hospital Readiness could not load the current operational state."
 
         );
 
@@ -143,7 +143,7 @@ export async function saveServerCurrentState(
         throw new Error(
 
             payload.message
-            ?? "EDORI could not save the current operational state."
+            ?? "Hospital Readiness could not save the current operational state."
 
         );
 
@@ -193,7 +193,7 @@ Promise<boolean> {
         throw new Error(
 
             payload.message
-            ?? "EDORI could not clear the current operational state."
+            ?? "Hospital Readiness could not clear the current operational state."
 
         );
 

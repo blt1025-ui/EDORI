@@ -1,7 +1,7 @@
 /**
  * SynchronizationStatusService
  *
- * Read-only UI status for EDORI multi-workstation
+ * Read-only UI status for Hospital Readiness multi-workstation
  * synchronization.
  *
  * This service does not perform synchronization. It only
@@ -131,7 +131,7 @@ void {
             now,
 
         message:
-            "Checking for shared EDORI updates."
+            "Checking for shared Hospital Readiness updates."
 
     });
 
@@ -164,7 +164,7 @@ void {
             0,
 
         message:
-            "EDORI is synchronized."
+            "Hospital Readiness is synchronized."
 
     });
 
@@ -288,12 +288,12 @@ function createFailureMessage(
         )
     ){
 
-        return "EDORI could not reach the server. Retrying automatically.";
+        return "Hospital Readiness could not reach the server. Retrying automatically.";
 
     }
 
 
-    return "Synchronization is delayed. EDORI will retry automatically.";
+    return "Synchronization is delayed. Hospital Readiness will retry automatically.";
 
 }
 
@@ -323,7 +323,7 @@ function updateStatus(
             catch(error){
 
                 console.error(
-                    "EDORI synchronization-status listener failed:",
+                    "Hospital Readiness synchronization-status listener failed:",
                     error
                 );
 

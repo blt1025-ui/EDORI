@@ -1,7 +1,7 @@
 /**
  * AdminUserRoutes
  *
- * PostgreSQL-backed EDORI user administration.
+ * PostgreSQL-backed Hospital Readiness user administration.
  */
 
 import {
@@ -117,7 +117,7 @@ adminUserRouter.use(
 
 
 /**
- * Return centralized EDORI user directory.
+ * Return centralized Hospital Readiness user directory.
  */
 adminUserRouter.get(
 
@@ -293,7 +293,7 @@ adminUserRouter.post(
                     true,
 
                 summary:
-                    "EDORI user account created.",
+                    "Hospital Readiness user account created.",
 
                 details:{
                     role:
@@ -505,7 +505,7 @@ adminUserRouter.put(
                     true,
 
                 summary:
-                    "EDORI user account updated.",
+                    "Hospital Readiness user account updated.",
 
                 details:{
                     usernameChanged:
@@ -552,7 +552,7 @@ adminUserRouter.put(
                         true,
 
                     summary:
-                        "EDORI user role changed.",
+                        "Hospital Readiness user role changed.",
 
                     details:{
                         previousRole:
@@ -592,7 +592,7 @@ adminUserRouter.put(
                         true,
 
                     summary:
-                        "EDORI user active status changed.",
+                        "Hospital Readiness user active status changed.",
 
                     details:{
                         previousActive:
@@ -758,7 +758,7 @@ adminUserRouter.post(
                     true,
 
                 summary:
-                    "EDORI Administrator reset a user password.",
+                    "Hospital Readiness Administrator reset a user password.",
 
                 details:{
                     mustChangePassword:
@@ -879,7 +879,7 @@ function normalizeRole(
 
     throw new Error(
 
-        "Select a valid EDORI role."
+        "Select a valid Hospital Readiness role."
 
     );
 

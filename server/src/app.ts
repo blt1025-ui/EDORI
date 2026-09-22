@@ -1,7 +1,7 @@
 /**
  * app
  *
- * Creates the EDORI Express application.
+ * Creates the Hospital Readiness Express application.
  */
 
 import express from "express";
@@ -116,7 +116,7 @@ from "./routes/ExecutiveReportDistributionRoutes.js";
 
 
 /**
- * Create and configure the EDORI API.
+ * Create and configure the Hospital Readiness API.
  */
 export function createApp() {
 
@@ -127,7 +127,7 @@ export function createApp() {
 
     /**
      * Railway terminates public HTTPS before forwarding
-     * requests to the EDORI Express application.
+     * requests to the Hospital Readiness Express application.
      *
      * Trust one proxy hop so Express can correctly resolve
      * the original client protocol and IP address.
@@ -219,7 +219,7 @@ export function createApp() {
 
 
     /**
-     * Shared EDORI model configuration override.
+     * Shared Hospital Readiness model configuration override.
      */
     app.use(
 
@@ -358,7 +358,7 @@ export function createApp() {
                     "not_found",
 
                 message:
-                    "The requested EDORI API endpoint does not exist."
+                    "The requested Hospital Readiness API endpoint does not exist."
 
             });
 
@@ -381,7 +381,7 @@ export function createApp() {
 
             console.error(
 
-                "Unhandled EDORI API error:",
+                "Unhandled Hospital Readiness API error:",
 
                 error
 
@@ -394,7 +394,7 @@ export function createApp() {
                     "internal_server_error",
 
                 message:
-                    "EDORI could not complete the request."
+                    "Hospital Readiness could not complete the request."
 
             });
 

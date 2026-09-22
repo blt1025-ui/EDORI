@@ -1,7 +1,7 @@
 /**
  * TriggerConfigurationRoutes
  *
- * Authenticated API for EDORI hospital-specific
+ * Authenticated API for Hospital Readiness hospital-specific
  * operational-trigger overrides.
  *
  * Protected trigger logic is never accepted through this
@@ -168,7 +168,7 @@ triggerConfigurationRouter.put(
                         "invalid_trigger_configuration",
 
                     message:
-                        "The EDORI trigger configuration is invalid."
+                        "The Hospital Readiness trigger configuration is invalid."
 
                 });
 
