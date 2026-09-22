@@ -21,6 +21,8 @@ export type PermissionId =
     | "historicalData.manage"
     | "triggerConfiguration.manage"
     | "surgePlan.manage"
+    | "executiveReportDistribution.manage"
+    | "executiveReportDistribution.send"
     | "data.export"
     | "history.restore";
 
@@ -37,6 +39,7 @@ const ROLE_PERMISSIONS:Record<RoleId, readonly PermissionId[]> = {
         "assessment.view",
         "assessment.submit",
         "operational.view",
+        "executiveReportDistribution.send",
         "data.export"
     ],
 
@@ -52,6 +55,8 @@ const ROLE_PERMISSIONS:Record<RoleId, readonly PermissionId[]> = {
         "historicalData.manage",
         "triggerConfiguration.manage",
         "surgePlan.manage",
+        "executiveReportDistribution.manage",
+        "executiveReportDistribution.send",
         "data.export",
         "history.restore"
     ]

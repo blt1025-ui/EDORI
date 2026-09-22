@@ -1,21 +1,7 @@
 /**
  * AdministrationPage
  *
- * Administrative workspace for EDORI.
- *
- * Responsibilities:
- *
- * - Manage historical baseline data
- * - Export operational and assessment data
- * - Restore saved EDORI history
- * - Manage configuration backups
- * - Provide operational-level reference material
- * - Provide Hospital Readiness system configuration
- * - Manage EDORI application users
- * - Review authentication and account-security audit events
- *
- * Routine assessment and operational decision-support
- * functions intentionally live on the other pages.
+ * Administrative workspace for Hospital Readiness.
  */
 
 import {
@@ -74,6 +60,15 @@ from "../OperationalLevelReference";
 
 import {
 
+    ExecutiveReportDistribution
+
+}
+
+from "../ExecutiveReportDistribution";
+
+
+import {
+
     UserManagement
 
 }
@@ -124,16 +119,14 @@ export function AdministrationPage():string {
                         System Management
                     </span>
 
-
                     <h2>
                         Administration
                     </h2>
 
-
                     <p>
                         Manage historical baselines, data exports, backups,
-                        reference information, system configuration, and
-                        application access.
+                        reference information, system configuration, report
+                        distribution, and application access.
                     </p>
 
                 </div>
@@ -199,10 +192,6 @@ export function AdministrationPage():string {
 
                 <div class="administration-data-workflow">
 
-                    <!-- =================================
-                         DATA EXPORT
-                    ================================== -->
-
                     <div class="administration-data-workflow-primary">
 
                         ${CollapsiblePanel({
@@ -227,10 +216,6 @@ export function AdministrationPage():string {
                     </div>
 
 
-                    <!-- =================================
-                         HISTORY RESTORE
-                    ================================== -->
-
                     <div class="administration-data-workflow-secondary">
 
                         ${CollapsiblePanel({
@@ -254,10 +239,6 @@ export function AdministrationPage():string {
 
                     </div>
 
-
-                    <!-- =================================
-                         CONFIGURATION BACKUP
-                    ================================== -->
 
                     <div class="administration-data-workflow-tertiary">
 
@@ -345,6 +326,45 @@ export function AdministrationPage():string {
 
 
             <!-- =========================================
+                 REPORT DISTRIBUTION
+            ========================================== -->
+
+            <section
+                class="
+                    administration-section
+                    administration-section-report-distribution
+                "
+                aria-label="Executive report distribution"
+            >
+
+                ${createAdministrationSectionLabel(
+                    "Report Distribution"
+                )}
+
+
+                ${CollapsiblePanel({
+
+                    id:
+                        "executive-report-distribution-panel",
+
+                    title:
+                        "Executive Report Distribution",
+
+                    description:
+                        "Manage Executive Assessment Report recipients and review distribution activity",
+
+                    content:
+                        ExecutiveReportDistribution(),
+
+                    initiallyOpen:
+                        false
+
+                })}
+
+            </section>
+
+
+            <!-- =========================================
                  USERS + ACCESS
             ========================================== -->
 
@@ -371,8 +391,8 @@ export function AdministrationPage():string {
                         title:
                             "User Management",
 
-                  description:
-    "Create, edit, deactivate, and manage Hospital Readiness application users",
+                        description:
+                            "Create, edit, deactivate, and manage Hospital Readiness application users",
 
                         content:
                             UserManagement(),

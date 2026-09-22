@@ -26564,3 +26564,226 @@ small {
 .surge-plan-category-chevron-glyph {
     transform: rotate(-45deg) translate(-1px, -1px);
 }
+
+/* =========================================================
+   EXECUTIVE REPORT DISTRIBUTION
+========================================================= */
+
+.executive-report-distribution {
+    width: 100%;
+    min-width: 0;
+}
+
+.executive-report-distribution-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 18px;
+}
+
+.executive-report-distribution-header h2 {
+    margin: 4px 0 6px;
+}
+
+.executive-report-distribution-header p {
+    margin: 0;
+}
+
+.executive-report-distribution-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.executive-report-distribution-message {
+    min-height: 0;
+    margin-bottom: 12px;
+}
+
+.executive-report-distribution-message:empty {
+    display: none;
+}
+
+.executive-report-distribution-message-success {
+    padding: 10px 12px;
+    border: 1px solid rgba(46, 125, 50, 0.28);
+    border-radius: 8px;
+    background: rgba(46, 125, 50, 0.08);
+}
+
+.executive-report-distribution-message-error {
+    padding: 10px 12px;
+    border: 1px solid rgba(183, 28, 28, 0.28);
+    border-radius: 8px;
+    background: rgba(183, 28, 28, 0.08);
+}
+
+.executive-report-distribution-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.executive-report-distribution-summary-card {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border-color, #d9dee7);
+    border-radius: 10px;
+    background: var(--surface-color, #ffffff);
+}
+
+.executive-report-distribution-summary-card > span {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+}
+
+.executive-report-distribution-summary-card > strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 1.5rem;
+}
+
+.executive-report-distribution-summary-card > small {
+    display: block;
+    opacity: 0.72;
+}
+
+.executive-report-distribution-workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+}
+
+.executive-report-distribution-section {
+    min-width: 0;
+}
+
+.executive-report-distribution-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.executive-report-distribution-section-heading h3 {
+    margin: 0 0 4px;
+}
+
+.executive-report-distribution-section-heading p {
+    margin: 0;
+    opacity: 0.72;
+}
+
+.executive-report-recipient-table-container,
+.executive-report-distribution-history-container {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.executive-report-recipient-table,
+.executive-report-distribution-history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.executive-report-recipient-table th,
+.executive-report-recipient-table td,
+.executive-report-distribution-history-table th,
+.executive-report-distribution-history-table td {
+    padding: 11px 10px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-color, #e1e5eb);
+}
+
+.executive-report-recipient-table th,
+.executive-report-distribution-history-table th {
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.68;
+}
+
+.executive-report-recipient-status,
+.executive-report-distribution-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.executive-report-recipient-status-enabled,
+.executive-report-distribution-status-accepted {
+    background: rgba(46, 125, 50, 0.12);
+}
+
+.executive-report-recipient-status-disabled {
+    background: rgba(90, 100, 115, 0.12);
+}
+
+.executive-report-distribution-status-pending {
+    background: rgba(21, 101, 192, 0.12);
+}
+
+.executive-report-distribution-status-partial {
+    background: rgba(249, 168, 37, 0.15);
+}
+
+.executive-report-distribution-status-failed {
+    background: rgba(183, 28, 28, 0.12);
+}
+
+.executive-report-distribution-status-sandbox {
+    background: rgba(94, 53, 177, 0.12);
+}
+
+.executive-report-distribution-level {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.76rem;
+    opacity: 0.68;
+}
+
+.executive-report-distribution-empty {
+    padding: 24px;
+    text-align: center;
+    border: 1px dashed var(--border-color, #d9dee7);
+    border-radius: 10px;
+}
+
+.executive-report-distribution-empty strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.executive-report-distribution-empty p {
+    margin: 0;
+    opacity: 0.72;
+}
+
+@media (max-width: 900px) {
+
+    .executive-report-distribution-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .executive-report-distribution-header {
+        flex-direction: column;
+    }
+
+}

@@ -220,6 +220,15 @@ from "../UserManagement";
 
 import {
 
+    initializeExecutiveReportDistribution
+
+}
+
+from "../ExecutiveReportDistribution";
+
+
+import {
+
     initializeSecurityAuditLog
 
 }
@@ -339,9 +348,12 @@ export function initializeDashboardComponents():void {
 
 
     /*
-     * Administrative configuration and user access.
+     * Administrative configuration, report distribution,
+     * and user access.
      */
     initializeSystemConfiguration();
+
+    initializeExecutiveReportDistribution();
 
     initializeUserManagement();
 

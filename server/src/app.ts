@@ -42,6 +42,7 @@ import {
 
 from "./routes/ModelConfigurationRoutes.js";
 
+
 import {
 
     triggerConfigurationRouter
@@ -59,6 +60,7 @@ import {
 
 from "./routes/SecurityAuditRoutes.js";
 
+
 import {
 
     surgePlanRouter
@@ -66,6 +68,7 @@ import {
 }
 
 from "./routes/SurgePlanRoutes.js";
+
 
 import {
 
@@ -103,35 +106,44 @@ import {
 from "./routes/AdminUserRoutes.js";
 
 
+import {
+
+    executiveReportDistributionRouter
+
+}
+
+from "./routes/ExecutiveReportDistributionRoutes.js";
+
+
 /**
  * Create and configure the EDORI API.
  */
 export function createApp() {
 
-   const app =
+    const app =
 
-    express();
-
-
-/**
- * Railway terminates public HTTPS before forwarding
- * requests to the EDORI Express application.
- *
- * Trust one proxy hop so Express can correctly resolve
- * the original client protocol and IP address.
- */
-app.set(
-
-    "trust proxy",
-
-    1
-
-);
+        express();
 
 
-app.disable(
-    "x-powered-by"
-);
+    /**
+     * Railway terminates public HTTPS before forwarding
+     * requests to the EDORI Express application.
+     *
+     * Trust one proxy hop so Express can correctly resolve
+     * the original client protocol and IP address.
+     */
+    app.set(
+
+        "trust proxy",
+
+        1
+
+    );
+
+
+    app.disable(
+        "x-powered-by"
+    );
 
 
     app.use(
@@ -219,6 +231,67 @@ app.disable(
 
 
     /**
+     * Shared operational-trigger configuration.
+     */
+    app.use(
+
+        "/api/trigger-configuration",
+
+        triggerConfigurationRouter
+
+    );
+
+
+    /**
+     * Shared Hospital Surge Plan.
+     */
+    app.use(
+
+        "/api/surge-plan",
+
+        surgePlanRouter
+
+    );
+
+
+    /**
+     * Shared current Hospital Readiness result state.
+     */
+    app.use(
+
+        "/api/result-state",
+
+        currentResultRouter
+
+    );
+
+
+    /**
+     * Read-only PostgreSQL security audit log.
+     */
+    app.use(
+
+        "/api/security-audit",
+
+        securityAuditRouter
+
+    );
+
+
+    /**
+     * Executive Assessment Report recipient
+     * configuration and distribution history.
+     */
+    app.use(
+
+        "/api/executive-report-distribution",
+
+        executiveReportDistributionRouter
+
+    );
+
+
+    /**
      * API + PostgreSQL health endpoint.
      */
     app.get(
@@ -267,49 +340,6 @@ app.disable(
     );
 
 
-    /**
- * Shared operational-trigger configuration.
- */
-app.use(
-
-    "/api/trigger-configuration",
-
-    triggerConfigurationRouter
-
-);
-
-/**
- * Shared Hospital Surge Plan.
- */
-app.use(
-
-    "/api/surge-plan",
-
-    surgePlanRouter
-
-);
-
-/**
- * Shared current Hospital Readiness result state.
- */
-app.use(
-
-    "/api/result-state",
-
-    currentResultRouter
-
-);
-
-/**
- * Read-only PostgreSQL security audit log.
- */
-app.use(
-
-    "/api/security-audit",
-
-    securityAuditRouter
-
-);
     /**
      * Unknown API routes return JSON.
      *

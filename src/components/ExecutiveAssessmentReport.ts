@@ -74,6 +74,28 @@ import {
 from "../services/StateService";
 
 
+import {
+
+    loadExecutiveReportSendPreview,
+
+    sendExecutiveReport
+
+}
+
+from "../services/ExecutiveReportDistributionApiService";
+
+
+import type {
+
+    ExecutiveReportPayload,
+
+    ExecutiveReportListItem
+
+}
+
+from "../types/ExecutiveReportPayload";
+
+
 import type {
 
     EdoriSnapshot
@@ -142,14 +164,27 @@ export function ExecutiveAssessmentReport():string {
                 </div>
 
 
-                <button
-                    id="printExecutiveReportButton"
-                    class="executive-report-print-button"
-                    type="button"
-                    disabled
-                >
-                    Print / Save as PDF
-                </button>
+                <div class="executive-report-actions">
+
+                    <button
+                        id="sendExecutiveReportButton"
+                        class="executive-report-print-button"
+                        type="button"
+                        disabled
+                    >
+                        Send Executive Report
+                    </button>
+
+                    <button
+                        id="printExecutiveReportButton"
+                        class="executive-report-print-button"
+                        type="button"
+                        disabled
+                    >
+                        Print / Save as PDF
+                    </button>
+
+                </div>
 
             </div>
 
@@ -196,6 +231,22 @@ export function initializeExecutiveAssessmentReport():void {
         "click",
 
         handlePrintExecutiveReport
+
+    );
+
+
+    const sendButton = document.getElementById(
+
+        "sendExecutiveReportButton"
+
+    );
+
+
+    sendButton?.addEventListener(
+
+        "click",
+
+        handleSendExecutiveReport
 
     );
 
@@ -267,6 +318,12 @@ function updateExecutiveAssessmentReport():void {
 
         );
 
+        updateSendButton(
+
+            false
+
+        );
+
 
         container.innerHTML =
 
@@ -290,6 +347,12 @@ function updateExecutiveAssessmentReport():void {
 
         );
 
+        updateSendButton(
+
+            false
+
+        );
+
 
         container.innerHTML =
 
@@ -307,6 +370,12 @@ function updateExecutiveAssessmentReport():void {
     if(!result){
 
         updatePrintButton(
+
+            false
+
+        );
+
+        updateSendButton(
 
             false
 
@@ -362,6 +431,12 @@ function updateExecutiveAssessmentReport():void {
 
         );
 
+        updateSendButton(
+
+            true
+
+        );
+
     }
     catch(error){
 
@@ -375,6 +450,12 @@ function updateExecutiveAssessmentReport():void {
 
 
         updatePrintButton(
+
+            false
+
+        );
+
+        updateSendButton(
 
             false
 
@@ -1424,6 +1505,483 @@ function createReportEmptyState(
 
 
 /**
+ * Send the current Executive Assessment Report.
+ *
+ * The report payload is rebuilt from the same authoritative
+ * services used by the visible report immediately before send.
+ */
+async function handleSendExecutiveReport():Promise<void> {
+
+    const invalidationReason =
+        getResultInvalidationReason();
+
+
+    if(
+        invalidationReason
+        ||
+        !hasCommittedAssessment()
+        ||
+        !getLatestResult()
+    ){
+
+        showReportMessage(
+            "A current calculated Hospital Readiness assessment is required before sending.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    updateSendButton(
+        false,
+        "Loading recipients..."
+    );
+
+
+    clearReportMessage();
+
+
+    try {
+
+        const preview =
+            await loadExecutiveReportSendPreview();
+
+
+        if(preview.recipientCount === 0){
+
+            showReportMessage(
+                "No enabled Executive Report recipients are configured.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        if(
+            preview.remaining < preview.recipientCount
+        ){
+
+            showReportMessage(
+                `This report requires ${preview.recipientCount} email deliveries, but only ${preview.remaining} remain in today's configured delivery limit.`,
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        const result =
+            getLatestResult();
+
+
+        if(
+            !result
+            ||
+            getResultInvalidationReason()
+            ||
+            !hasCommittedAssessment()
+        ){
+
+            showReportMessage(
+                "The Hospital Readiness assessment changed while the distribution preview was loading. Recalculate or review the current assessment before sending.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        const snapshots =
+            getSnapshots();
+
+
+        const operationalAssessment =
+            createOperationalAssessment({
+
+                assessment:
+                    getState(),
+
+                result,
+
+                snapshots,
+
+                evaluatedAt:
+                    new Date()
+
+            });
+
+
+        const report =
+            createExecutiveReportPayload(
+                operationalAssessment,
+                snapshots
+            );
+
+
+        const recipientLines =
+            preview.recipients
+                .map(
+                    recipient =>
+                        recipient.displayName
+                            ? `${recipient.displayName} <${recipient.email}>`
+                            : recipient.email
+                )
+                .join("\n");
+
+
+        const confirmed = window.confirm(
+            [
+                "Send Executive Assessment Report?",
+                "",
+                `HRI Score: ${Math.round(report.hriScore)}`,
+                `Operational Level: ${report.operationalLevel}`,
+                `Assessment: ${formatAssessmentTime(report.assessmentTimestamp)}`,
+                "",
+                `Recipients (${preview.recipientCount}):`,
+                recipientLines,
+                "",
+                `Daily delivery usage after this send: ${preview.used + preview.recipientCount} / ${preview.dailyLimit}`
+            ].join("\n")
+        );
+
+
+        if(!confirmed){
+            return;
+        }
+
+
+        updateSendButton(
+            false,
+            "Sending..."
+        );
+
+
+        const sendResult =
+            await sendExecutiveReport(
+                report
+            );
+
+
+        showReportMessage(
+            sendResult.message,
+            "success"
+        );
+
+    }
+    catch(error){
+
+        console.error(
+            "Unable to send the Executive Assessment Report:",
+            error
+        );
+
+
+        showReportMessage(
+            error instanceof Error
+                ? error.message
+                : "The Executive Assessment Report could not be sent.",
+            "error"
+        );
+
+    }
+    finally {
+
+        const canSend =
+            !getResultInvalidationReason()
+            &&
+            hasCommittedAssessment()
+            &&
+            Boolean(
+                getLatestResult()
+            );
+
+
+        updateSendButton(
+            canSend
+        );
+
+    }
+
+}
+
+
+/**
+ * Build the structured, non-PHI distribution payload from the
+ * authoritative OperationalAssessment used by the visible report.
+ */
+function createExecutiveReportPayload(
+
+    operationalAssessment:OperationalAssessment,
+
+    snapshots:EdoriSnapshot[]
+
+):ExecutiveReportPayload {
+
+    const assessment =
+        operationalAssessment.assessment;
+
+    const result =
+        operationalAssessment.scoreResult;
+
+    const finalState =
+        operationalAssessment.finalOperationalState;
+
+    const score =
+        result.score;
+
+    const highAcuityCount =
+        assessment.esi1 + assessment.esi2;
+
+    const lowerAcuityCount = Math.max(
+        0,
+        assessment.totalEDVolume - highAcuityCount
+    );
+
+    const leadingDrivers =
+        operationalAssessment.primaryDrivers
+            .slice()
+            .sort(
+                (first, second) =>
+                    second.severity - first.severity
+            )
+            .slice(
+                0,
+                MAXIMUM_REPORT_DRIVERS
+            );
+
+    const activeTriggers =
+        operationalAssessment.activeTriggers
+            .slice(
+                0,
+                MAXIMUM_REPORT_TRIGGERS
+            );
+
+    const recommendations =
+        operationalAssessment.recommendations
+            .slice()
+            .sort(
+                compareRecommendations
+            )
+            .slice(
+                0,
+                MAXIMUM_REPORT_ACTIONS
+            );
+
+
+    return {
+
+        assessmentTimestamp:
+            new Date(
+                assessment.assessmentTime
+            ).toISOString(),
+
+        generatedTimestamp:
+            new Date().toISOString(),
+
+        hriScore:
+            score,
+
+        operationalLevel:
+            finalState.title,
+
+        operationalIcon:
+            finalState.icon,
+
+        operationalColor:
+            finalState.color,
+
+        riskDirection:
+            operationalAssessment.riskDirection,
+
+        confidence:
+            operationalAssessment.confidence,
+
+        scoreChange:
+            determineScoreChange(
+                snapshots,
+                Math.round(score)
+            ),
+
+        activeTriggerCount:
+            operationalAssessment.activeTriggers.length,
+
+        priorityActionCount:
+            operationalAssessment.recommendations.length,
+
+        domains:{
+
+            edOperationalPressure:
+                result.edPressureScore,
+
+            projectedAcuteCareCapacity:
+                result.projectedCapacityScore,
+
+            criticalCareCapacity:
+                result.criticalCapacityScore
+
+        },
+
+        capacity:{
+
+            totalEDVolume:
+                assessment.totalEDVolume,
+
+            edTreatmentBeds:
+                ED_TREATMENT_BEDS,
+
+            edCapacityPercent:
+                calculatePercentage(
+                    assessment.totalEDVolume,
+                    ED_TREATMENT_BEDS
+                ),
+
+            boardedPatients:
+                assessment.boardedPatients,
+
+            boardingSharePercent:
+                calculatePercentage(
+                    assessment.boardedPatients,
+                    assessment.totalEDVolume
+                ),
+
+            occupiedAcuteCareBeds:
+                assessment.occupiedAcuteCareBeds,
+
+            staffedAcuteCareBeds:
+                assessment.staffedAcuteCareBeds,
+
+            acuteOccupancyPercent:
+                calculatePercentage(
+                    assessment.occupiedAcuteCareBeds,
+                    assessment.staffedAcuteCareBeds
+                ),
+
+            occupiedCriticalCareBeds:
+                assessment.occupiedCriticalCareBeds,
+
+            staffedCriticalCareBeds:
+                assessment.staffedCriticalCareBeds,
+
+            criticalOccupancyPercent:
+                calculatePercentage(
+                    assessment.occupiedCriticalCareBeds,
+                    assessment.staffedCriticalCareBeds
+                ),
+
+            knownDirectAdmissions4h:
+                assessment.currentDirectAdmissions,
+
+            knownSurgicalAdmissions4h:
+                assessment.currentSurgicalAdmissions,
+
+            expectedAdditionalEDAdmissions4h:
+                assessment.expectedEDAdmissions4h,
+
+            expectedInpatientDepartures4h:
+                result.expectedInpatientDepartures,
+
+            projectedAvailableAcuteCareBeds:
+                result.projectedAvailableAcuteCareBeds
+
+        },
+
+        acuity:{
+
+            esi1:
+                assessment.esi1,
+
+            esi2:
+                assessment.esi2,
+
+            esi3to5:
+                lowerAcuityCount,
+
+            highAcuityCount,
+
+            highAcuityPercent:
+                calculatePercentage(
+                    highAcuityCount,
+                    assessment.totalEDVolume
+                )
+
+        },
+
+        drivers:
+            leadingDrivers.map(
+                driver => createReportPayloadItem(
+                    driver.title,
+                    driver.description,
+                    `Impact ${Math.round(driver.severity)}`
+                )
+            ),
+
+        triggers:
+            activeTriggers.map(
+                triggerResult => createReportPayloadItem(
+                    triggerResult.trigger.title,
+                    triggerResult.activationReason,
+                    triggerResult.trigger.priority
+                )
+            ),
+
+        recommendations:
+            recommendations.map(
+                recommendation => createReportPayloadItem(
+                    recommendation.title,
+                    recommendation.description,
+                    recommendation.priority
+                )
+            ),
+
+        outlook:{
+
+            heading:
+                createOutlookHeading(
+                    result.projectedAvailableAcuteCareBeds,
+                    operationalAssessment.riskDirection
+                ),
+
+            description:
+                createOutlookDescription(
+                    result.projectedAvailableAcuteCareBeds,
+                    assessment.boardedPatients,
+                    assessment.expectedEDBoarders,
+                    operationalAssessment.riskDirection
+                )
+
+        }
+
+    };
+
+}
+
+
+function createReportPayloadItem(
+
+    title:string,
+
+    description:string,
+
+    label:string
+
+):ExecutiveReportListItem {
+
+    return {
+        title,
+        description,
+        label
+    };
+
+}
+
+
+/**
  * Print only the executive report.
  */
 function handlePrintExecutiveReport():void {
@@ -2118,6 +2676,33 @@ function updatePrintButton(
 
 
     button.disabled = !enabled;
+
+}
+
+
+/**
+ * Enable, disable, or relabel the send button.
+ */
+function updateSendButton(
+
+    enabled:boolean,
+
+    label = "Send Executive Report"
+
+):void {
+
+    const button = document.getElementById(
+        "sendExecutiveReportButton"
+    ) as HTMLButtonElement | null;
+
+
+    if(!button){
+        return;
+    }
+
+
+    button.disabled = !enabled;
+    button.textContent = label;
 
 }
 
