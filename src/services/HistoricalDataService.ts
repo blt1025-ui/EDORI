@@ -41,6 +41,8 @@ from "../types/HistoricalExpectation";
 
 export const HOSPITAL_FORECAST_HOURS = 4;
 
+export const OPERATIONAL_TIME_ZONE = "America/New_York";
+
 
 export interface ExpectedOperationalValues {
 
@@ -457,22 +459,9 @@ export function getDayOfWeekFromDate(
 
 ):DayOfWeek {
 
-    const days:DayOfWeek[] = [
-
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday"
-
-    ];
-
-
-    return days[
-        date.getDay()
-    ];
+    return getOperationalDateParts(
+        date
+    ).day;
 
 }
 
@@ -489,19 +478,105 @@ export function getAssessmentPeriod(
 
 } {
 
+    const period = getOperationalDateParts(
+        date
+    );
+
+
     return {
 
         day:
-            getDayOfWeekFromDate(
-                date
-            ),
+            period.day,
 
         hour:
             normalizeHour(
-                date.getHours()
+                period.hour
             )
 
     };
+
+}
+
+
+function getOperationalDateParts(
+
+    date:Date
+
+):{
+
+    day:DayOfWeek;
+
+    hour:number;
+
+} {
+
+    const formatter = new Intl.DateTimeFormat(
+
+        "en-US-u-hc-h23",
+
+        {
+
+            timeZone:
+                OPERATIONAL_TIME_ZONE,
+
+            weekday:
+                "long",
+
+            hour:
+                "numeric"
+
+        }
+
+    );
+
+
+    const parts = formatter.formatToParts(
+        date
+    );
+
+
+    const weekday = parts.find(
+        part => part.type === "weekday"
+    )?.value;
+
+
+    const hourValue = Number(
+        parts.find(
+            part => part.type === "hour"
+        )?.value
+    );
+
+
+    return {
+
+        day:
+            isDayOfWeek(weekday)
+                ? weekday
+                : "Sunday",
+
+        hour:
+            Number.isFinite(hourValue)
+                ? hourValue
+                : 0
+
+    };
+
+}
+
+
+function isDayOfWeek(
+
+    value:string | undefined
+
+):value is DayOfWeek {
+
+    return value === "Sunday"
+        || value === "Monday"
+        || value === "Tuesday"
+        || value === "Wednesday"
+        || value === "Thursday"
+        || value === "Friday"
+        || value === "Saturday";
 
 }
 

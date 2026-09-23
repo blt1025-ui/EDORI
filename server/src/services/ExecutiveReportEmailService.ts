@@ -60,6 +60,8 @@ import {
 from "./ExecutiveReportPdfService.js";
 
 
+const REPORT_TIME_ZONE = "America/New_York";
+
 const BREVO_TRANSACTIONAL_EMAIL_URL =
     "https://api.brevo.com/v3/smtp/email";
 
@@ -1228,11 +1230,11 @@ function formatTrendEmailTimestamp(value:string):{date:string;time:string} {
     return {
         date:date.toLocaleDateString(
             "en-US",
-            {month:"numeric", day:"numeric"}
+            {timeZone:REPORT_TIME_ZONE, month:"numeric", day:"numeric"}
         ),
         time:date.toLocaleTimeString(
             "en-US",
-            {hour:"numeric", minute:"2-digit"}
+            {timeZone:REPORT_TIME_ZONE, hour:"numeric", minute:"2-digit"}
         )
     };
 
@@ -1260,6 +1262,7 @@ function formatTrendDateTime(value:string):string {
     return date.toLocaleString(
         "en-US",
         {
+            timeZone:REPORT_TIME_ZONE,
             month:"short",
             day:"numeric",
             hour:"numeric",
@@ -1496,35 +1499,60 @@ function createPdfFilename(
         );
 
 
-    const datePart =
+    let datePart =
+        "assessment";
 
-        Number.isNaN(
-            date.getTime()
-        )
 
-            ? "assessment"
+    if(!Number.isNaN(date.getTime())){
 
-            : [
+        const parts = new Intl.DateTimeFormat(
 
-                date.getFullYear(),
+            "en-US",
 
-                String(
-                    date.getMonth() + 1
-                ).padStart(
-                    2,
-                    "0"
-                ),
+            {
 
-                String(
-                    date.getDate()
-                ).padStart(
-                    2,
-                    "0"
-                )
+                timeZone:
+                    REPORT_TIME_ZONE,
 
-            ].join(
-                "-"
-            );
+                year:
+                    "numeric",
+
+                month:
+                    "2-digit",
+
+                day:
+                    "2-digit"
+
+            }
+
+        ).formatToParts(
+            date
+        );
+
+
+        const year = parts.find(
+            part => part.type === "year"
+        )?.value;
+
+
+        const month = parts.find(
+            part => part.type === "month"
+        )?.value;
+
+
+        const day = parts.find(
+            part => part.type === "day"
+        )?.value;
+
+
+        if(year && month && day){
+
+            datePart =
+                `${year}-${month}-${day}`;
+
+        }
+
+    }
 
 
     return `Hospital_Readiness_Executive_Assessment_${datePart}.pdf`;
@@ -1556,6 +1584,9 @@ function formatDateTime(
         "en-US",
 
         {
+
+            timeZone:
+                REPORT_TIME_ZONE,
 
             month:
                 "short",
