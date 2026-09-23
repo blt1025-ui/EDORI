@@ -616,8 +616,8 @@ function createExecutiveSummaryHtml(
     ${createKeyValuePanel([
         ["ED Volume", `${formatNumber(report.capacity.totalEDVolume)} (${formatNumber(report.capacity.edCapacityPercent)}%)`],
         ["Boarding", `${formatNumber(report.capacity.boardedPatients)} (${formatNumber(report.capacity.boardingSharePercent)}%)`],
-        ["Acute Beds", `${formatNumber(report.capacity.occupiedAcuteCareBeds)} / ${formatNumber(report.capacity.staffedAcuteCareBeds)}`],
-        ["Critical Beds", `${formatNumber(report.capacity.occupiedCriticalCareBeds)} / ${formatNumber(report.capacity.staffedCriticalCareBeds)}`]
+        ["Acute Beds (Occupied Beds / Staffed Beds)", `${formatNumber(report.capacity.occupiedAcuteCareBeds)} / ${formatNumber(report.capacity.staffedAcuteCareBeds)}`],
+        ["Critical Beds (Occupied Beds / Staffed Beds)", `${formatNumber(report.capacity.occupiedCriticalCareBeds)} / ${formatNumber(report.capacity.staffedCriticalCareBeds)}`]
     ])}
 </td>
 
@@ -1181,38 +1181,92 @@ function createHriTrendHtml(report:ExecutiveReportPayload):string {
 
     const recentPoints = report.trend.slice(-12);
 
-    const cells = recentPoints.map(
+    const scoreCells = recentPoints.map(
         point => `
             <td valign="bottom" align="center"
-                style="width:${100 / recentPoints.length}%;padding:4px 2px;">
-                <div style="color:#172033;font-size:12px;line-height:16px;font-weight:700;">
-                    ${Math.round(point.score)}
-                </div>
-                <div style="
-                    height:${Math.max(6, Math.round(point.score * 0.55))}px;
-                    margin:4px auto 5px auto;
-                    width:8px;
-                    background:${escapeAttribute(getTrendLevelColor(point.operationalLevel))};
-                    border-radius:3px 3px 0 0;">
-                </div>
-                <div style="color:#5f6b7a;font-size:9px;line-height:12px;">
-                    ${escapeHtml(formatTrendDate(point.timestamp))}
-                </div>
+                style="width:${100 / recentPoints.length}%;padding:0 2px 4px 2px;color:#172033;font-size:11px;line-height:14px;font-weight:700;">
+                ${Math.round(point.score)}
             </td>`
+    ).join("");
+
+    const barCells = recentPoints.map(
+        point => {
+            const barHeight = Math.max(6, Math.round(point.score * 0.48));
+            const spacerHeight = Math.max(0, 48 - barHeight);
+            const color = escapeAttribute(getTrendLevelColor(point.operationalLevel));
+
+            return `
+                <td valign="bottom" align="center"
+                    style="width:${100 / recentPoints.length}%;height:48px;padding:0 2px;">
+                    <table role="presentation" width="8" height="48"
+                        cellspacing="0" cellpadding="0" border="0" align="center"
+                        style="width:8px;height:48px;border-collapse:collapse;">
+                        ${spacerHeight > 0
+                            ? `<tr><td height="${spacerHeight}"
+                                style="height:${spacerHeight}px;font-size:1px;line-height:1px;">&nbsp;</td></tr>`
+                            : ""
+                        }
+                        <tr>
+                            <td height="${barHeight}" bgcolor="${color}"
+                                style="height:${barHeight}px;background-color:${color};font-size:1px;line-height:1px;">&nbsp;</td>
+                        </tr>
+                    </table>
+                </td>`;
+        }
+    ).join("");
+
+    const timestampCells = recentPoints.map(
+        point => {
+            const timestamp = formatTrendEmailTimestamp(point.timestamp);
+            return `
+                <td valign="top" align="center"
+                    style="width:${100 / recentPoints.length}%;padding:5px 2px 0 2px;color:#5f6b7a;font-size:8px;line-height:11px;">
+                    ${escapeHtml(timestamp.date)}<br>${escapeHtml(timestamp.time)}
+                </td>`;
+        }
     ).join("");
 
     const latest = recentPoints[recentPoints.length - 1];
 
     return `
-        <div style="border:1px solid #d8dee8;border-radius:8px;padding:12px 12px 10px 12px;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
-                border="0" style="width:100%;border-collapse:collapse;">
-                <tr>${cells}</tr>
-            </table>
-            <div style="margin-top:8px;color:#5f6b7a;font-size:11px;line-height:16px;text-align:right;">
-                Latest: HRI ${Math.round(latest.score)} · ${escapeHtml(latest.operationalLevel)}
-            </div>
-        </div>`;
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+            style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid #d8dee8;border-radius:8px;">
+            <tr>
+                <td style="padding:11px 10px 9px 10px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                        style="width:100%;border-collapse:collapse;table-layout:fixed;">
+                        <tr>${scoreCells}</tr>
+                        <tr>${barCells}</tr>
+                        <tr>${timestampCells}</tr>
+                    </table>
+                    <div style="margin-top:8px;color:#5f6b7a;font-size:10px;line-height:15px;text-align:right;">
+                        Latest: HRI ${Math.round(latest.score)} · ${escapeHtml(latest.operationalLevel)}
+                    </div>
+                </td>
+            </tr>
+        </table>`;
+}
+
+
+function formatTrendEmailTimestamp(value:string):{date:string;time:string} {
+
+    const date = new Date(value);
+
+    if(Number.isNaN(date.getTime())){
+        return {date:"--", time:"--"};
+    }
+
+    return {
+        date:date.toLocaleDateString(
+            "en-US",
+            {month:"numeric", day:"numeric"}
+        ),
+        time:date.toLocaleTimeString(
+            "en-US",
+            {hour:"numeric", minute:"2-digit"}
+        )
+    };
+
 }
 
 
@@ -1238,18 +1292,6 @@ function getTrendLevelColor(level:string):string {
         case "Bravo": return "#1565c0";
         default: return "#2e7d32";
     }
-}
-
-
-function formatTrendDate(value:string):string {
-
-    const date = new Date(value);
-    if(Number.isNaN(date.getTime())) return "--";
-
-    return date.toLocaleDateString(
-        "en-US",
-        { month:"numeric", day:"numeric" }
-    );
 }
 
 
