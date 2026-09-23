@@ -214,49 +214,159 @@ function renderStatusStrip(
 ):void {
 
     const y = document.y;
-    const height = 46;
+    const height = 78;
 
     document
         .roundedRect(PAGE_MARGIN, y, CONTENT_WIDTH, height, 7)
         .fillAndStroke(LIGHT_BACKGROUND, BORDER);
 
     document
-        .rect(PAGE_MARGIN, y, 5, height)
-        .fill(normalizeColor(report.operationalColor));
+        .fillColor(BRAND_DARK)
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text("Overall Hospital Readiness", PAGE_MARGIN + 16, y + 11, { width:260 });
 
-    const cells = [
-        { label:"HRI SCORE", value:String(Math.round(report.hriScore)) },
-        { label:"OPERATIONAL LEVEL", value:report.operationalLevel },
-        { label:"TREND", value:report.riskDirection },
-        { label:"CONFIDENCE", value:report.confidence },
-        { label:"PRIORITY ACTIONS", value:String(report.priorityActionCount) }
-    ];
+    document
+        .fillColor(BRAND_MUTED)
+        .font("Helvetica")
+        .fontSize(7.2)
+        .text(
+            "The Hospital Readiness Index (HRI) reflects current operational pressure across the emergency department and inpatient capacity.",
+            PAGE_MARGIN + 16,
+            y + 28,
+            { width:280, lineGap:1 }
+        );
 
-    const cellWidth = (CONTENT_WIDTH - 18) / cells.length;
-
-    cells.forEach((cell, index) => {
-        const x = PAGE_MARGIN + 14 + index * cellWidth;
-
-        document
-            .fillColor(BRAND_MUTED)
-            .font("Helvetica-Bold")
-            .fontSize(6.2)
-            .text(cell.label, x, y + 8, {
-                width:cellWidth - 8
-            });
-
-        document
-            .fillColor(BRAND_DARK)
-            .font("Helvetica-Bold")
-            .fontSize(index === 0 ? 17 : 11)
-            .text(cell.value, x, y + 20, {
-                width:cellWidth - 8,
-                ellipsis:true
-            });
-    });
+    renderHriGauge(document, report, PAGE_MARGIN + 315, y + 5, 185, 68);
+    renderSurgeStatus(document, report, PAGE_WIDTH - PAGE_MARGIN - 185, y + 7, 172, 64);
 
     document.y = y + height + 7;
 }
+
+
+function renderSurgeStatus(
+    document:PDFKit.PDFDocument,
+    report:ExecutiveReportPayload,
+    x:number,
+    y:number,
+    width:number,
+    height:number
+):void {
+
+    const color = getSurgeStatusColor(report.operationalLevel);
+
+    document
+        .roundedRect(x, y, width, height, 6)
+        .lineWidth(1.4)
+        .fillAndStroke(WHITE, color);
+
+    document
+        .fillColor(BRAND_MUTED)
+        .font("Helvetica-Bold")
+        .fontSize(6.5)
+        .text("CURRENT SURGE STATUS", x + 8, y + 10, { width:width - 16, align:"center" });
+
+    document
+        .fillColor(color)
+        .font("Helvetica-Bold")
+        .fontSize(19)
+        .text(report.operationalLevel.toUpperCase(), x + 8, y + 25, { width:width - 16, align:"center", ellipsis:true });
+}
+
+
+function getSurgeStatusColor(level:string):string {
+    switch(level.trim().toLowerCase()){
+        case "echo": return "#111111";
+        case "delta": return "#D64545";
+        case "charlie": return "#F28C28";
+        case "bravo": return "#C69A00";
+        default: return "#2E7D32";
+    }
+}
+
+
+function renderHriGauge(
+    document:PDFKit.PDFDocument,
+    report:ExecutiveReportPayload,
+    x:number,
+    y:number,
+    width:number,
+    height:number
+):void {
+
+    const score = Math.max(0, Math.min(100, report.hriScore));
+    const centerX = x + width / 2;
+    const centerY = y + height - 12;
+    const radius = Math.min(width / 2 - 14, height - 18);
+    const lineWidth = 11;
+
+    const segments = [
+        {start:180, end:144, color:"#2E7D32"},
+        {start:144, end:108, color:"#F9C74F"},
+        {start:108, end:72, color:"#F28C28"},
+        {start:72, end:36, color:"#D64545"},
+        {start:36, end:0, color:"#111111"}
+    ];
+
+    for(const segment of segments){
+        document
+            .path(createArcPath(centerX, centerY, radius, segment.start, segment.end))
+            .lineWidth(lineWidth)
+            .strokeColor(segment.color)
+            .stroke();
+    }
+
+    const needleAngle = 180 - score * 1.8;
+    const needleRadians = needleAngle * Math.PI / 180;
+    const needleLength = radius - 8;
+    const needleX = centerX + Math.cos(needleRadians) * needleLength;
+    const needleY = centerY - Math.sin(needleRadians) * needleLength;
+
+    document
+        .moveTo(centerX, centerY)
+        .lineTo(needleX, needleY)
+        .lineWidth(1.8)
+        .strokeColor(BRAND_DARK)
+        .stroke();
+
+    document.circle(centerX, centerY, 2.5).fillColor(BRAND_DARK).fill();
+
+    document
+        .fillColor(BRAND_DARK)
+        .font("Helvetica-Bold")
+        .fontSize(18)
+        .text(String(Math.round(score)), centerX - 30, centerY - 24, { width:60, align:"center" });
+
+    document
+        .fillColor(BRAND_MUTED)
+        .font("Helvetica-Bold")
+        .fontSize(6.5)
+        .text("HRI", centerX - 25, centerY - 5, { width:50, align:"center" });
+}
+
+
+function createArcPath(
+    centerX:number,
+    centerY:number,
+    radius:number,
+    startDegrees:number,
+    endDegrees:number
+):string {
+    const point = (degrees:number) => {
+        const radians = degrees * Math.PI / 180;
+        return {
+            x:centerX + radius * Math.cos(radians),
+            y:centerY - radius * Math.sin(radians)
+        };
+    };
+
+    const start = point(startDegrees);
+    const end = point(endDegrees);
+    const largeArc = Math.abs(startDegrees - endDegrees) > 180 ? 1 : 0;
+
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+}
+
 
 function renderDomainRow(
     document:PDFKit.PDFDocument,
@@ -331,114 +441,63 @@ function renderCompactTrend(
 ):void {
 
     const points = Array.isArray(report.trend)
-        ? report.trend.slice(-24)
+        ? report.trend.slice(-12)
         : [];
 
-    renderCompactSectionLabel(document, "HRI Trend");
+    renderCompactSectionLabel(document, "Recent Hospital Readiness Index (HRI)");
 
     const y = document.y;
-    const height = 64;
+    const height = 86;
 
     document
         .roundedRect(PAGE_MARGIN, y, CONTENT_WIDTH, height, 6)
         .fillAndStroke(WHITE, BORDER);
 
     if(points.length === 0){
-        document
-            .fillColor(BRAND_MUTED)
-            .font("Helvetica")
-            .fontSize(7.5)
-            .text(
-                "No saved historical assessments are available.",
-                PAGE_MARGIN + 10,
-                y + 24
-            );
-
+        document.fillColor(BRAND_MUTED).font("Helvetica").fontSize(7.5)
+            .text("No saved historical assessments are available.", PAGE_MARGIN + 10, y + 32);
         document.y = y + height + 6;
         return;
     }
 
-    const plotLeft = PAGE_MARGIN + 28;
-    const plotRight = PAGE_WIDTH - PAGE_MARGIN - 82;
-    const plotTop = y + 8;
-    const plotBottom = y + 45;
+    const plotLeft = PAGE_MARGIN + 30;
+    const plotRight = PAGE_WIDTH - PAGE_MARGIN - 18;
+    const plotTop = y + 10;
+    const plotBottom = y + 52;
     const plotWidth = plotRight - plotLeft;
     const plotHeight = plotBottom - plotTop;
 
-    for(const value of [100, 50, 0]){
+    for(const value of [100, 75, 50, 25, 0]){
         const lineY = plotTop + (100 - value) / 100 * plotHeight;
-
-        document
-            .moveTo(plotLeft, lineY)
-            .lineTo(plotRight, lineY)
-            .strokeColor(BORDER)
-            .lineWidth(0.35)
-            .stroke();
-
-        document
-            .fillColor(BRAND_MUTED)
-            .font("Helvetica")
-            .fontSize(5.5)
-            .text(String(value), PAGE_MARGIN + 5, lineY - 3, {
-                width:18,
-                align:"right"
-            });
+        document.moveTo(plotLeft, lineY).lineTo(plotRight, lineY)
+            .strokeColor(BORDER).lineWidth(0.35).stroke();
+        document.fillColor(BRAND_MUTED).font("Helvetica").fontSize(5.3)
+            .text(String(value), PAGE_MARGIN + 5, lineY - 3, {width:20, align:"right"});
     }
 
     points.forEach((point, index) => {
         const score = Math.max(0, Math.min(100, point.score));
-        const x = points.length === 1
-            ? plotLeft + plotWidth / 2
-            : plotLeft + index / (points.length - 1) * plotWidth;
+        const x = points.length === 1 ? plotLeft + plotWidth / 2 : plotLeft + index / (points.length - 1) * plotWidth;
         const pointY = plotTop + (100 - score) / 100 * plotHeight;
 
         if(index > 0){
             const previous = Math.max(0, Math.min(100, points[index - 1].score));
             const previousX = plotLeft + (index - 1) / (points.length - 1) * plotWidth;
             const previousY = plotTop + (100 - previous) / 100 * plotHeight;
-
-            document
-                .moveTo(previousX, previousY)
-                .lineTo(x, pointY)
-                .strokeColor(BRAND_DARK)
-                .lineWidth(1.15)
-                .stroke();
+            document.moveTo(previousX, previousY).lineTo(x, pointY)
+                .strokeColor("#1565C0").lineWidth(1.4).stroke();
         }
 
-        document
-            .circle(x, pointY, index === points.length - 1 ? 2.2 : 1.25)
-            .fillColor(BRAND_DARK)
-            .fill();
+        document.circle(x, pointY, 1.8).fillColor("#1565C0").fill();
+        document.fillColor(BRAND_DARK).font("Helvetica-Bold").fontSize(5.4)
+            .text(String(Math.round(score)), x - 12, pointY - 10, {width:24, align:"center"});
+        document.fillColor(BRAND_MUTED).font("Helvetica").fontSize(4.7)
+            .text(formatPdfTrendTimestamp(point.timestamp), x - 27, plotBottom + 5, {width:54, align:"center"});
     });
-
-    const first = points[0];
-    const last = points[points.length - 1];
-
-    document
-        .fillColor(BRAND_MUTED)
-        .font("Helvetica")
-        .fontSize(5.7)
-        .text(formatPdfTrendTimestamp(first.timestamp), plotLeft, plotBottom + 4, {
-            width:plotWidth / 2
-        })
-        .text(formatPdfTrendTimestamp(last.timestamp), plotLeft + plotWidth / 2, plotBottom + 4, {
-            width:plotWidth / 2,
-            align:"right"
-        });
-
-    document
-        .fillColor(BRAND_DARK)
-        .font("Helvetica-Bold")
-        .fontSize(7)
-        .text(
-            `Latest\nHRI ${Math.round(last.score)} · ${last.operationalLevel}`,
-            plotRight + 10,
-            y + 17,
-            { width:66, align:"center" }
-        );
 
     document.y = y + height + 6;
 }
+
 
 function renderConditionsAndAcuity(
     document:PDFKit.PDFDocument,
@@ -898,10 +957,3 @@ function formatBedAvailability(value:number):string {
     return `${formatNumber(value)} beds`;
 }
 
-function normalizeColor(value:string):string {
-    if(/^#[0-9a-f]{6}$/i.test(value)){
-        return value;
-    }
-
-    return BRAND_DARK;
-}

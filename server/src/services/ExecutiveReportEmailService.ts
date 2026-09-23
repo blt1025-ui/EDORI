@@ -408,9 +408,7 @@ export async function sendExecutiveReportEmail(
  * Build the concise HTML executive summary.
  */
 function createExecutiveSummaryHtml(
-
     report:ExecutiveReportPayload
-
 ):string {
 
     const projectedBeds =
@@ -446,184 +444,86 @@ function createExecutiveSummaryHtml(
         }
     ]);
 
-    const acuityCards = createEmailCardRow([
-        {
-            label:"ESI 1",
-            value:formatNumber(report.acuity.esi1),
-            detail:"Highest acuity"
-        },
-        {
-            label:"ESI 2",
-            value:formatNumber(report.acuity.esi2),
-            detail:"High acuity"
-        },
-        {
-            label:"ESI 3–5",
-            value:formatNumber(report.acuity.esi3to5),
-            detail:"Remaining census"
-        },
-        {
-            label:"High Acuity",
-            value:formatNumber(report.acuity.highAcuityCount),
-            detail:`${formatNumber(report.acuity.highAcuityPercent)}% of ED census`
-        }
-    ]);
-
     return `<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-    <title>Hospital Readiness Executive Assessment Report</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hospital Readiness Executive Assessment Report</title>
 </head>
-
-<body
-    style="
-        margin:0;
-        padding:0;
-        background:#f3f5f8;
-        font-family:Arial, Helvetica, sans-serif;
-        color:#172033;
-    "
->
-<table
-    role="presentation"
-    width="100%"
-    cellspacing="0"
-    cellpadding="0"
-    border="0"
-    style="width:100%;background:#f3f5f8;"
->
+<body style="margin:0;padding:0;background-color:#eef2f6;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#eef2f6" style="width:100%;background-color:#eef2f6;">
 <tr>
-<td align="center" style="padding:22px 10px;">
+<td align="center" style="padding:18px 8px;">
 
-<table
-    role="presentation"
-    width="760"
-    cellspacing="0"
-    cellpadding="0"
-    border="0"
-    style="
-        width:100%;
-        max-width:760px;
-        background:#ffffff;
-        border-collapse:separate;
-        border-spacing:0;
-        border:1px solid #d8dee8;
-        border-radius:12px;
-        overflow:hidden;
-    "
->
-
+<table role="presentation" width="760" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff"
+    style="width:760px;max-width:760px;background-color:#ffffff;border:1px solid #d8dee8;border-collapse:separate;">
 <tr>
-<td style="padding:22px 24px 14px 24px;">
-    <div
-        style="
-            color:#5f6b7a;
-            font-size:10px;
-            line-height:14px;
-            font-weight:700;
-            letter-spacing:1.1px;
-            text-transform:uppercase;
-        "
-    >
-        Hospital Readiness Index
+<td style="padding:22px 24px 12px 24px;">
+    <div style="color:#5f6b7a;font-size:10px;line-height:14px;font-weight:bold;letter-spacing:1px;">
+        HOSPITAL READINESS INDEX
     </div>
-
-    <div
-        style="
-            margin-top:4px;
-            color:#172033;
-            font-size:24px;
-            line-height:29px;
-            font-weight:700;
-        "
-    >
+    <div style="padding-top:3px;color:#172033;font-size:24px;line-height:29px;font-weight:bold;">
         Executive Assessment Report
     </div>
-
-    <div
-        style="
-            margin-top:5px;
-            color:#5f6b7a;
-            font-size:12px;
-            line-height:17px;
-        "
-    >
+    <div style="padding-top:5px;color:#5f6b7a;font-size:12px;line-height:17px;">
         Assessment ${escapeHtml(formatDateTime(report.assessmentTimestamp))}
     </div>
 </td>
 </tr>
 
 <tr>
-<td style="padding:0 24px 16px 24px;">
-<table
-    role="presentation"
-    width="100%"
-    cellspacing="0"
-    cellpadding="0"
-    border="0"
-    style="
-        width:100%;
-        border-collapse:separate;
-        border-spacing:0;
-        background:#f4f6f9;
-        border-left:6px solid ${escapeAttribute(normalizeColor(report.operationalColor))};
-        border-radius:8px;
-    "
->
+<td style="padding:0 24px 15px 24px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f8fafc"
+    style="width:100%;background-color:#f8fafc;border:1px solid #d8dee8;border-collapse:collapse;">
 <tr>
-    ${createStatusCell("HRI Score", String(Math.round(report.hriScore)), true)}
-    ${createStatusCell("Operational Level", report.operationalLevel)}
-    ${createStatusCell("Trend", report.riskDirection)}
-    ${createStatusCell("Confidence", report.confidence)}
-    ${createStatusCell("Priority Actions", String(report.priorityActionCount))}
+<td width="37%" valign="middle" style="width:37%;padding:16px;">
+    <div style="color:#172033;font-size:15px;line-height:20px;font-weight:bold;">Overall Hospital Readiness</div>
+    <div style="padding-top:5px;color:#5f6b7a;font-size:11px;line-height:16px;">
+        Current Hospital Readiness Index and surge status.
+    </div>
+</td>
+<td width="34%" valign="middle" align="center" style="width:34%;padding:12px 8px;">
+    ${createHriGaugeHtml(report)}
+</td>
+<td width="29%" valign="middle" align="center" style="width:29%;padding:12px 14px;">
+    ${createSurgeStatusHtml(report)}
+</td>
 </tr>
 </table>
 </td>
 </tr>
 
 <tr>
-<td style="padding:0 24px 16px 24px;">
+<td style="padding:0 24px 15px 24px;">
     ${createCompactSectionHeading("Hospital Readiness Domains")}
     ${domainCards}
 </td>
 </tr>
 
 <tr>
-<td style="padding:0 24px 16px 24px;">
+<td style="padding:0 24px 15px 24px;">
     ${createCompactSectionHeading("HRI Trend")}
     ${createHriTrendHtml(report)}
 </td>
 </tr>
 
 <tr>
-<td style="padding:0 24px 16px 24px;">
-<table
-    role="presentation"
-    width="100%"
-    cellspacing="0"
-    cellpadding="0"
-    border="0"
-    style="width:100%;border-collapse:collapse;"
->
+<td style="padding:0 24px 15px 24px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;">
 <tr>
-<td width="49%" valign="top" style="width:49%;padding:0 8px 0 0;">
+<td width="49%" valign="top" style="width:49%;padding:0 7px 0 0;">
     ${createCompactSectionHeading("Current Conditions")}
     ${createKeyValuePanel([
         ["ED Volume", `${formatNumber(report.capacity.totalEDVolume)} (${formatNumber(report.capacity.edCapacityPercent)}%)`],
+        ["ED High Acuity", `${formatNumber(report.acuity.highAcuityCount)} (${formatNumber(report.acuity.highAcuityPercent)}%)`],
         ["Boarding", `${formatNumber(report.capacity.boardedPatients)} (${formatNumber(report.capacity.boardingSharePercent)}%)`],
-        ["Acute Beds (Occupied Beds / Staffed Beds)", `${formatNumber(report.capacity.occupiedAcuteCareBeds)} / ${formatNumber(report.capacity.staffedAcuteCareBeds)}`],
-        ["Critical Beds (Occupied Beds / Staffed Beds)", `${formatNumber(report.capacity.occupiedCriticalCareBeds)} / ${formatNumber(report.capacity.staffedCriticalCareBeds)}`]
+        ["Acute Beds (Occupied / Staffed)", `${formatNumber(report.capacity.occupiedAcuteCareBeds)} / ${formatNumber(report.capacity.staffedAcuteCareBeds)}`],
+        ["Critical Beds (Occupied / Staffed)", `${formatNumber(report.capacity.occupiedCriticalCareBeds)} / ${formatNumber(report.capacity.staffedCriticalCareBeds)}`]
     ])}
 </td>
-
 <td width="2%" style="width:2%;font-size:1px;line-height:1px;">&nbsp;</td>
-
-<td width="49%" valign="top" style="width:49%;padding:0 0 0 8px;">
+<td width="49%" valign="top" style="width:49%;padding:0 0 0 7px;">
     ${createCompactSectionHeading("Four-Hour Capacity Forecast")}
     ${createKeyValuePanel([
         ["Direct Admissions", formatNumber(report.capacity.knownDirectAdmissions4h)],
@@ -639,31 +539,15 @@ function createExecutiveSummaryHtml(
 </tr>
 
 <tr>
-<td style="padding:0 24px 16px 24px;">
-    ${createCompactSectionHeading("Clinical Acuity")}
-    ${acuityCards}
-</td>
-</tr>
-
+<td style="padding:0 24px 15px 24px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;">
 <tr>
-<td style="padding:0 24px 16px 24px;">
-<table
-    role="presentation"
-    width="100%"
-    cellspacing="0"
-    cellpadding="0"
-    border="0"
-    style="width:100%;border-collapse:collapse;"
->
-<tr>
-<td width="49%" valign="top" style="width:49%;padding:0 8px 0 0;">
+<td width="49%" valign="top" style="width:49%;padding:0 7px 0 0;">
     ${createCompactSectionHeading("Primary Drivers")}
     ${driverMarkup}
 </td>
-
 <td width="2%" style="width:2%;font-size:1px;line-height:1px;">&nbsp;</td>
-
-<td width="49%" valign="top" style="width:49%;padding:0 0 0 8px;">
+<td width="49%" valign="top" style="width:49%;padding:0 0 0 7px;">
     ${createCompactSectionHeading("Recommended Actions")}
     ${recommendationMarkup}
 </td>
@@ -675,39 +559,14 @@ function createExecutiveSummaryHtml(
 <tr>
 <td style="padding:0 24px 20px 24px;">
     ${createCompactSectionHeading("Operational Outlook")}
-    <table
-        role="presentation"
-        width="100%"
-        cellspacing="0"
-        cellpadding="0"
-        border="0"
-        style="
-            width:100%;
-            background:#f4f6f9;
-            border:1px solid #d8dee8;
-            border-radius:8px;
-        "
-    >
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f4f6f9"
+        style="width:100%;background-color:#f4f6f9;border:1px solid #d8dee8;border-collapse:collapse;">
     <tr>
     <td style="padding:13px 15px;">
-        <div
-            style="
-                color:#172033;
-                font-size:14px;
-                line-height:19px;
-                font-weight:700;
-            "
-        >
+        <div style="color:#172033;font-size:14px;line-height:19px;font-weight:bold;">
             ${escapeHtml(report.outlook.heading)}
         </div>
-        <div
-            style="
-                margin-top:4px;
-                color:#5f6b7a;
-                font-size:12px;
-                line-height:18px;
-            "
-        >
+        <div style="padding-top:4px;color:#5f6b7a;font-size:12px;line-height:18px;">
             ${escapeHtml(report.outlook.description)}
         </div>
     </td>
@@ -717,73 +576,20 @@ function createExecutiveSummaryHtml(
 </tr>
 
 <tr>
-<td
-    style="
-        padding:16px 24px;
-        background:#172033;
-        color:#dfe5ee;
-        font-size:10px;
-        line-height:15px;
-    "
->
+<td bgcolor="#172033" style="padding:15px 24px;background-color:#172033;color:#dfe5ee;font-size:10px;line-height:15px;">
     The complete Executive Assessment Report is attached as a PDF.
     <br><br>
     The Hospital Readiness Index is an operational decision-support tool.
-    Results should be interpreted with clinical and administrative judgment
-    and local surge policies.
+    Results should be interpreted with clinical and administrative judgment and local surge policies.
 </td>
 </tr>
-
 </table>
+
 </td>
 </tr>
 </table>
 </body>
 </html>`;
-
-}
-
-
-function createStatusCell(
-    label:string,
-    value:string,
-    emphasized:boolean = false
-):string {
-
-    return `
-        <td
-            valign="top"
-            align="center"
-            style="
-                padding:13px 7px;
-                border-right:1px solid #d8dee8;
-            "
-        >
-            <div
-                style="
-                    color:#5f6b7a;
-                    font-size:9px;
-                    line-height:12px;
-                    font-weight:700;
-                    text-transform:uppercase;
-                "
-            >
-                ${escapeHtml(label)}
-            </div>
-
-            <div
-                style="
-                    margin-top:3px;
-                    color:#172033;
-                    font-size:${emphasized ? "24px" : "15px"};
-                    line-height:${emphasized ? "27px" : "20px"};
-                    font-weight:700;
-                "
-            >
-                ${escapeHtml(value)}
-            </div>
-        </td>
-    `;
 
 }
 
@@ -1076,8 +882,6 @@ function createExecutiveSummaryText(
 
         `Trend: ${report.riskDirection}`,
 
-        `Confidence: ${report.confidence}`,
-
         "",
 
         "Hospital Readiness Domains",
@@ -1171,80 +975,245 @@ function createExecutiveSummaryText(
 
 
 
+function createHriGaugeHtml(report:ExecutiveReportPayload):string {
+
+    const score = Math.max(0, Math.min(100, Math.round(report.hriScore)));
+    const pointer = Math.max(2, Math.min(98, score));
+
+    /*
+     * Deliberately built from ordinary HTML tables instead of SVG/data-URI
+     * images. Outlook and several enterprise email clients block embedded
+     * SVG/data images, while this renders reliably without downloading an
+     * external image.
+     */
+    return `
+        <table role="presentation" width="190" cellspacing="0" cellpadding="0" border="0"
+            style="width:190px;border-collapse:collapse;">
+            <tr>
+                <td align="center" style="color:#172033;font-size:27px;line-height:29px;font-weight:700;">${score}</td>
+            </tr>
+            <tr>
+                <td align="center" style="padding:0 0 5px 0;color:#5f6b7a;font-size:9px;line-height:12px;font-weight:700;">HRI</td>
+            </tr>
+            <tr>
+                <td style="padding:0 0 2px 0;">
+                    <div style="position:relative;width:190px;height:8px;font-size:1px;line-height:1px;">
+                        <table role="presentation" width="190" cellspacing="0" cellpadding="0" border="0" style="width:190px;border-collapse:collapse;">
+                            <tr>
+                                <td width="38" height="8" bgcolor="#2E7D32" style="width:38px;height:8px;background:#2E7D32;">&nbsp;</td>
+                                <td width="38" height="8" bgcolor="#F9C74F" style="width:38px;height:8px;background:#F9C74F;">&nbsp;</td>
+                                <td width="38" height="8" bgcolor="#F28C28" style="width:38px;height:8px;background:#F28C28;">&nbsp;</td>
+                                <td width="38" height="8" bgcolor="#D64545" style="width:38px;height:8px;background:#D64545;">&nbsp;</td>
+                                <td width="38" height="8" bgcolor="#111111" style="width:38px;height:8px;background:#111111;">&nbsp;</td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding:0;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                            <td width="${pointer}%" style="width:${pointer}%;font-size:1px;line-height:1px;">&nbsp;</td>
+                            <td width="1" align="center" style="width:1px;color:#172033;font-size:12px;line-height:10px;">▲</td>
+                            <td style="font-size:1px;line-height:1px;">&nbsp;</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;">
+                        <tr>
+                            <td align="left" style="color:#5f6b7a;font-size:8px;line-height:10px;">0</td>
+                            <td align="right" style="color:#5f6b7a;font-size:8px;line-height:10px;">100</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>`;
+}
+
+
+function createSurgeStatusHtml(report:ExecutiveReportPayload):string {
+
+    const level = escapeHtml(report.operationalLevel);
+    const color = escapeAttribute(getSurgeStatusColor(report.operationalLevel));
+
+    return `
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+            style="width:100%;border-collapse:separate;border-spacing:0;border:2px solid ${color};border-radius:7px;background:#ffffff;">
+            <tr>
+                <td align="center" style="padding:7px 8px 2px 8px;color:#5f6b7a;font-size:9px;line-height:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
+                    Current Surge Status
+                </td>
+            </tr>
+            <tr>
+                <td align="center" style="padding:0 8px 8px 8px;color:${color};font-size:23px;line-height:27px;font-weight:700;">
+                    ${level}
+                </td>
+            </tr>
+        </table>`;
+}
+
+
+function getSurgeStatusColor(level:string):string {
+    switch(level.trim().toLowerCase()){
+        case "echo": return "#111111";
+        case "delta": return "#D64545";
+        case "charlie": return "#F28C28";
+        case "bravo": return "#C69A00";
+        default: return "#2E7D32";
+    }
+}
+
+
 function createHriTrendHtml(report:ExecutiveReportPayload):string {
 
     if(report.trend.length === 0){
-        return `<div style="color:#5f6b7a;font-size:13px;line-height:19px;">
-            No saved historical assessments are available.
-        </div>`;
+        return `
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="width:100%;border:1px solid #d8dee8;border-collapse:collapse;background-color:#ffffff;">
+            <tr>
+            <td style="padding:14px;color:#5f6b7a;font-size:11px;line-height:16px;">
+                No saved historical assessments are available.
+            </td>
+            </tr>
+            </table>
+        `;
     }
 
     const recentPoints = report.trend.slice(-12);
 
-    const scoreCells = recentPoints.map(
-        point => `
-            <td valign="bottom" align="center"
-                style="width:${100 / recentPoints.length}%;padding:0 2px 4px 2px;color:#172033;font-size:11px;line-height:14px;font-weight:700;">
-                ${Math.round(point.score)}
-            </td>`
-    ).join("");
+    const pointCells = recentPoints.map(point => {
 
-    const barCells = recentPoints.map(
-        point => {
-            const barHeight = Math.max(6, Math.round(point.score * 0.48));
-            const spacerHeight = Math.max(0, 48 - barHeight);
-            const color = escapeAttribute(getTrendLevelColor(point.operationalLevel));
+        const score =
+            Math.max(
+                0,
+                Math.min(
+                    100,
+                    Math.round(point.score)
+                )
+            );
 
-            return `
-                <td valign="bottom" align="center"
-                    style="width:${100 / recentPoints.length}%;height:48px;padding:0 2px;">
-                    <table role="presentation" width="8" height="48"
-                        cellspacing="0" cellpadding="0" border="0" align="center"
-                        style="width:8px;height:48px;border-collapse:collapse;">
-                        ${spacerHeight > 0
-                            ? `<tr><td height="${spacerHeight}"
-                                style="height:${spacerHeight}px;font-size:1px;line-height:1px;">&nbsp;</td></tr>`
-                            : ""
-                        }
-                        <tr>
-                            <td height="${barHeight}" bgcolor="${color}"
-                                style="height:${barHeight}px;background-color:${color};font-size:1px;line-height:1px;">&nbsp;</td>
-                        </tr>
-                    </table>
-                </td>`;
-        }
-    ).join("");
+        const timestamp =
+            formatTrendEmailTimestamp(
+                point.timestamp
+            );
 
-    const timestampCells = recentPoints.map(
-        point => {
-            const timestamp = formatTrendEmailTimestamp(point.timestamp);
-            return `
-                <td valign="top" align="center"
-                    style="width:${100 / recentPoints.length}%;padding:5px 2px 0 2px;color:#5f6b7a;font-size:8px;line-height:11px;">
-                    ${escapeHtml(timestamp.date)}<br>${escapeHtml(timestamp.time)}
-                </td>`;
-        }
-    ).join("");
+        const color =
+            getSurgeStatusColor(
+                point.operationalLevel
+            );
 
-    const latest = recentPoints[recentPoints.length - 1];
+        return `
+            <td
+                width="${100 / recentPoints.length}%"
+                valign="bottom"
+                align="center"
+                style="
+                    width:${100 / recentPoints.length}%;
+                    padding:0 2px;
+                "
+            >
+                <div
+                    style="
+                        color:#172033;
+                        font-size:10px;
+                        line-height:13px;
+                        font-weight:bold;
+                    "
+                >
+                    ${score}
+                </div>
+
+                <table
+                    role="presentation"
+                    width="100%"
+                    cellspacing="0"
+                    cellpadding="0"
+                    border="0"
+                    style="
+                        width:100%;
+                        border-collapse:collapse;
+                        margin-top:4px;
+                    "
+                >
+                <tr>
+                <td
+                    height="6"
+                    bgcolor="${escapeAttribute(color)}"
+                    style="
+                        height:6px;
+                        background-color:${escapeAttribute(color)};
+                        font-size:1px;
+                        line-height:1px;
+                    "
+                >
+                    &nbsp;
+                </td>
+                </tr>
+                </table>
+
+                <div
+                    style="
+                        padding-top:5px;
+                        color:#5f6b7a;
+                        font-size:7px;
+                        line-height:9px;
+                        white-space:nowrap;
+                    "
+                >
+                    ${escapeHtml(timestamp.date)}
+                    <br>
+                    ${escapeHtml(timestamp.time)}
+                </div>
+            </td>
+        `;
+
+    }).join("");
 
     return `
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
-            style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid #d8dee8;border-radius:8px;">
+        <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            border="0"
+            bgcolor="#ffffff"
+            style="
+                width:100%;
+                background-color:#ffffff;
+                border:1px solid #d8dee8;
+                border-collapse:collapse;
+            "
+        >
+        <tr>
+        <td style="padding:12px 10px 10px 10px;">
+
+            <table
+                role="presentation"
+                width="100%"
+                cellspacing="0"
+                cellpadding="0"
+                border="0"
+                style="
+                    width:100%;
+                    border-collapse:collapse;
+                    table-layout:fixed;
+                "
+            >
             <tr>
-                <td style="padding:11px 10px 9px 10px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
-                        style="width:100%;border-collapse:collapse;table-layout:fixed;">
-                        <tr>${scoreCells}</tr>
-                        <tr>${barCells}</tr>
-                        <tr>${timestampCells}</tr>
-                    </table>
-                    <div style="margin-top:8px;color:#5f6b7a;font-size:10px;line-height:15px;text-align:right;">
-                        Latest: HRI ${Math.round(latest.score)} · ${escapeHtml(latest.operationalLevel)}
-                    </div>
-                </td>
+                ${pointCells}
             </tr>
-        </table>`;
+            </table>
+
+
+        </td>
+        </tr>
+        </table>
+    `;
+
 }
 
 
@@ -1280,18 +1249,6 @@ function createHriTrendText(report:ExecutiveReportPayload):string[] {
         point =>
             `${formatTrendDateTime(point.timestamp)}: HRI ${Math.round(point.score)} (${point.operationalLevel})`
     );
-}
-
-
-function getTrendLevelColor(level:string):string {
-
-    switch(level){
-        case "Echo": return "#8f1d2c";
-        case "Delta": return "#c65d1e";
-        case "Charlie": return "#b88900";
-        case "Bravo": return "#1565c0";
-        default: return "#2e7d32";
-    }
 }
 
 
@@ -1691,28 +1648,6 @@ function formatBedAvailability(
     return `${formatNumber(
         value
     )} beds`;
-
-}
-
-
-function normalizeColor(
-
-    value:string
-
-):string {
-
-    if(
-        /^#[0-9a-f]{6}$/i.test(
-            value
-        )
-    ){
-
-        return value;
-
-    }
-
-
-    return "#172033";
 
 }
 

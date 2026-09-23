@@ -155,6 +155,20 @@ export function OperationalDetailPage():string {
 
                 </div>
 
+
+                <div class="executive-report-actions">
+
+                    <button
+                        id="sendExecutiveReportButton"
+                        class="executive-report-print-button"
+                        type="button"
+                        disabled
+                    >
+                        Send Executive Report
+                    </button>
+
+                </div>
+
             </div>
 
 
