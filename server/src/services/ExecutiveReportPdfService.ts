@@ -903,6 +903,7 @@ function formatDateTime(value:string):string {
     }
 
     return date.toLocaleString("en-US", {
+        timeZone:"America/New_York",
         month:"short",
         day:"numeric",
         year:"numeric",
@@ -920,6 +921,7 @@ function formatPdfTrendTimestamp(value:string):string {
     }
 
     return date.toLocaleString("en-US", {
+        timeZone:"America/New_York",
         month:"short",
         day:"numeric",
         hour:"numeric",
