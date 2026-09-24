@@ -21,15 +21,6 @@
 
 import {
 
-    AssessmentDetails
-
-}
-
-from "../AssessmentDetails";
-
-
-import {
-
     Drivers
 
 }
@@ -89,15 +80,6 @@ import {
 }
 
 from "../Recommendations";
-
-
-import {
-
-    ShiftHandoffSummary
-
-}
-
-from "../ShiftHandoffSummary";
 
 
 import {
@@ -437,44 +419,7 @@ export function OperationalDetailPage():string {
     </div>
 
 
-    ${CollapsiblePanel({
 
-        id:
-            "assessment-details-panel",
-
-        title:
-            "Assessment Details",
-
-        description:
-            "Submitted values and historical comparisons",
-
-        content:
-            AssessmentDetails(),
-
-        initiallyOpen:
-            false
-
-    })}
-
-
-    ${CollapsiblePanel({
-
-        id:
-            "shift-handoff-panel",
-
-        title:
-            "Shift Handoff Summary",
-
-        description:
-            "Operational handoff summary",
-
-        content:
-            ShiftHandoffSummary(),
-
-        initiallyOpen:
-            false
-
-    })}
 
 </div>
 
