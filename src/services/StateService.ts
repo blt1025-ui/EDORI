@@ -1323,7 +1323,7 @@ function normalizeAssessment(
 
     const expectedAvailableAcuteCareBeds =
 
-        normalizeNonNegativeNumber(
+        normalizeSignedNumber(
 
             candidate.expectedAvailableAcuteCareBeds
 
@@ -1631,42 +1631,14 @@ function normalizeAssessment(
     }
 
 
-    /**
-     * Occupied acute-care beds cannot exceed the
-     * currently staffed acute-care denominator.
+    /*
+     * Occupied acute-care and critical-care beds may
+     * legitimately exceed staffed capacity during surge.
+     *
+     * Preserve those values so downstream Hospital
+     * Readiness calculations can represent over-capacity
+     * conditions rather than rejecting the assessment.
      */
-    if(
-
-        occupiedAcuteCareBeds
-
-        >
-
-        staffedAcuteCareBeds
-
-    ){
-
-        return null;
-
-    }
-
-
-    /**
-     * Occupied critical-care beds cannot exceed the
-     * currently staffed critical-care denominator.
-     */
-    if(
-
-        occupiedCriticalCareBeds
-
-        >
-
-        staffedCriticalCareBeds
-
-    ){
-
-        return null;
-
-    }
 
 
     /**
@@ -1688,23 +1660,12 @@ function normalizeAssessment(
     }
 
 
-    /**
-     * Historical occupied acute-care beds cannot
-     * exceed historical staffed acute-care beds.
+    /*
+     * Historical occupied acute-care beds may exceed
+     * historical staffed capacity. In that case the
+     * expected available-bed value is negative and is
+     * intentionally preserved.
      */
-    if(
-
-        expectedOccupiedAcuteCareBeds
-
-        >
-
-        expectedStaffedAcuteCareBeds
-
-    ){
-
-        return null;
-
-    }
 
 
     /**
