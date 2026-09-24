@@ -1349,7 +1349,6 @@ function validateHistoricalExpectations(
             | "expectedEDBoarders"
             | "expectedStaffedAcuteCareBeds"
             | "expectedOccupiedAcuteCareBeds"
-            | "expectedAvailableAcuteCareBeds"
             | "expectedEDAdmissions4h"
             | "expectedDirectAdmissions4h"
             | "expectedSurgicalAdmissions4h"
@@ -1382,11 +1381,6 @@ function validateHistoricalExpectations(
         {
             key:"expectedOccupiedAcuteCareBeds",
             label:"Expected occupied acute-care beds"
-        },
-
-        {
-            key:"expectedAvailableAcuteCareBeds",
-            label:"Expected available acute-care beds"
         },
 
         {
@@ -1502,8 +1496,25 @@ function validateHistoricalExpectations(
         assessment.expectedStaffedAcuteCareBeds
     ){
 
+        warnings.push(
+            `Expected acute-care occupancy exceeds expected staffed capacity by ${assessment.expectedOccupiedAcuteCareBeds - assessment.expectedStaffedAcuteCareBeds} beds.`
+        );
+
+    }
+
+
+    /*
+     * Expected available acute-care beds may be negative
+     * when historical occupancy exceeds staffed capacity.
+     */
+    if(
+        !Number.isFinite(
+            assessment.expectedAvailableAcuteCareBeds
+        )
+    ){
+
         errors.push(
-            "Expected occupied acute-care beds cannot exceed expected staffed acute-care beds."
+            "Expected available acute-care beds must be a valid number."
         );
 
     }
